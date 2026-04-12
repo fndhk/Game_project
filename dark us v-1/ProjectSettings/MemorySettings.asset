@@ -32,4 +32,8 @@ MemorySettings:
     m_TempAllocatorSizeJobWorker: -1
     m_TempAllocatorSizeBackgroundWorker: -1
     m_TempAllocatorSizePreloadManager: -1
+<<<<<<< HEAD
   m_PlatformMemorySettings: {}
+=======
+  m_PlatformMemorySettings: []
+>>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c

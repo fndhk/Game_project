@@ -1,80 +1,57 @@
 using UnityEngine;
 
-// 이 스크립트는 1인칭 시점에서
-// 카메라 시점에 따라 플레이어가 움직이도록 만드는 마우스 시점 제어 스크립트이다.
-// 좌우 회전은 플레이어 몸체가 담당하고,
-// 위아래 회전은 카메라가 담당한다.
+// 1인칭 시점에서 마우스로 시야를 회전시키는 스크립트임
 public class MouseLook : MonoBehaviour
 {
-    [Header("참조")]
-    // 위아래 회전을 적용할 카메라 Transform이다.
-    // 보통 Main Camera를 연결하면 된다.
-    public Transform playerCamera;
+    // 좌우 회전을 담당할 플레이어 본체 Transform임
+    public Transform playerBody;
 
-    [Header("마우스 감도")]
-    // 좌우 회전 감도이다.
-    // 너무 빠르지 않게 적당히 낮춘 값으로 시작한다.
-    public float mouseSensitivityX = 100f;
+    // 마우스 감도 설정값임
+    public float mouseSensitivity = 200f;
 
-    // 위아래 회전 감도이다.
-    // 좌우와 비슷하거나 조금 낮게 두면 자연스럽다.
-    public float mouseSensitivityY = 95f;
+    // 위아래 회전값을 따로 저장해서 카메라 상하 시야에 사용함
+    private float xRotation = 0f;
 
-    [Header("위아래 시야 제한")]
-    // 위쪽으로 볼 수 있는 최대 각도이다.
-    public float maxLookUpAngle = 75f;
-
-    // 아래쪽으로 볼 수 있는 최대 각도이다.
-    public float maxLookDownAngle = -75f;
-
-    // 현재 위아래 회전값을 저장하는 변수이다.
-    private float pitch = 0f;
-
-    // 시작할 때 카메라 연결과 마우스 잠금을 처리한다.
-    private void Start()
+    void Start()
     {
-        // 카메라가 직접 연결되지 않았으면 Main Camera를 자동으로 찾는다.
-        if (playerCamera == null && Camera.main != null)
-        {
-            playerCamera = Camera.main.transform;
-        }
-
-        // 마우스 커서를 화면 중앙에 고정해서 FPS처럼 조작되게 만든다.
+        // 게임 시작할 때 마우스 포인터를 화면 중앙에 고정함
         Cursor.lockState = CursorLockMode.Locked;
 
-        // 마우스 커서를 보이지 않게 만든다.
+        // 1인칭 게임에서는 마우스 포인터를 숨겨서 화면 중앙 고정처럼 보이게 함
         Cursor.visible = false;
+
+        // 시작할 때 카메라의 상하 회전을 정면으로 초기화함
+        xRotation = 0f;
+        transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+
+        // playerBody가 연결되어 있으면 플레이어 좌우 회전도 정면으로 초기화함
+        if (playerBody != null)
+        {
+            playerBody.rotation = Quaternion.Euler(0f, playerBody.rotation.eulerAngles.y, 0f);
+        }
     }
 
-    // 매 프레임 마우스 입력을 받아 회전을 적용한다.
-    private void Update()
+    void Update()
     {
-        // 카메라가 없으면 더 진행하지 않는다.
-        if (playerCamera == null)
+        // 마우스 좌우 이동량을 받아서 좌우 회전에 사용함
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
+
+        // 마우스 상하 이동량을 받아서 상하 회전에 사용함
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+
+        // 상하 회전은 xRotation 변수로 누적해서 관리함
+        xRotation -= mouseY;
+
+        // 상하 회전 각도가 너무 과하게 꺾이지 않게 제한함
+        xRotation = Mathf.Clamp(xRotation, -80f, 80f);
+
+        // 카메라는 상하 회전만 적용하게 함
+        transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+
+        // 플레이어 본체는 좌우 회전만 적용하게 함
+        if (playerBody != null)
         {
-            return;
+            playerBody.Rotate(Vector3.up * mouseX);
         }
-
-        // 마우스 좌우 입력값을 가져온다.
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivityX * Time.deltaTime;
-
-        // 마우스 위아래 입력값을 가져온다.
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivityY * Time.deltaTime;
-
-        // 위아래 회전값은 누적해서 관리한다.
-        // 마우스를 위로 올리면 화면이 위를 보도록 부호를 반대로 준다.
-        pitch -= mouseY;
-
-        // 위아래 각도가 너무 많이 꺾이지 않도록 제한한다.
-        pitch = Mathf.Clamp(pitch, maxLookDownAngle, maxLookUpAngle);
-
-        // 플레이어 몸체는 좌우 회전만 담당한다.
-        // 이 회전이 곧 이동 방향 기준이 되므로
-        // PlayerMotor가 transform.forward, transform.right를 사용하면
-        // 카메라 시점에 따라 움직이게 된다.
-        transform.Rotate(Vector3.up * mouseX);
-
-        // 카메라는 위아래 회전만 적용한다.
-        playerCamera.localRotation = Quaternion.Euler(pitch, 0f, 0f);
     }
 }
