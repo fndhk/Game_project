@@ -70,6 +70,51 @@ public class PlayerStats : MonoBehaviour
         return currentStamina / currentHealth;
     }
 
+    // 예전 UI 코드와 호환되도록 체력 비율을 반환하는 기본 함수이다.
+    // 인자가 없는 GetNormalizedValue()를 호출하는 코드가 있으면 이 함수가 대응한다.
+    public float GetNormalizedValue()
+    {
+        // 기본값은 체력 비율을 반환한다.
+        return GetHealthNormalized();
+    }
+
+    // 예전 UI 코드와 호환되도록 bool 인자를 받는 함수이다.
+    // true면 스테미나, false면 체력 비율을 반환한다.
+    public float GetNormalizedValue(bool useStamina)
+    {
+        // bool 값에 따라 체력 또는 스테미나 비율을 반환한다.
+        return useStamina ? GetStaminaNormalized() : GetHealthNormalized();
+    }
+
+    // 예전 UI 코드와 호환되도록 문자열 인자를 받는 함수이다.
+    // "stamina" 또는 "health" 같은 문자열에 대응한다.
+    public float GetNormalizedValue(string statType)
+    {
+        // 문자열이 비어 있으면 기본적으로 체력 비율을 반환한다.
+        if (string.IsNullOrEmpty(statType))
+        {
+            return GetHealthNormalized();
+        }
+
+        // 소문자로 바꿔 비교하기 쉽게 만든다.
+        string lowerStatType = statType.ToLower();
+
+        // stamina 관련 문자열이면 스테미나 비율을 반환한다.
+        if (lowerStatType == "stamina")
+        {
+            return GetStaminaNormalized();
+        }
+
+        // health 관련 문자열이면 체력 비율을 반환한다.
+        if (lowerStatType == "health")
+        {
+            return GetHealthNormalized();
+        }
+
+        // 그 외의 문자열이 들어오면 기본적으로 체력 비율을 반환한다.
+        return GetHealthNormalized();
+    }
+
     // 현재 달릴 수 있는 상태인지 반환한다.
     public bool CanSprint()
     {

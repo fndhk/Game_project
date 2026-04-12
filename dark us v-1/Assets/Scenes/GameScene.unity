@@ -248,6 +248,7 @@ GameObject:
   - component: {fileID: 49013745}
   - component: {fileID: 49013744}
   - component: {fileID: 49013746}
+  - component: {fileID: 49013747}
   m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
@@ -285,22 +286,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c99b770ff7389974cb4c46600684f8c7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerRevealTrail
-  scanOrigin: {fileID: 0}
+  scanOrigin: {fileID: 330585546}
+  scanCamera: {fileID: 330585545}
   scanMouseButton: 1
+  scanCooldown: 1.2
   dotSize: 0.15
   cellSize: 0.3
-  minVisibleDotsPerScan: 45
-  maxVisibleDotsPerScan: 55
-  maxAttemptsPerScan: 220
-  minSpawnDelay: 0.002
-  maxSpawnDelay: 0.008
+  clearDotsBeforeScan: 1
+  sweepDuration: 0.3
+  sweepRows: 28
+  raysPerRow: 140
   maxRevealDistance: 8
-  horizontalAngle: 140
-  verticalAngle: 80
-  forwardBias: 0.6
+  horizontalViewportMargin: 0.02
+  lineVisualDistance: 6
+  lineWidth: 0.035
+  scanLineColor: {r: 0.15, g: 1, b: 0.25, a: 0.95}
+  lineSegments: 64
   revealSurfaceMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   myDots: []
 --- !u!143 &49013740
 CharacterController:
@@ -342,6 +346,7 @@ Transform:
   m_Children:
   - {fileID: 1294672818}
   - {fileID: 330585546}
+  - {fileID: 655947322}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &49013742
@@ -454,6 +459,24 @@ MonoBehaviour:
   sprintDrainPerSecond: 25
   staminaRecoverPerSecond: 18
   attackDamage: 50
+--- !u!114 &49013747
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 49013734}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 886da8322a4c69f4599368e3b753d542, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DotVisionRenderer
+  revealTrail: {fileID: 49013737}
+  dotPrefab: {fileID: 0}
+  dotParent: {fileID: 655947322}
+  forceWhiteColor: 1
+  dotColor: {r: 1, g: 1, b: 1, a: 1}
+  renderedCount: 0
 --- !u!1 &193655014
 GameObject:
   m_ObjectHideFlags: 0
@@ -626,7 +649,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3032bdc1712fd844ca1bab9819d1972a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerRole
-  role: 0
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -772,7 +794,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b83b2d8c5bd73040a3ba46f73999ad5, type: 3}
   m_Name: 
@@ -1495,6 +1517,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 615910198}
   m_CullTransparentMesh: 1
+--- !u!1 &655947321
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 655947322}
+  m_Layer: 3
+  m_Name: DotContainer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &655947322
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 655947321}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 49013741}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &675406825
 GameObject:
   m_ObjectHideFlags: 0
@@ -1649,10 +1702,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoleAssignmentManager
   players:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 49013745}
+  - {fileID: 193655020}
+  - {fileID: 1885129016}
+  - {fileID: 1525905947}
   assignRolesOnStart: 1
 --- !u!4 &840979396
 Transform:
@@ -2346,7 +2399,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3032bdc1712fd844ca1bab9819d1972a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerRole
-  role: 0
 --- !u!1 &1529000900
 GameObject:
   m_ObjectHideFlags: 0
@@ -2982,7 +3034,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3032bdc1712fd844ca1bab9819d1972a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerRole
-  role: 0
 --- !u!1 &1930545496
 GameObject:
   m_ObjectHideFlags: 0
