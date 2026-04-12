@@ -4,9 +4,4 @@
 VersionControlSettings:
   m_ObjectHideFlags: 0
   m_Mode: Visible Meta Files
-<<<<<<< HEAD
-  m_CollabEditorSettings:
-    inProgressEnabled: 1
-=======
   m_TrackPackagesOutsideProject: 0
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
