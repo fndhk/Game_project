@@ -95,4 +95,10 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+<<<<<<< HEAD
 /[Pp]ackages/packages-lock.json
+=======
+
+# Unity Packages Lock file (Git 충돌 방지를 위해 제외 권장)
+/[Pp]ackages/packages-lock.json
+>>>>>>> 3b9e4796bfc9f301cf3ae23bbcc82ee096adfa14
