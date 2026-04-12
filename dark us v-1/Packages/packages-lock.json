@@ -1,6 +1,5 @@
 {
   "dependencies": {
-<<<<<<< HEAD
     "com.unity.ai.navigation": {
       "version": "2.0.12",
       "depth": 0,
@@ -10,8 +9,6 @@
       },
       "url": "https://packages.unity.com"
     },
-=======
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
     "com.unity.burst": {
       "version": "1.8.29",
       "depth": 2,
@@ -22,7 +19,6 @@
       },
       "url": "https://packages.unity.com"
     },
-<<<<<<< HEAD
     "com.unity.collab-proxy": {
       "version": "2.12.4",
       "depth": 0,
@@ -30,8 +26,6 @@
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
-=======
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
     "com.unity.collections": {
       "version": "6.4.0",
       "depth": 2,
@@ -46,7 +40,6 @@
     },
     "com.unity.ext.nunit": {
       "version": "2.0.5",
-<<<<<<< HEAD
       "depth": 1,
       "source": "builtin",
       "dependencies": {}
@@ -69,12 +62,6 @@
       },
       "url": "https://packages.unity.com"
     },
-=======
-      "depth": 4,
-      "source": "builtin",
-      "dependencies": {}
-    },
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
     "com.unity.inputsystem": {
       "version": "1.19.0",
       "depth": 0,
@@ -99,11 +86,6 @@
         "com.unity.modules.uielements": "1.0.0"
       }
     },
-<<<<<<< HEAD
-    "com.unity.nuget.mono-cecil": {
-      "version": "1.11.6",
-      "depth": 3,
-=======
     "com.unity.netcode.gameobjects": {
       "version": "2.11.0",
       "depth": 0,
@@ -117,12 +99,10 @@
     "com.unity.nuget.mono-cecil": {
       "version": "1.11.6",
       "depth": 1,
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
-<<<<<<< HEAD
     "com.unity.render-pipelines.core": {
       "version": "17.4.0",
       "depth": 1,
@@ -173,11 +153,6 @@
     "com.unity.test-framework": {
       "version": "1.6.0",
       "depth": 0,
-=======
-    "com.unity.test-framework": {
-      "version": "1.6.0",
-      "depth": 3,
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
       "source": "builtin",
       "dependencies": {
         "com.unity.ext.nunit": "2.0.3",
@@ -195,7 +170,6 @@
       },
       "url": "https://packages.unity.com"
     },
-<<<<<<< HEAD
     "com.unity.timeline": {
       "version": "1.8.12",
       "depth": 0,
@@ -205,6 +179,17 @@
         "com.unity.modules.director": "1.0.0",
         "com.unity.modules.animation": "1.0.0",
         "com.unity.modules.particlesystem": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.transport": {
+      "version": "2.7.2",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.burst": "1.8.24",
+        "com.unity.collections": "2.2.1",
+        "com.unity.mathematics": "1.3.2"
       },
       "url": "https://packages.unity.com"
     },
@@ -226,24 +211,6 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
-=======
-    "com.unity.transport": {
-      "version": "2.7.2",
-      "depth": 1,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.burst": "1.8.24",
-        "com.unity.collections": "2.2.1",
-        "com.unity.mathematics": "1.3.2"
-      },
-      "url": "https://packages.unity.com"
-    },
-    "com.veriorpies.parrelsync": {
-      "version": "file:C:/Users/MY_PC/Documents/GitHub/Game_project/ParrelSync-master/ParrelSync",
-      "depth": 0,
-      "source": "local",
-      "dependencies": {}
->>>>>>> 16d97c80931fa6a82ad83042f9a90c0aadde3f4c
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
