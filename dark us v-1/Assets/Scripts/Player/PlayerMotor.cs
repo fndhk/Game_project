@@ -2,7 +2,7 @@ using UnityEngine;
 
 // 이 스크립트는 플레이어의 기본 이동, 달리기, 웅크리기,
 // 점프, 중력, 카메라 높이, 카메라 시야각(FOV)을 담당한다.
-// 체력과 스태미너는 PlayerStats의 같은 값을 공유해서 사용한다.
+// 체력과 스테미나는 PlayerStats에서 따로 관리한다.
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMotor : MonoBehaviour
 {
@@ -10,7 +10,7 @@ public class PlayerMotor : MonoBehaviour
     // 플레이어의 눈 역할을 하는 카메라 Transform이다.
     public Transform playerCamera;
 
-    // 체력과 스태미너를 같이 관리하는 PlayerStats이다.
+    // 체력과 스테미나를 관리하는 PlayerStats이다.
     public PlayerStats playerStats;
 
     [Header("이동 속도")]
@@ -113,7 +113,7 @@ public class PlayerMotor : MonoBehaviour
             cameraComponent = playerCamera.GetComponent<Camera>();
         }
 
-        // 시작 시 플레이어는 서 있는 상태이므로 높이를 서 있는 값으로 맞춘다.
+        // 시작 시 높이를 서 있는 값으로 맞춘다.
         controller.height = standingControllerHeight;
 
         // 컨트롤러 중심도 높이에 맞게 설정한다.
@@ -149,7 +149,7 @@ public class PlayerMotor : MonoBehaviour
         // 중력을 처리한다.
         HandleGravity();
 
-        // 수평 이동과 스태미너 소모를 처리한다.
+        // 수평 이동과 스테미나 소모를 처리한다.
         HandleHorizontalMovement();
 
         // 캐릭터 높이와 카메라 높이, 시야각을 갱신한다.
@@ -181,10 +181,11 @@ public class PlayerMotor : MonoBehaviour
     // 현재 실제로 달릴 수 있는 상태인지 반환하는 함수이다.
     private bool IsTryingToSprint()
     {
-        // 앞쪽 입력이 있고, Ctrl 상태가 아니고, Shift를 누르고 있는지 확인한다.
+        // 앞쪽 입력을 받는지 확인한다.
         float z = Input.GetAxisRaw("Vertical");
 
-        // PlayerStats가 없으면 달리기 가능 판단을 기본값으로 처리한다.
+        // PlayerStats가 없으면 기본적으로 달리기 가능으로 보고,
+        // 있으면 스테미나가 남아 있을 때만 달리기 가능하게 한다.
         bool hasSprintResource = playerStats == null || playerStats.CanSprint();
 
         // 조건을 모두 만족하면 달리기 상태로 본다.
@@ -228,7 +229,7 @@ public class PlayerMotor : MonoBehaviour
         }
     }
 
-    // WASD 이동, Shift 달리기, 스태미너 소모/회복을 처리하는 함수이다.
+    // WASD 이동, Shift 달리기, 스테미나 소모/회복을 처리하는 함수이다.
     private void HandleHorizontalMovement()
     {
         // 좌우 이동 입력을 받는다.
@@ -264,18 +265,19 @@ public class PlayerMotor : MonoBehaviour
             }
         }
 
-        // PlayerStats가 있으면 달리기 중에는 소모, 아니면 회복을 처리한다.
+        // PlayerStats가 있으면 달리기 중에는 스테미나만 소모하고,
+        // 달리지 않으면 스테미나만 회복한다.
         if (playerStats != null)
         {
-            // 실제 이동 입력이 있고 실제로 달릴 때만 값을 소모한다.
+            // 실제 이동 입력이 있고 실제로 달릴 때만 스테미나를 소모한다.
             if (isSprinting && inputDirection.sqrMagnitude > 0.0001f)
             {
-                playerStats.DrainForSprint(Time.deltaTime);
+                playerStats.DrainStaminaForSprint(Time.deltaTime);
             }
             else
             {
-                // 달리지 않으면 값을 회복한다.
-                playerStats.RecoverSharedValue(Time.deltaTime);
+                // 달리지 않으면 스테미나를 회복한다.
+                playerStats.RecoverStamina(Time.deltaTime);
             }
         }
 

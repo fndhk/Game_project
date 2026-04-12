@@ -8,7 +8,6 @@ public class KillerAttack : MonoBehaviour
 {
     [Header("참조")]
     // 공격 방향 기준이 되는 카메라이다.
-    // 보통 Main Camera를 넣는다.
     public Transform playerCamera;
 
     // 자기 자신의 역할/사망 상태를 확인하기 위한 컴포넌트이다.
@@ -112,7 +111,7 @@ public class KillerAttack : MonoBehaviour
         canAttack = true;
     }
 
-    // 실제로 주변에서 맞는 시민이 있는지 찾고, 있으면 죽이는 함수이다.
+    // 실제로 주변에서 맞는 시민이 있는지 찾고, 있으면 피해를 주는 함수이다.
     private void TryAttack()
     {
         // 카메라가 없으면 종료한다.
@@ -191,17 +190,16 @@ public class KillerAttack : MonoBehaviour
             }
         }
 
-        // 최종 타겟이 있으면 죽인다.
-        // 최종 타겟이 있으면 바로 죽이지 말고 50 피해를 준다.
+        // 최종 타겟이 있으면 체력 50 피해를 준다.
         if (bestTarget != null)
         {
             // 맞은 대상의 PlayerStats를 가져온다.
             PlayerStats targetStats = bestTarget.GetComponent<PlayerStats>();
 
-            // PlayerStats가 있으면 기본 공격 피해량 50을 적용한다.
+            // PlayerStats가 있으면 기본 피해량을 적용한다.
             if (targetStats != null)
             {
-                targetStats.TakeDamage(50f);
+                targetStats.TakeDefaultAttackDamage();
             }
             else
             {
