@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 9139244078215490661}
   - component: {fileID: 5799833548347805543}
   - component: {fileID: 8347906060813873423}
-  - component: {fileID: 8381022417772591013}
+  - component: {fileID: 3036265007576724606}
   m_Layer: 0
   m_Name: DotPrefab_dot
   m_TagString: Untagged
@@ -91,7 +91,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &8381022417772591013
+--- !u!114 &3036265007576724606
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -100,6 +100,6 @@ MonoBehaviour:
   m_GameObject: {fileID: 9043815522817725080}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 63e95e9056c6b084aadd80a1354faabe, type: 3}
+  m_Script: {fileID: 11500000, guid: d476eab773bcd954ea3dd8793fa0d3f5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScanDotBillboard
+  m_EditorClassIdentifier: Assembly-CSharp::ScanDot
