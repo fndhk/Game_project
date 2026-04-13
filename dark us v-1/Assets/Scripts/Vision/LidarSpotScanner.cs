@@ -15,6 +15,10 @@ public class LidarSpotScanner : MonoBehaviour
     // 스캔 기준 카메라이다.
     [SerializeField] private Camera scanCamera;
 
+    [Header("Scan Audio")]
+    // 우클릭 중에만 재생할 스캔 루프 사운드 소스이다.
+    [SerializeField] private AudioSource scanLoopSource;
+
     [Header("Scan Settings")]
     // 초당 생성할 점 개수이다.
     [SerializeField] private float pointsPerSecond = 900f;
@@ -45,10 +49,16 @@ public class LidarSpotScanner : MonoBehaviour
     // 이미 점이 찍힌 셀을 저장한다.
     private readonly HashSet<Vector3Int> occupiedCells = new HashSet<Vector3Int>();
 
+    // 직전 프레임에 스캔 중이었는지 저장한다.
+    private bool wasScanningLastFrame;
+
     private void Reset()
     {
         // 같은 오브젝트의 카메라를 기본값으로 넣는다.
         scanCamera = GetComponent<Camera>();
+
+        // 같은 오브젝트의 오디오 소스를 기본값으로 넣는다.
+        scanLoopSource = GetComponent<AudioSource>();
     }
 
     private void Awake()
@@ -65,12 +75,36 @@ public class LidarSpotScanner : MonoBehaviour
             GameObject container = new GameObject("ScanDots");
             dotContainer = container.transform;
         }
+
+        // 오디오 소스가 있으면 시작 시 자동 재생되지 않게 막는다.
+        if (scanLoopSource != null)
+        {
+            scanLoopSource.playOnAwake = false;
+        }
     }
 
     private void Update()
     {
         // 우클릭 중일 때만 스캔한다.
-        if (!Input.GetMouseButton(1))
+        bool isScanning = Input.GetMouseButton(1);
+
+        // 스캔 시작 순간에 루프 사운드를 켠다.
+        if (isScanning && !wasScanningLastFrame)
+        {
+            StartScanSound();
+        }
+
+        // 스캔 종료 순간에 루프 사운드를 끈다.
+        if (!isScanning && wasScanningLastFrame)
+        {
+            StopScanSound();
+        }
+
+        // 다음 프레임 비교를 위해 현재 상태를 저장한다.
+        wasScanningLastFrame = isScanning;
+
+        // 스캔 중이 아니면 점 생성은 하지 않는다.
+        if (!isScanning)
         {
             return;
         }
@@ -83,6 +117,36 @@ public class LidarSpotScanner : MonoBehaviour
         {
             spawnBudget -= 1f;
             TrySpawnOneDot();
+        }
+    }
+
+    private void StartScanSound()
+    {
+        // 오디오 소스가 없으면 종료한다.
+        if (scanLoopSource == null)
+        {
+            return;
+        }
+
+        // 이미 재생 중이 아니면 재생한다.
+        if (!scanLoopSource.isPlaying)
+        {
+            scanLoopSource.Play();
+        }
+    }
+
+    private void StopScanSound()
+    {
+        // 오디오 소스가 없으면 종료한다.
+        if (scanLoopSource == null)
+        {
+            return;
+        }
+
+        // 재생 중이면 정지한다.
+        if (scanLoopSource.isPlaying)
+        {
+            scanLoopSource.Stop();
         }
     }
 
