@@ -289,19 +289,28 @@ MonoBehaviour:
   scanOrigin: {fileID: 330585546}
   scanCamera: {fileID: 330585545}
   scanMouseButton: 1
-  scanCooldown: 1.2
-  dotSize: 0.15
-  cellSize: 0.3
+  minDotSize: 0.01
+  maxDotSize: 0.018
+  surfaceOffset: 0.015
+  planarJitterRadius: 0.025
+  dotLifetime: -1
   clearDotsBeforeScan: 1
-  sweepDuration: 0.3
-  sweepRows: 28
-  raysPerRow: 140
+  maxStoredDots: 0
+  pulseDuration: 0.28
   maxRevealDistance: 8
+  samplesPerSecond: 4200
+  minSamplesPerFrame: 24
   horizontalViewportMargin: 0.02
-  lineVisualDistance: 6
-  lineWidth: 0.035
-  scanLineColor: {r: 0.15, g: 1, b: 0.25, a: 0.95}
-  lineSegments: 64
+  bottomViewportMargin: 0.06
+  topViewportMargin: 0.04
+  baseKeepChance: 0.22
+  floorDensityMultiplier: 1
+  wallDensityMultiplier: 0.42
+  farDistanceMultiplier: 0.55
+  edgeBoostMultiplier: 2.1
+  edgeDepthThreshold: 0.75
+  edgeNormalAngleThreshold: 22
+  debugCurrentRadius: 0
   revealSurfaceMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -474,8 +483,13 @@ MonoBehaviour:
   revealTrail: {fileID: 49013737}
   dotPrefab: {fileID: 0}
   dotParent: {fileID: 655947322}
-  forceWhiteColor: 1
+  targetCamera: {fileID: 0}
+  forceDotColor: 1
   dotColor: {r: 1, g: 1, b: 1, a: 1}
+  faceCamera: 1
+  fadeWithLifetime: 0
+  startAlpha: 1
+  endAlpha: 0
   renderedCount: 0
 --- !u!1 &193655014
 GameObject:
@@ -2623,8 +2637,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Citizen
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 0161d805a3764c089bef00bfe00793f5, type: 2}
-  m_sharedMaterial: {fileID: 2147374, guid: 0161d805a3764c089bef00bfe00793f5, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

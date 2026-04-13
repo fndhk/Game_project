@@ -1,10 +1,5 @@
-using UnityEngine;
-
-public class PlayerRole : MonoBehaviour
+public enum PlayerRole
 {
-    [Header("Role")]
-    public RoleType role = RoleType.Civilian;
-
-    public bool IsKiller => role == RoleType.Killer;
-    public bool IsCivilian => role == RoleType.Civilian;
+    Citizen,
+    Killer
 }
