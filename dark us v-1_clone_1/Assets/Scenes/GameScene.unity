@@ -317,6 +317,7 @@ MonoBehaviour:
   crouchSpeed: 0.85
   acceleration: 10
   deceleration: 12
+  sprintRecoverUnlockPercent: 0.25
   walkJumpHeight: 0.9
   sprintJumpHeight: 1.05
   crouchJumpHeight: 0.55
@@ -407,6 +408,7 @@ MonoBehaviour:
   currentStamina: 100
   sprintDrainPerSecond: 25
   staminaRecoverPerSecond: 18
+  emptyStaminaRecoverDelay: 0.6
   attackDamage: 50
 --- !u!114 &49013747
 MonoBehaviour:
@@ -3512,7 +3514,7 @@ MonoBehaviour:
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
   m_textAlignment: 65535
@@ -5282,6 +5284,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 8347906060813873423, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: f8e25d888cf5d0c448b18ea8be48e610, type: 2}
     - target: {fileID: 9043815522817725080, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
       propertyPath: m_Name
       value: DotPrefab_dot
