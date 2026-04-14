@@ -242,15 +242,12 @@ GameObject:
   - component: {fileID: 49013741}
   - component: {fileID: 49013740}
   - component: {fileID: 49013742}
-  - component: {fileID: 49013737}
-  - component: {fileID: 49013736}
   - component: {fileID: 49013743}
   - component: {fileID: 49013745}
   - component: {fileID: 49013744}
   - component: {fileID: 49013746}
   - component: {fileID: 49013747}
   - component: {fileID: 49013748}
-  - component: {fileID: 49013749}
   m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
@@ -258,65 +255,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &49013736
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 49013734}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 80d48a35afcbef241a14accb8e38ab8e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ProximitySensor
-  detectRadius: 6
-  playerMask:
-    serializedVersion: 2
-    m_Bits: 0
-  smoothSpeed: 6
-  currentIntensity: 0
---- !u!114 &49013737
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 49013734}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c99b770ff7389974cb4c46600684f8c7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerRevealTrail
-  scanOrigin: {fileID: 49013741}
-  scanCamera: {fileID: 330585545}
-  scanMouseButton: 1
-  minDotSize: 0.009
-  maxDotSize: 0.016
-  surfaceOffset: 0.011
-  planarJitterRadius: 0.018
-  dotLifetime: -1
-  clearDotsBeforeScan: 0
-  maxStoredDots: 18000
-  pulseDuration: 0.2
-  maxRevealDistance: 25
-  samplesPerSecond: 5800
-  minSamplesPerFrame: 34
-  horizontalViewportMargin: 0.02
-  bottomViewportMargin: 0.05
-  topViewportMargin: 0.03
-  baseKeepChance: 0.3
-  floorDensityMultiplier: 1
-  wallDensityMultiplier: 0.68
-  farDistanceMultiplier: 0.76
-  edgeBoostMultiplier: 2.1
-  edgeDepthThreshold: 0.55
-  edgeNormalAngleThreshold: 17
-  debugCurrentRadius: 0
-  revealSurfaceMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  myDots: []
 --- !u!143 &49013740
 CharacterController:
   m_ObjectHideFlags: 0
@@ -476,29 +414,6 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 49013734}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 886da8322a4c69f4599368e3b753d542, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DotVisionRenderer
-  revealTrail: {fileID: 49013737}
-  dotPrefab: {fileID: 0}
-  dotParent: {fileID: 655947322}
-  targetCamera: {fileID: 0}
-  forceDotColor: 1
-  dotColor: {r: 1, g: 1, b: 1, a: 1}
-  faceCamera: 1
-  fadeWithLifetime: 0
-  startAlpha: 1
-  endAlpha: 0
-  renderedCount: 0
---- !u!114 &49013748
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 49013734}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5d969d5f48833aa48bb4af21affd6bd0, type: 3}
@@ -507,17 +422,21 @@ MonoBehaviour:
   dotPrefab: {fileID: 1883318055}
   dotContainer: {fileID: 655947322}
   scanCamera: {fileID: 330585545}
-  scanLoopSource: {fileID: 49013749}
-  pointsPerSecond: 400
-  maxDistance: 10
+  scanPulseSource: {fileID: 49013748}
+  pulseCooldown: 1.2
+  pulseTravelDuration: 0.4
+  pointsPerPulse: 450
+  maxSpawnAttemptsPerDot: 200
+  maxDistance: 8
   viewportRadius: 0.5
+  waveThickness: 0.75
   surfaceOffset: 0.01
-  cellSize: 0.07
+  cellSize: 0.08
   scanMask:
     serializedVersion: 2
     m_Bits: 4294967295
   triggerInteraction: 1
---- !u!82 &49013749
+--- !u!82 &49013748
 AudioSource:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -528,11 +447,11 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: b85140a3b51b40b45901891fb6177535, type: 3}
+  m_Resource: {fileID: 8300000, guid: 869e50b440605d342a75f030e78f5ce7, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.01
-  m_Pitch: 0.89
-  Loop: 1
+  m_Volume: 0.02
+  m_Pitch: 2
+  Loop: 0
   Mute: 0
   Spatialize: 0
   SpatializePostEffects: 0
@@ -738,7 +657,6 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
-  - component: {fileID: 330585549}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -864,37 +782,6 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!114 &330585549
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 330585543}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6b83b2d8c5bd73040a3ba46f73999ad5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BlindDotPainterPersistent
-  playerCamera: {fileID: 330585545}
-  clickCooldown: 1.5
-  revealMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  maxDistance: 18
-  totalRaysPerClick: 400
-  revealDuration: 0.3
-  raysPerStep: 12
-  minPointsPerHit: 1
-  maxPointsPerHit: 2
-  hitSpreadRadius: 0.012
-  surfaceOffset: 0.002
-  minPointSize: 0.015
-  maxPointSize: 0.015
-  pointColor: {r: 1, g: 1, b: 1, a: 1}
-  pointMaterial: {fileID: 0}
-  maxPointCount: 18000
-  pointParent: {fileID: 0}
 --- !u!1 &340156555
 GameObject:
   m_ObjectHideFlags: 0
@@ -2723,18 +2610,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 9043815522817725080, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
   m_PrefabInstance: {fileID: 8379284543649969013}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1883318060
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1883318055}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 63e95e9056c6b084aadd80a1354faabe, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScanDotBillboard
 --- !u!1 &1930545496
 GameObject:
   m_ObjectHideFlags: 0
@@ -3166,14 +3041,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 3036265007576724606, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 9043815522817725080, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1883318060}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
