@@ -15,6 +15,7 @@ public class MultiplayerController : NetworkBehaviour
     [SerializeField] private GameObject roomPanel;   // 대기실 (코드표시/시작/나가기)
     [SerializeField] private GameObject loadingPanel; // "연결 중..." 메시지 패널
     [SerializeField] private GameObject errorPanel;   // 에러 팝업
+    [SerializeField] private GameObject backgroundPanel;
 
     [Header("UI References")]
     [SerializeField] private TMP_InputField codeInputField; // 방 번호 입력창
@@ -58,15 +59,16 @@ public class MultiplayerController : NetworkBehaviour
         lobbyPanel?.SetActive(false);
         roomPanel?.SetActive(true);
         loadingPanel?.SetActive(false);
+        backgroundPanel?.SetActive(false);
     }
 
     // --- [방 만들기 - Host] ---
     public void CreateRoom()
     {
-        ushort randomCode = (ushort)UnityEngine.Random.Range(10000, 50000);
+        ushort randomCode = (ushort)UnityEngine.Random.Range(10000, 99999);
         transport.ConnectionData.Port = randomCode;
 
-        if (roomCodeText != null) roomCodeText.text = $"방 코드: {randomCode}";
+        if (roomCodeText != null) roomCodeText.text = $"방코드\n{randomCode}";
 
         if (NetworkManager.Singleton.StartHost())
         {
@@ -212,5 +214,27 @@ public class MultiplayerController : NetworkBehaviour
                 Debug.LogWarning($"씬 로드 실패: {status}");
             }
         }
+    }
+
+    public void QuitGame()
+    {
+        Debug.Log("게임 종료 시도 중...");
+
+        // 1. 네트워크 연결이 되어 있다면 먼저 안전하게 끊기
+        if (NetworkManager.Singleton != null)
+        {
+            // 내가 방장(Host)이라면 방을 폭파하고, 참여자(Client)라면 나만 나갑니다.
+            NetworkManager.Singleton.Shutdown();
+            Debug.Log("네트워크 연결을 성공적으로 종료했습니다.");
+        }
+
+        // 2. 플랫폼에 따른 종료 처리
+        #if UNITY_EDITOR
+    // 유니티 에디터에서 플레이 모드를 수동으로 끄는 효과
+    UnityEditor.EditorApplication.isPlaying = false;
+        #else
+        // 실제 빌드된 게임 프로그램 종료
+        Application.Quit();
+        #endif
     }
 }
