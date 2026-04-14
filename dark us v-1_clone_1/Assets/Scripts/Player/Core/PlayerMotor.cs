@@ -28,6 +28,14 @@ public class PlayerMotor : MonoBehaviour
 
     // 이동을 멈출 때 감속되는 속도이다.
     public float deceleration = 12f;
+    
+    [Header("달리기 탈진")]
+    // 스태미나가 0이 되었을 때 다시 달릴 수 있게 풀어줄 회복 비율이다.
+    // 예를 들어 0.25면 현재 체력 기준 최대 스태미나의 25%까지 회복해야 다시 달릴 수 있다.
+    public float sprintRecoverUnlockPercent = 0.25f;
+
+    // 현재 탈진 상태인지 저장하는 값이다.
+    private bool isSprintExhausted = false;
 
     [Header("점프 / 중력")]
     // 기본 걷기 상태에서의 점프 높이이다.
@@ -137,6 +145,9 @@ public class PlayerMotor : MonoBehaviour
     // 매 프레임 입력, 이동, 점프, 중력, 시점 처리를 진행한다.
     private void Update()
     {
+        // 현재 스태미나를 기준으로 탈진 상태를 먼저 갱신한다.
+        UpdateSprintExhaustedState();
+
         // 현재 바닥 상태를 먼저 갱신한다.
         UpdateGroundedState();
 
@@ -178,15 +189,48 @@ public class PlayerMotor : MonoBehaviour
         }
     }
 
+    // 현재 스태미나 값에 따라 탈진 상태를 갱신하는 함수이다.
+    private void UpdateSprintExhaustedState()
+    {
+        // PlayerStats가 없으면 탈진 상태를 쓸 수 없으므로 false로 둔다.
+        if (playerStats == null)
+        {
+            isSprintExhausted = false;
+            return;
+        }
+
+        // 체력이 0이면 달릴 수 없으므로 탈진 상태로 둔다.
+        if (playerStats.currentHealth <= 0f)
+        {
+            isSprintExhausted = true;
+            return;
+        }
+
+        // 스태미나가 거의 0이면 탈진 상태로 진입시킨다.
+        if (playerStats.currentStamina <= 0.01f)
+        {
+            isSprintExhausted = true;
+        }
+
+        // 현재 체력 기준 최대 스태미나의 몇 퍼센트까지 회복하면 다시 달릴지 계산한다.
+        float recoverUnlockValue = playerStats.currentHealth * sprintRecoverUnlockPercent;
+
+        // 이미 탈진 상태이고, 충분히 회복했다면 탈진 상태를 해제한다.
+        if (isSprintExhausted && playerStats.currentStamina >= recoverUnlockValue)
+        {
+            isSprintExhausted = false;
+        }
+    }
+
     // 현재 실제로 달릴 수 있는 상태인지 반환하는 함수이다.
     private bool IsTryingToSprint()
     {
         // 앞쪽 입력을 받는지 확인한다.
         float z = Input.GetAxisRaw("Vertical");
 
-        // PlayerStats가 없으면 기본적으로 달리기 가능으로 보고,
-        // 있으면 스테미나가 남아 있을 때만 달리기 가능하게 한다.
-        bool hasSprintResource = playerStats == null || playerStats.CanSprint();
+        // PlayerStats가 없으면 기본적으로 달리기 가능으로 본다.
+        // PlayerStats가 있으면 스태미나가 남아 있고 탈진 상태가 아닐 때만 달리기 가능하다.
+        bool hasSprintResource = playerStats == null || (playerStats.CanSprint() && !isSprintExhausted);
 
         // 조건을 모두 만족하면 달리기 상태로 본다.
         return
@@ -279,6 +323,8 @@ public class PlayerMotor : MonoBehaviour
                 // 달리지 않으면 스테미나를 회복한다.
                 playerStats.RecoverStamina(Time.deltaTime);
             }
+            // 방금 소모/회복된 값을 기준으로 탈진 상태를 한 번 더 갱신한다.
+            UpdateSprintExhaustedState();
         }
 
         // 최종 수평 목표 속도를 만든다.

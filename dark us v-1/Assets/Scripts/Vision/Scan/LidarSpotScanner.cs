@@ -320,4 +320,37 @@ public class LidarSpotScanner : MonoBehaviour
         // 셀 좌표를 반환한다.
         return new Vector3Int(x, y, z);
     }
+
+        // 현재 스캔을 바로 사용할 수 있는 상태인지 반환한다.
+    public bool IsPulseReady
+    {
+        get
+        {
+            return Time.time >= nextPulseTime;
+        }
+    }
+
+    // 현재 쿨타임 진행률을 0~1로 반환한다.
+    // 0이면 방금 사용한 상태이고, 1이면 다시 사용 가능한 상태이다.
+    public float GetCooldownNormalized()
+    {
+        // 쿨타임이 0 이하이면 항상 사용 가능으로 본다.
+        if (pulseCooldown <= 0f)
+        {
+            return 1f;
+        }
+
+        // 이미 다시 사용할 수 있으면 1을 반환한다.
+        if (Time.time >= nextPulseTime)
+        {
+            return 1f;
+        }
+
+        // 남은 시간을 기준으로 진행률을 계산한다.
+        float remaining = nextPulseTime - Time.time;
+        float normalized = 1f - (remaining / pulseCooldown);
+
+        // 0~1 범위로 고정해서 반환한다.
+        return Mathf.Clamp01(normalized);
+    }
 }
