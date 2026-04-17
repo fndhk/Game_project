@@ -25,6 +25,13 @@ public class PlayerStats : MonoBehaviour
     // 달리지 않을 때 초당 얼마나 회복될지 정하는 값이다.
     public float staminaRecoverPerSecond = 18f;
 
+    [Header("스태미나 회복 지연")]
+    // 스태미나를 완전히 다 썼을 때 회복이 시작되기 전까지 기다리는 시간이다.
+    public float emptyStaminaRecoverDelay = 0.6f;
+
+    // 현재 회복 잠금 남은 시간이다.
+    private float staminaRecoverLockTimer = 0f;
+
     [Header("피해")]
     // 공격 한 번 맞았을 때 깎일 체력 값이다.
     public float attackDamage = 50f;
@@ -125,18 +132,28 @@ public class PlayerStats : MonoBehaviour
     // 달릴 때 스테미나를 줄이는 함수이다.
     public void DrainStaminaForSprint(float deltaTime)
     {
-        // 이미 스테미나가 없으면 0으로 고정한다.
+        // 이미 스테미나가 없으면 0으로 고정하고 회복 잠금을 건다.
         if (currentStamina <= 0f)
         {
             currentStamina = 0f;
+            staminaRecoverLockTimer = emptyStaminaRecoverDelay;
             return;
         }
 
         // 초당 소모량 기준으로 스테미나를 줄인다.
         currentStamina -= sprintDrainPerSecond * deltaTime;
 
-        // 스테미나가 0 아래로 내려가지 않게 막는다.
-        currentStamina = Mathf.Clamp(currentStamina, 0f, currentHealth);
+        // 0 아래로 내려가면 0으로 고정하고 회복 잠금을 건다.
+        if (currentStamina <= 0f)
+        {
+            currentStamina = 0f;
+            staminaRecoverLockTimer = emptyStaminaRecoverDelay;
+        }
+        else
+        {
+            // 현재 체력을 넘지 않게 한 번 더 보정한다.
+            currentStamina = Mathf.Clamp(currentStamina, 0f, currentHealth);
+        }
     }
 
     // 달리지 않을 때 스테미나를 회복하는 함수이다.
@@ -147,6 +164,20 @@ public class PlayerStats : MonoBehaviour
         if (currentHealth <= 0f)
         {
             currentStamina = 0f;
+            return;
+        }
+
+        // 회복 잠금 시간이 남아 있으면 아직 회복하지 않는다.
+        if (staminaRecoverLockTimer > 0f)
+        {
+            staminaRecoverLockTimer -= deltaTime;
+
+            // 음수로 너무 내려가지 않게 0으로 맞춘다.
+            if (staminaRecoverLockTimer < 0f)
+            {
+                staminaRecoverLockTimer = 0f;
+            }
+
             return;
         }
 
