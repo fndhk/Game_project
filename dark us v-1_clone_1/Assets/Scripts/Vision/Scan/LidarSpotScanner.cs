@@ -1,105 +1,102 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 우클릭 클릭 1회마다 파동을 한 번 발사하고,
-// 파동이 지나간 표면에만 흰 점을 생성하는 스캐너이다.
-// 생성된 점은 사라지지 않고 계속 남는다.
+// 우클릭 시 화면에 보이는 넓은 범위를 훑어서 표면에 점을 찍는 스캐너이다.
+// 실제 점 렌더링은 InstancedScanDotRenderer가 맡고,
+// 이 스크립트는 스캔 파동 진행과 Raycast 샘플링만 담당한다.
 public class LidarSpotScanner : MonoBehaviour
 {
     [Header("References")]
-    // 점 프리팹이다.
-    [SerializeField] private GameObject dotPrefab;
-
-    // 생성된 점을 담아둘 부모이다.
-    [SerializeField] private Transform dotContainer;
-
     // 스캔 기준 카메라이다.
     [SerializeField] private Camera scanCamera;
 
+    // 실제 점을 GPU 인스턴싱으로 그리는 렌더러이다.
+    [SerializeField] private InstancedScanDotRenderer instancedDotRenderer;
+
     [Header("Scan Audio")]
-    // 클릭할 때 단발로 재생할 파동 사운드 소스이다.
+    // 스캔 사운드 소스이다.
     [SerializeField] private AudioSource scanPulseSource;
 
     [Header("Pulse Settings")]
-    // 우클릭 클릭 후 다음 파동을 쏠 때까지의 최소 간격이다.
-    [SerializeField] private float pulseCooldown = 0.55f;
+    // 우클릭 후 다음 사용까지의 쿨타임이다.
+    [SerializeField] private float pulseCooldown = 0.42f;
 
-    // 파동이 0 거리에서 최대 거리까지 퍼지는 시간이다.
-    [SerializeField] private float pulseTravelDuration = 0.4f;
+    // 파동이 최대 거리까지 퍼지는 시간이다.
+    [SerializeField] private float pulseTravelDuration = 0.34f;
 
-    // 파동 1회 동안 목표로 하는 점 생성 시도 수이다.
-    [SerializeField] private int pointsPerPulse = 120;
+    // 파동 1회 총 샘플 수이다.
+    [SerializeField] private int pointsPerPulse = 380;
 
-    // 점 1개를 만들기 위해 몇 번까지 레이를 다시 시도할지 정하는 값이다.
-    [SerializeField] private int maxSpawnAttemptsPerDot = 6;
+    // 점 1개를 만들기 위해 재시도할 최대 횟수이다.
+    [SerializeField] private int maxSpawnAttemptsPerDot = 14;
 
     // 최대 스캔 거리이다.
-    [SerializeField] private float maxDistance = 14f;
+    [SerializeField] private float maxDistance = 16f;
 
-    // 화면 중심 기준으로 얼마나 넓게 퍼져서 찍을지 정하는 반경이다.
-    [SerializeField] private float viewportRadius = 0.14f;
+    // 화면 가로 절반 범위이다.
+    [SerializeField] private float screenHalfWidth = 0.42f;
 
-    // 파동이 지나간 직후까지 점 생성이 허용되는 두께이다.
-    [SerializeField] private float waveThickness = 0.55f;
+    // 화면 세로 절반 범위이다.
+    [SerializeField] private float screenHalfHeight = 0.30f;
 
-    // 점을 표면에서 살짝 띄우는 값이다.
+    // 현재 파동 띠 두께이다.
+    [SerializeField] private float waveThickness = 1.05f;
+
+    // 표면에서 점을 살짝 띄우는 값이다.
     [SerializeField] private float surfaceOffset = 0.01f;
 
-    [Header("Duplicate Block")]
-    // 같은 위치에 중복 생성되지 않게 하는 셀 크기이다.
-    [SerializeField] private float cellSize = 0.08f;
+    [Header("Performance")]
+    // 한 프레임에 처리할 최대 샘플 수이다.
+    // 점이 많이 찍혀도 프레임이 뚝 끊기지 않게 분산한다.
+    [SerializeField] private int maxSamplesPerFrame = 42;
 
     [Header("Raycast")]
-    // 스캔할 레이어이다.
+    // 스캔 대상 레이어이다.
     [SerializeField] private LayerMask scanMask = ~0;
 
-    // 트리거 충돌 처리 방식이다.
+    // 트리거 처리 방식이다.
     [SerializeField] private QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.Ignore;
 
-    // 다음 파동을 사용할 수 있는 시간이다.
+    // 다음 스캔 가능 시간이다.
     private float nextPulseTime = 0f;
 
-    // 이미 점이 찍힌 셀을 저장한다.
-    private readonly HashSet<Vector3Int> occupiedCells = new HashSet<Vector3Int>();
-
-    // 현재 진행 중인 파동들을 저장한다.
+    // 현재 진행 중인 파동 목록이다.
     private readonly List<ActivePulse> activePulses = new List<ActivePulse>();
 
-    // 파동 1개의 진행 상태를 담는 내부 클래스이다.
+    // 파동 1개의 진행 상태이다.
     private class ActivePulse
     {
-        // 파동이 시작된 뒤 지난 시간이다.
+        // 파동 시작 후 지난 시간이다.
         public float elapsedTime = 0f;
 
-        // 프레임마다 점 생성 시도를 누적하기 위한 예산이다.
+        // 이번 프레임까지 누적된 샘플 예산이다.
         public float sampleBudget = 0f;
     }
 
     private void Reset()
     {
-        // 같은 오브젝트의 카메라를 기본값으로 넣는다.
+        // 기본 참조를 자동으로 채운다.
         scanCamera = GetComponent<Camera>();
-
-        // 같은 오브젝트의 오디오 소스를 기본값으로 넣는다.
         scanPulseSource = GetComponent<AudioSource>();
+        instancedDotRenderer = GetComponent<InstancedScanDotRenderer>();
     }
 
     private void Awake()
     {
-        // 카메라가 비어 있으면 메인 카메라를 넣는다.
+        // 최소값 보정이다.
+        pointsPerPulse = Mathf.Max(1, pointsPerPulse);
+        maxSpawnAttemptsPerDot = Mathf.Max(1, maxSpawnAttemptsPerDot);
+        pulseTravelDuration = Mathf.Max(0.01f, pulseTravelDuration);
+        waveThickness = Mathf.Max(0.05f, waveThickness);
+        maxSamplesPerFrame = Mathf.Max(1, maxSamplesPerFrame);
+
+        // 카메라가 비어 있으면 메인 카메라를 사용한다.
         if (scanCamera == null)
         {
             scanCamera = Camera.main;
         }
 
-        // 컨테이너가 비어 있으면 자동 생성한다.
-        if (dotContainer == null)
-        {
-            GameObject container = new GameObject("ScanDots");
-            dotContainer = container.transform;
-        }
-
-        // 오디오 소스가 있으면 시작 시 자동 재생과 루프를 꺼둔다.
+        // 오디오 설정을 정리한다.
         if (scanPulseSource != null)
         {
             scanPulseSource.playOnAwake = false;
@@ -109,42 +106,38 @@ public class LidarSpotScanner : MonoBehaviour
 
     private void Update()
     {
-        // 로컬에서 실제로 스캔 가능한 상태인지 먼저 확인한다.
+        // 준비가 안 되었으면 종료한다.
         if (!CanUseScanner())
         {
             return;
         }
 
-        // 우클릭 클릭 입력을 받아 새 파동을 시작한다.
+        // 입력을 처리한다.
         HandlePulseInput();
 
-        // 현재 진행 중인 파동들을 갱신한다.
+        // 진행 중인 파동을 갱신한다.
         UpdateActivePulses();
     }
 
-    // 현재 이 스캐너가 실제로 동작해도 되는 상태인지 확인한다.
+    // 스캐너를 사용할 수 있는지 확인하는 함수이다.
     private bool CanUseScanner()
     {
-        // 카메라가 없으면 메인 카메라를 다시 찾아본다.
         if (scanCamera == null)
         {
             scanCamera = Camera.main;
         }
 
-        // 카메라가 없으면 스캔할 수 없다.
         if (scanCamera == null)
         {
             return false;
         }
 
-        // 비활성화된 카메라에서는 입력을 받아도 스캔하지 않는다.
         if (!scanCamera.isActiveAndEnabled)
         {
             return false;
         }
 
-        // 점 프리팹이 없으면 생성할 수 없다.
-        if (dotPrefab == null)
+        if (instancedDotRenderer == null)
         {
             return false;
         }
@@ -152,16 +145,16 @@ public class LidarSpotScanner : MonoBehaviour
         return true;
     }
 
-    // 우클릭 클릭으로 파동 발사를 처리하는 함수이다.
+    // 우클릭 입력을 처리하는 함수이다.
     private void HandlePulseInput()
     {
-        // 우클릭을 누른 순간이 아니면 종료한다.
+        // 우클릭 순간만 처리한다.
         if (!Input.GetMouseButtonDown(1))
         {
             return;
         }
 
-        // 쿨타임이 아직 남아 있으면 종료한다.
+        // 쿨타임 중이면 종료한다.
         if (Time.time < nextPulseTime)
         {
             return;
@@ -170,158 +163,183 @@ public class LidarSpotScanner : MonoBehaviour
         // 새 파동을 시작한다.
         StartPulse();
 
-        // 다음 사용 가능 시간을 갱신한다.
+        // 다음 사용 시간을 갱신한다.
         nextPulseTime = Time.time + pulseCooldown;
     }
 
-    // 새 파동을 하나 시작하는 함수이다.
+    // 새 파동을 시작하는 함수이다.
     private void StartPulse()
     {
-        // 진행 중인 파동 목록에 새 파동을 추가한다.
-        activePulses.Add(new ActivePulse());
+        ActivePulse pulse = new ActivePulse();
+        activePulses.Add(pulse);
 
-        // 파동 사운드를 단발로 재생한다.
+        // 사운드를 재생한다.
         PlayPulseSound();
     }
 
-    // 파동 사운드를 재생하는 함수이다.
+    // 스캔 사운드를 재생하는 함수이다.
     private void PlayPulseSound()
     {
-        // 오디오 소스가 없으면 종료한다.
         if (scanPulseSource == null)
         {
             return;
         }
 
-        // 클립이 연결되어 있으면 단발 재생한다.
         if (scanPulseSource.clip != null)
         {
             scanPulseSource.PlayOneShot(scanPulseSource.clip);
             return;
         }
 
-        // 클립이 따로 없어도 기본 재생은 가능하게 한다.
         scanPulseSource.Play();
     }
 
-    // 현재 진행 중인 파동들을 갱신하는 함수이다.
+    // 진행 중인 파동들을 갱신하는 함수이다.
     private void UpdateActivePulses()
     {
-        // 파동 이동 시간이 너무 작아지는 것을 막는다.
-        float safeDuration = Mathf.Max(0.01f, pulseTravelDuration);
+        // 총 샘플 속도를 계산한다.
+        float samplesPerSecond = pointsPerPulse / pulseTravelDuration;
 
-        // 파동 1회당 점 생성 시도를 초당 값으로 바꾼다.
-        float samplesPerSecond = Mathf.Max(1, pointsPerPulse) / safeDuration;
+        // 한 프레임 총 처리 샘플 수를 제한한다.
+        int processedSamplesThisFrame = 0;
 
-        // 뒤에서부터 순회해서 끝난 파동을 안전하게 제거한다.
         for (int i = activePulses.Count - 1; i >= 0; i--)
         {
-            // 현재 파동을 가져온다.
             ActivePulse pulse = activePulses[i];
 
-            // 파동 진행 시간을 누적한다.
+            // 시간 누적이다.
             pulse.elapsedTime += Time.deltaTime;
 
-            // 이번 프레임에 사용할 점 생성 예산을 누적한다.
+            // 예산 누적이다.
             pulse.sampleBudget += samplesPerSecond * Time.deltaTime;
 
-            // 현재 파동의 진행률을 계산한다.
-            float normalizedTime = Mathf.Clamp01(pulse.elapsedTime / safeDuration);
-
-            // 진행률을 기반으로 현재 파동 반경을 계산한다.
+            // 현재 반경이다.
+            float normalizedTime = Mathf.Clamp01(pulse.elapsedTime / pulseTravelDuration);
             float currentRadius = normalizedTime * maxDistance;
 
-            // 누적된 예산만큼 점 생성을 시도한다.
-            while (pulse.sampleBudget >= 1f)
+            // 이번 프레임 허용량까지만 샘플링한다.
+            while (pulse.sampleBudget >= 1f && processedSamplesThisFrame < maxSamplesPerFrame)
             {
                 pulse.sampleBudget -= 1f;
+                processedSamplesThisFrame++;
+
                 TrySpawnOneDotForCurrentWave(currentRadius);
             }
 
-            // 파동 진행 시간이 끝났으면 목록에서 제거한다.
-            if (pulse.elapsedTime >= safeDuration)
+            // 파동이 끝났으면 제거한다.
+            if (pulse.elapsedTime >= pulseTravelDuration)
             {
                 activePulses.RemoveAt(i);
+            }
+
+            // 이미 프레임 예산을 다 썼으면 더 돌지 않는다.
+            if (processedSamplesThisFrame >= maxSamplesPerFrame)
+            {
+                break;
             }
         }
     }
 
-    // 현재 파동 반경에 해당하는 위치에 점 1개 생성을 시도하는 함수이다.
+    // 현재 반경 띠에 맞는 점 1개를 만들려고 시도하는 함수이다.
     private void TrySpawnOneDotForCurrentWave(float currentRadius)
     {
-        // 파동 두께가 너무 작아지지 않게 보정한다.
-        float safeWaveThickness = Mathf.Max(0.01f, waveThickness);
-
-        // 점 1개를 만들기 위해 여러 번 레이를 시도한다.
         for (int attempt = 0; attempt < maxSpawnAttemptsPerDot; attempt++)
         {
-            // 화면 중심의 작은 원 안에서 랜덤 좌표를 뽑는다.
-            Vector2 offset = Random.insideUnitCircle * viewportRadius;
+            // 화면 넓은 사각 범위에서 랜덤 샘플링한다.
+            Vector2 viewportPoint = GetRandomViewportPoint();
 
-            // 뷰포트 좌표를 만든다.
-            float viewX = 0.5f + offset.x;
-            float viewY = 0.5f + offset.y;
+            // 카메라 기준 레이를 만든다.
+            Ray ray = scanCamera.ViewportPointToRay(new Vector3(viewportPoint.x, viewportPoint.y, 0f));
 
-            // 카메라 기준으로 레이를 만든다.
-            Ray ray = scanCamera.ViewportPointToRay(new Vector3(viewX, viewY, 0f));
-
-            // 표면에 맞지 않으면 다음 시도로 넘어간다.
+            // 표면을 맞추지 못하면 다음 시도다.
             if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, scanMask, triggerInteraction))
             {
                 continue;
             }
 
-            // 현재 파동이 이미 지나간 바로 뒤쪽 범위까지만 점을 허용한다.
-            float bandStart = Mathf.Max(0f, currentRadius - safeWaveThickness);
+            // 현재 파동 띠 범위를 계산한다.
+            float bandStart = Mathf.Max(0f, currentRadius - waveThickness);
             float bandEnd = currentRadius;
 
-            // 맞은 지점 거리가 현재 파동 띠 범위 밖이면 제외한다.
+            // 현재 띠 밖이면 제외한다.
             if (hit.distance < bandStart || hit.distance > bandEnd)
             {
                 continue;
             }
 
-            // 점이 표면 안에 박히지 않도록 살짝 띄운다.
-            Vector3 spawnPos = hit.point + hit.normal * surfaceOffset;
+            // 표면에서 살짝 띄운 위치를 계산한다.
+            Vector3 spawnPosition = hit.point + hit.normal * surfaceOffset;
 
-            // 월드 좌표를 셀 좌표로 바꾼다.
-            Vector3Int cell = WorldToCell(spawnPos);
+            // 표면 타입에 따라 색상 그룹을 정한다.
+            ScanDotColorGroup colorGroup = ResolveDotColorGroup(hit);
 
-            // 이미 점이 있는 셀이면 생성하지 않는다.
-            if (occupiedCells.Contains(cell))
-            {
-                continue;
-            }
-
-            // 점을 생성하고 셀을 기록한다.
-            SpawnDot(spawnPos);
-            occupiedCells.Add(cell);
-
-            // 점 1개 생성에 성공했으니 종료한다.
+            // 실제 점은 GPU 인스턴싱 렌더러에 넘긴다.
+            instancedDotRenderer.AddDot(spawnPosition, hit.normal, colorGroup);
             return;
         }
     }
 
-    // 실제 점 프리팹을 생성하는 함수이다.
-    private void SpawnDot(Vector3 position)
+    // 화면 넓은 범위에서 랜덤 뷰포트 좌표를 뽑는 함수이다.
+    private Vector2 GetRandomViewportPoint()
     {
-        // 점 프리팹을 생성한다.
-        Instantiate(dotPrefab, position, Quaternion.identity, dotContainer);
+        float viewX = 0.5f + Random.Range(-screenHalfWidth, screenHalfWidth);
+        float viewY = 0.5f + Random.Range(-screenHalfHeight, screenHalfHeight);
+
+        viewX = Mathf.Clamp(viewX, 0.02f, 0.98f);
+        viewY = Mathf.Clamp(viewY, 0.02f, 0.98f);
+
+        return new Vector2(viewX, viewY);
     }
 
-    // 월드 좌표를 중복 방지용 셀 좌표로 바꾸는 함수이다.
-    private Vector3Int WorldToCell(Vector3 worldPos)
+    // 표면 타입에 따라 색상 그룹을 정하는 함수이다.
+    private ScanDotColorGroup ResolveDotColorGroup(RaycastHit hit)
     {
-        // x, y, z를 셀 크기 단위로 나눠 반올림한다.
-        int x = Mathf.RoundToInt(worldPos.x / cellSize);
-        int y = Mathf.RoundToInt(worldPos.y / cellSize);
-        int z = Mathf.RoundToInt(worldPos.z / cellSize);
+        if (hit.collider == null)
+        {
+            return ScanDotColorGroup.Default;
+        }
 
-        // 셀 좌표를 반환한다.
-        return new Vector3Int(x, y, z);
+        // 자기 자신에서 먼저 찾는다.
+        ScanSurfaceInfo surfaceInfo = hit.collider.GetComponent<ScanSurfaceInfo>();
+
+        // 없으면 부모에서 찾는다.
+        if (surfaceInfo == null)
+        {
+            surfaceInfo = hit.collider.GetComponentInParent<ScanSurfaceInfo>();
+        }
+
+        // 없으면 기본 색이다.
+        if (surfaceInfo == null)
+        {
+            return ScanDotColorGroup.Default;
+        }
+
+        switch (surfaceInfo.surfaceType)
+        {
+            case ScanSurfaceType.Ground:
+                return ScanDotColorGroup.Ground;
+
+            case ScanSurfaceType.Rock:
+                return ScanDotColorGroup.Rock;
+
+            case ScanSurfaceType.TreeTrunk:
+                return ScanDotColorGroup.TreeTrunk;
+
+            case ScanSurfaceType.TreeLeaf:
+                return ScanDotColorGroup.TreeLeaf;
+
+            case ScanSurfaceType.Branch:
+                return ScanDotColorGroup.Branch;
+
+            case ScanSurfaceType.Bush:
+                return ScanDotColorGroup.Bush;
+
+            default:
+                return ScanDotColorGroup.Default;
+        }
     }
 
-        // 현재 스캔을 바로 사용할 수 있는 상태인지 반환한다.
+    // 현재 스캔이 사용 가능한지 반환하는 프로퍼티이다.
     public bool IsPulseReady
     {
         get
@@ -330,27 +348,38 @@ public class LidarSpotScanner : MonoBehaviour
         }
     }
 
-    // 현재 쿨타임 진행률을 0~1로 반환한다.
-    // 0이면 방금 사용한 상태이고, 1이면 다시 사용 가능한 상태이다.
+    // 쿨타임 진행률을 0~1로 반환하는 함수이다.
     public float GetCooldownNormalized()
     {
-        // 쿨타임이 0 이하이면 항상 사용 가능으로 본다.
         if (pulseCooldown <= 0f)
         {
             return 1f;
         }
 
-        // 이미 다시 사용할 수 있으면 1을 반환한다.
         if (Time.time >= nextPulseTime)
         {
             return 1f;
         }
 
-        // 남은 시간을 기준으로 진행률을 계산한다.
         float remaining = nextPulseTime - Time.time;
         float normalized = 1f - (remaining / pulseCooldown);
-
-        // 0~1 범위로 고정해서 반환한다.
         return Mathf.Clamp01(normalized);
+    }
+
+    // 테스트용으로 모든 점을 지우는 함수이다.
+    [ContextMenu("Clear Scan Dots")]
+    public void ClearScanDots()
+    {
+        // 진행 중 파동 초기화이다.
+        activePulses.Clear();
+
+        // 렌더러 쪽 점도 전부 지운다.
+        if (instancedDotRenderer != null)
+        {
+            instancedDotRenderer.ClearDots();
+        }
+
+        // 즉시 다시 사용 가능하게 만든다.
+        nextPulseTime = 0f;
     }
 }
