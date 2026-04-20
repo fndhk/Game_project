@@ -345,7 +345,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8566f64eef1418440bc095c69055436c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MouseLook
-  playerCamera: {fileID: 0}
+  playerCamera: {fileID: 49013741}
   mouseSensitivityX: 100
   mouseSensitivityY: 95
   maxLookUpAngle: 75
@@ -424,19 +424,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d969d5f48833aa48bb4af21affd6bd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LidarSpotScanner
-  dotPrefab: {fileID: 1883318055}
-  dotContainer: {fileID: 655947322}
   scanCamera: {fileID: 330585545}
+  instancedDotRenderer: {fileID: 0}
   scanPulseSource: {fileID: 49013748}
   pulseCooldown: 1.5
   pulseTravelDuration: 0.4
   pointsPerPulse: 450
   maxSpawnAttemptsPerDot: 200
   maxDistance: 10
-  viewportRadius: 0.5
+  screenHalfWidth: 0.42
+  screenHalfHeight: 0.3
   waveThickness: 0.75
   surfaceOffset: 0.01
-  cellSize: 0.08
+  maxSamplesPerFrame: 42
   scanMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -4845,11 +4845,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1876900606}
   m_CullTransparentMesh: 1
---- !u!1 &1883318055 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 9043815522817725080, guid: 181745792fe5abd42bfb276945fa5d8f, type: 3}
-  m_PrefabInstance: {fileID: 8379284543649969013}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1938737143
 GameObject:
   m_ObjectHideFlags: 0
