@@ -9,7 +9,13 @@ public enum ScanSurfaceType
     TreeTrunk,
     TreeLeaf,
     Branch,
-    Bush
+    Bush,
+
+    // 탈출 아이템은 일반 오브젝트와 다른 색 점으로 표시한다.
+    EscapeItem,
+
+    // 탈출구 문은 스캔 시 확실히 구분되도록 전용 색으로 표시한다.
+    ExitDoor
 }
 
 // 이 컴포넌트는 월드 오브젝트에 붙여서

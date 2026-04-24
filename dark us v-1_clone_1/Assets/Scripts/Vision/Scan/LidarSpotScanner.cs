@@ -420,6 +420,12 @@ public class LidarSpotScanner : MonoBehaviour
             case ScanSurfaceType.Bush:
                 return ScanDotColorGroup.Bush;
 
+            case ScanSurfaceType.EscapeItem:
+                return ScanDotColorGroup.EscapeItem;
+
+            case ScanSurfaceType.ExitDoor:
+                return ScanDotColorGroup.ExitDoor;
+                
             default:
                 return ScanDotColorGroup.Default;
         }

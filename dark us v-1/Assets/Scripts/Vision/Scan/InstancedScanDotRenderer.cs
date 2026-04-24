@@ -11,7 +11,9 @@ public enum ScanDotColorGroup
     TreeTrunk = 3,
     TreeLeaf = 4,
     Branch = 5,
-    Bush = 6
+    Bush = 6,
+    EscapeItem = 7,
+    ExitDoor = 8
 }
 
 // 점을 GameObject로 만들지 않고 GPU 인스턴싱으로 그리는 렌더러이다.
@@ -67,6 +69,12 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 부시용 점 색이다.
     [SerializeField] private Color bushDotColor = new Color(0.36f, 0.45f, 0.34f, 1f);
 
+    // 탈출 아이템용 점 색이다.
+    [SerializeField] private Color escapeItemDotColor = new Color(1.0f, 0.82f, 0.18f, 1f);
+
+    // 탈출구 문용 점 색이다.
+    [SerializeField] private Color exitDoorDotColor = new Color(0.0f, 0.95f, 0.85f, 1f);
+    
     // 원본 프리팹에서 가져온 메쉬이다.
     private Mesh instanceMesh;
 
@@ -115,7 +123,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
     // 색상 그룹 개수이다.
-    private const int ColorGroupCount = 7;
+    private const int ColorGroupCount = 9;
 
     private void Awake()
     {
@@ -376,7 +384,9 @@ public class InstancedScanDotRenderer : MonoBehaviour
             treeTrunkDotColor,
             treeLeafDotColor,
             branchDotColor,
-            bushDotColor
+            bushDotColor,
+            escapeItemDotColor,
+            exitDoorDotColor
         };
     }
 
