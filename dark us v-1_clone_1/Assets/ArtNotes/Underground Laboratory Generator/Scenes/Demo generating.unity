@@ -153,7 +153,7 @@ MonoBehaviour:
   CellLayer:
     serializedVersion: 2
     m_Bits: 4294967295
-  InsteadDoor: {fileID: 7639114947045758066, guid: 89f14f18f364b814b8e3c2a7258d8197, type: 3}
+  InsteadDoor: {fileID: 2130471771715180275, guid: 73278eca9bd804840a07ee5926b9acf0, type: 3}
   DoorPrefabs:
   - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
   - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
@@ -178,19 +178,6 @@ MonoBehaviour:
   - {fileID: 4306283604690561917, guid: 81484d12f3c12f840aae73e77b07944e, type: 3}
   - {fileID: 346204988107806966, guid: 0515e8a4d07f2b041a2639efa8833605, type: 3}
   - {fileID: 3687077963086360783, guid: ab2dd0706daeff54d87d645bbbf25bbf, type: 3}
-  - {fileID: 4892643769144039951, guid: f497c844ac9af9d49b14f07299b092fe, type: 3}
-  - {fileID: 1777275399059887341, guid: e4c345c465a9a1f4f932cf25a81d70fd, type: 3}
-  - {fileID: 2106306940899876607, guid: 4b62160741d887a47a63c2dd10a8b028, type: 3}
-  - {fileID: 5208687295194357408, guid: 0d4593f281a0ce34aaed0fc28b8e6cd9, type: 3}
-  - {fileID: 4046838180645043062, guid: 3186a6a1f3672df4681a96a94a9d2dad, type: 3}
-  - {fileID: 5269122835788026001, guid: febd1a7afd34c7349b32936c24f255d0, type: 3}
-  - {fileID: 1775043387963847528, guid: c7f4c3999012062478f3b94ff24b5ea2, type: 3}
-  - {fileID: 2004901786751058266, guid: 1011cbc0885fcee419031942e3c57c65, type: 3}
-  - {fileID: 471047999014910823, guid: 93ca53315dd82534fa0d7baa526b2c61, type: 3}
-  - {fileID: 500740190327199818, guid: 736565e83d2124d4899a2b5e51798507, type: 3}
-  - {fileID: 7218385072039734495, guid: 81a0bbacb3e98c044800fef7e60a62a5, type: 3}
-  - {fileID: 3745941486471605408, guid: 47c9e70439757384ebad1758ec8c3148, type: 3}
-  - {fileID: 5609003998976228916, guid: 18cbb28446f3b6649bd4f9c45e29d6a5, type: 3}
 --- !u!4 &491941056
 Transform:
   m_ObjectHideFlags: 0
