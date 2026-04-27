@@ -3488,20 +3488,6 @@ MonoBehaviour:
   - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
   - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
   - {fileID: 3448587255341618831, guid: 5ec566e85fa59834cb93903674af2a8b, type: 3}
-  ConnectedDoorPositionOffset: {x: 0, y: 0, z: 0}
-  ConnectedDoorRotationOffset: {x: 0, y: 0, z: 0}
-  BlockDoorPositionOffset: {x: 0, y: 1.5, z: 0}
-  BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
-  ExitDoorPositionOffset: {x: 0, y: 1.5, z: 0}
-  ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
-  HideExitVisualsWhenExitUsed: 1
-  DestroyExitVisualsInsteadOfDisable: 0
-  AutoHideRedExitMarkers: 1
-  RedExitMarkerSearchRadius: 3.2
-  RedExitMarkerMaxHeightDifference: 1.2
-  HideGeneratedVisualsInGame: 1
-  HideGeneratedVisualsOnlyInPlayMode: 0
-  HideGeneratedDoorVisualsToo: 1
   CellPrefabs:
   - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
   - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
@@ -3539,7 +3525,18 @@ MonoBehaviour:
   - {fileID: 2019504973805890188, guid: ab98d60067966a843bb2ae51e69da9d0, type: 3}
   - {fileID: -8494008749103874762, guid: 69f27df9dae5bd242953871dd31f99e3, type: 3}
   - {fileID: 7392582032655661870, guid: e25d900929cc02e4fb99c38afb67631d, type: 3}
+  ConnectedDoorPositionOffset: {x: 0, y: 0, z: 0}
+  ConnectedDoorRotationOffset: {x: 0, y: 0, z: 0}
+  BlockDoorPositionOffset: {x: 0, y: 1.5, z: 0}
+  BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
+  ExitDoorPositionOffset: {x: 0, y: 1.5, z: 0}
+  ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
+  HideGeneratedVisualsInGame: 1
+  HideGeneratedVisualsOnlyInPlayMode: 1
   ClearPreviousGeneratedChildren: 1
+  UseBfsExpansion: 1
+  BfsDepthRandomSpread: 0
+  MaxFailedAttemptsPerOpenExit: 2
 --- !u!4 &1212871146
 Transform:
   m_ObjectHideFlags: 0

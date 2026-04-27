@@ -40,6 +40,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("방과 방을 연결하는 DoorPoint 오브젝트 목록")]
         public GameObject[] Exits;
 
+        [Tooltip("Exits와 같은 순서로 넣는 출구 표시용 빨간 바닥/마커. 연결되거나 막힌 출구는 자동으로 꺼짐")]
+        public GameObject[] ExitVisuals;
+
         [Header("Generation Setting")]
         [Tooltip("방, 복도, 계단방, 시작방 같은 타입")]
         public FacilityCellType CellType = FacilityCellType.SmallRoom;

@@ -1375,85 +1375,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 349919851}
   m_CullTransparentMesh: 1
---- !u!1 &363932616
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 363932618}
-  - component: {fileID: 363932617}
-  m_Layer: 0
-  m_Name: ProceduralFacilityGenerator
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &363932617
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 363932616}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 22aaed7a8ba770942bbcd04d18d4f6ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ProceduralFacilityGenerator
-  generateOnStart: 1
-  clearBeforeGenerate: 1
-  useFixedSeed: 1
-  fixedSeed: 12345
-  lastGeneratedSeed: 0
-  playerCount: 4
-  startRoomPlacementRadius: 20
-  minStartRoomDistance: 12
-  targetRoomCount: 24
-  maxPlacementAttemptsPerStep: 50
-  startRoomPrefabs: []
-  smallRoomPrefabs: []
-  normalRoomPrefabs: []
-  largeRoomPrefabs: []
-  specialRoomPrefabs: []
-  corridorPrefabs: []
-  stairPrefabs: []
-  blockedDoorPrefab: {fileID: 0}
-  exitDoorPrefab: {fileID: 0}
-  escapeItemPrefabs: []
-  escapeItemCount: 4
-  directRoomConnectionChance: 0.45
-  stairRoomChance: 0.12
-  bridgeConnectionCount: 3
-  maxBridgeSocketDistance: 16
-  bridgeSocketSnapTolerance: 0.55
-  minEscapeItemDepthFromStart: 3
-  minEscapeItemDistanceFromStart: 15
-  boundsShrinkAmount: 0.35
-  maxAllowedConnectionOverlapDepth: 1
-  applyScanLayerAutomatically: 1
-  scanLayerName: RevealSurface
-  hideRenderersAfterGenerate: 0
-  generatedRoot: {fileID: 0}
-  debugPlacementFailures: 1
---- !u!4 &363932618
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 363932616}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 11.08494, y: -0, z: 5.10826}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -3541,21 +3462,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArtNotes.UndergroundLaboratoryGenerator.LaboratoryGenerator
   GenerateOnStart: 1
-  RoomCount: 15
+  RoomCount: 45
   PlayerCount: 4
   CellLayer:
     serializedVersion: 2
     m_Bits: 64
-  UseMapBounds: 1
+  UseMapBounds: 0
   MapCenter: {x: 0, y: 0, z: 0}
-  MapSize: {x: 100, y: 100}
+  MapSize: {x: 120, y: 120}
   MapBoundsPadding: 0
   DrawMapBoundsGizmo: 0
   FloorHeight: 4
-  BlockBigRoomToBigRoom: 1
+  BlockBigRoomToBigRoom: 0
+  BlockCorridorToCorridor: 1
   ForceCorridorBetweenRooms: 0
   AllowSmallBigDirectConnection: 1
-  StartRoomMinDistance: 15
+  StartRoomMinDistance: 12
   StartRoomsOnlyOnFirstFloor: 0
   ExitMinDistanceFromStart: 22
   ExitDoorPrefab: {fileID: 344243390541399612, guid: c5d2961b9e3647446b04001fc37ca6d8, type: 3}
@@ -3566,7 +3488,20 @@ MonoBehaviour:
   - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
   - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
   - {fileID: 3448587255341618831, guid: 5ec566e85fa59834cb93903674af2a8b, type: 3}
-  - {fileID: 8098944512544985556, guid: c02f45ee349fd1a478452aeb0c528289, type: 3}
+  ConnectedDoorPositionOffset: {x: 0, y: 0, z: 0}
+  ConnectedDoorRotationOffset: {x: 0, y: 0, z: 0}
+  BlockDoorPositionOffset: {x: 0, y: 1.5, z: 0}
+  BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
+  ExitDoorPositionOffset: {x: 0, y: 1.5, z: 0}
+  ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
+  HideExitVisualsWhenExitUsed: 1
+  DestroyExitVisualsInsteadOfDisable: 0
+  AutoHideRedExitMarkers: 1
+  RedExitMarkerSearchRadius: 3.2
+  RedExitMarkerMaxHeightDifference: 1.2
+  HideGeneratedVisualsInGame: 1
+  HideGeneratedVisualsOnlyInPlayMode: 0
+  HideGeneratedDoorVisualsToo: 1
   CellPrefabs:
   - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
   - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
@@ -5055,5 +4990,4 @@ SceneRoots:
   - {fileID: 977841480}
   - {fileID: 878139341}
   - {fileID: 845255687}
-  - {fileID: 363932618}
   - {fileID: 1212871146}
