@@ -168,7 +168,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 2, y: 1, z: 2}
+  m_LocalScale: {x: 2, y: 1.5, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5636057471769482090}
@@ -213,6 +213,7 @@ MonoBehaviour:
   Exits:
   - {fileID: 1347728967076465932}
   - {fileID: 5041099005827149753}
+  ExitVisuals: []
   CellType: 2
   CellSize: 1
   FloorRule: 0

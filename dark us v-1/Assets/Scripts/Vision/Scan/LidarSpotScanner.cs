@@ -1,131 +1,146 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 플레이어가 우클릭으로 어두운 공간을 점 형태로 탐색하는 스캐너이다.
+// 우클릭 시 화면에 보이는 넓은 범위를 훑어서 표면에 점을 찍는 스캐너이다.
+// 실제 점 렌더링은 InstancedScanDotRenderer가 맡고,
+// 이 스크립트는 스캔 파동 진행과 Raycast 샘플링만 담당한다.
 public class LidarSpotScanner : MonoBehaviour
 {
-    [Header("참조")]
-    // 스캔 레이를 발사할 카메라이다.
-    public Camera scanCamera;
+    [Header("References")]
+    // 스캔 기준 카메라이다.
+    [SerializeField] private Camera scanCamera;
 
-    // 실제 점을 GPU 인스턴싱으로 그려주는 렌더러이다.
-    public InstancedScanDotRenderer instancedDotRenderer;
+    // 실제 점을 GPU 인스턴싱으로 그리는 렌더러이다.
+    [SerializeField] private InstancedScanDotRenderer instancedDotRenderer;
 
-    // 스캔 사운드를 재생할 오디오 소스이다.
-    public AudioSource scanPulseSource;
+    [Header("Scan Audio")]
+    // 스캔 사운드 소스이다.
+    [SerializeField] private AudioSource scanPulseSource;
 
-    [Header("입력")]
-    // true이면 우클릭을 누르고 있는 동안 쿨타임마다 자동으로 스캔한다.
-    public bool holdToRepeat = true;
+    [Header("Pulse Settings")]
+    // 우클릭 후 다음 사용까지의 쿨타임이다.
+    [SerializeField] private float pulseCooldown = 0.42f;
 
-    [Header("자기 자신 제외")]
-    // true이면 자기 자신의 콜라이더는 스캔에서 제외한다.
-    public bool ignoreSelfHits = true;
+    // 파동이 최대 거리까지 퍼지는 시간이다.
+    [SerializeField] private float pulseTravelDuration = 0.34f;
 
-    // 자기 자신 판정에 사용할 루트이다.
-    // 비워두면 현재 오브젝트의 루트를 자동으로 사용한다.
-    public Transform selfRootOverride;
+    // 파동 1회 총 샘플 수이다.
+    [SerializeField] private int pointsPerPulse = 380;
 
-    [Header("스캔 범위")]
+    // 점 1개를 만들기 위해 재시도할 최대 횟수이다.
+    [SerializeField] private int maxSpawnAttemptsPerDot = 14;
+
     // 최대 스캔 거리이다.
-    public float maxDistance = 18f;
+    [SerializeField] private float maxDistance = 16f;
 
-    // 화면 중심 기준 가로 반 범위이다.
-    [Range(0.05f, 0.5f)] public float screenHalfWidth = 0.42f;
+    // 화면 가로 절반 범위이다.
+    [SerializeField] private float screenHalfWidth = 0.42f;
 
-    // 화면 중심 기준 세로 반 범위이다.
-    [Range(0.05f, 0.5f)] public float screenHalfHeight = 0.28f;
+    // 화면 세로 절반 범위이다.
+    [SerializeField] private float screenHalfHeight = 0.30f;
 
-    // 점을 표면에서 얼마나 띄울지 정한다.
-    public float surfaceOffset = 0.02f;
+    // 현재 파동 띠 두께이다.
+    [SerializeField] private float waveThickness = 1.05f;
 
-    [Header("파동 설정")]
-    // 우클릭 한 번의 쿨타임이다.
-    public float pulseCooldown = 1.15f;
+    // 표면에서 점을 살짝 띄우는 값이다.
+    [SerializeField] private float surfaceOffset = 0.01f;
 
-    // 한 번의 파동이 퍼지는 시간이다.
-    public float pulseTravelDuration = 0.28f;
+    [Header("Readability Filter")]
+    // 카메라와 너무 가까운 점은 화면을 크게 가리기 때문에 생성하지 않는다.
+    [SerializeField] private float minDotDistanceFromCamera = 1.25f;
 
-    // 파동 하나에서 목표로 하는 총 점 개수이다.
-    public int pointsPerPulse = 650;
+    // 바닥 점 생성 확률이다.
+    [Range(0f, 1f)]
+    [SerializeField] private float groundDotChance = 0.45f;
 
-    // 파동 띠 두께이다.
-    public float waveThickness = 1.35f;
+    // 천장 점 생성 확률이다.
+    [Range(0f, 1f)]
+    [SerializeField] private float ceilingDotChance = 0.14f;
 
-    // 점 하나를 만들 때 최대 시도 횟수이다.
-    public int maxSpawnAttemptsPerDot = 8;
+    // 벽과 일반 오브젝트 점 생성 확률이다.
+    [Range(0f, 1f)]
+    [SerializeField] private float wallAndObjectDotChance = 1f;
 
-    [Header("성능 제한")]
-    // 한 프레임 최대 샘플 처리 수이다.
-    public int maxSamplesPerFrame = 180;
+    // 바닥/천장 판정을 위한 노멀 기준값이다.
+    [Range(0.1f, 0.95f)]
+    [SerializeField] private float horizontalSurfaceNormalThreshold = 0.55f;
 
-    [Header("레이어")]
-    // 스캔 대상 레이어 마스크이다.
-    public LayerMask scanMask = ~0;
+    [Header("Performance")]
+    // 한 프레임에 처리할 최대 샘플 수이다.
+    // 점이 많이 찍혀도 프레임이 뚝 끊기지 않게 분산한다.
+    [SerializeField] private int maxSamplesPerFrame = 42;
 
-    // 트리거 포함 여부이다.
-    public QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.Ignore;
+    [Header("Raycast")]
+    // 스캔 대상 레이어이다.
+    [SerializeField] private LayerMask scanMask = ~0;
 
-    // 현재 살아 있는 파동 하나의 상태이다.
-    private class ActivePulse
-    {
-        // 파동이 시작된 뒤 흐른 시간이다.
-        public float elapsedTime;
+    // 트리거 처리 방식이다.
+    [SerializeField] private QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.Ignore;
 
-        // 누적된 샘플 예산이다.
-        public float sampleBudget;
-    }
+    // 다음 스캔 가능 시간이다.
+    private float nextPulseTime = 0f;
 
     // 현재 진행 중인 파동 목록이다.
     private readonly List<ActivePulse> activePulses = new List<ActivePulse>();
 
-    // 다음 스캔이 가능해지는 시각이다.
-    private float nextPulseTime;
+    // 파동 1개의 진행 상태이다.
+    private class ActivePulse
+    {
+        // 파동 시작 후 지난 시간이다.
+        public float elapsedTime = 0f;
 
-    // 자기 자신 판정에 사용할 실제 루트 캐시이다.
-    private Transform cachedSelfRoot;
+        // 이번 프레임까지 누적된 샘플 예산이다.
+        public float sampleBudget = 0f;
+    }
 
-    // 레이 위의 여러 히트를 재사용 버퍼로 받기 위한 배열이다.
-    private readonly RaycastHit[] raycastHits = new RaycastHit[16];
+    private void Reset()
+    {
+        // 기본 참조를 자동으로 채운다.
+        scanCamera = GetComponent<Camera>();
+        scanPulseSource = GetComponent<AudioSource>();
+        instancedDotRenderer = GetComponent<InstancedScanDotRenderer>();
+    }
 
-    // 시작 시 기본 참조를 자동으로 찾는다.
     private void Awake()
     {
+        // 최소값 보정이다.
+        pointsPerPulse = Mathf.Max(1, pointsPerPulse);
+        maxSpawnAttemptsPerDot = Mathf.Max(1, maxSpawnAttemptsPerDot);
+        pulseTravelDuration = Mathf.Max(0.01f, pulseTravelDuration);
+        waveThickness = Mathf.Max(0.05f, waveThickness);
+        maxSamplesPerFrame = Mathf.Max(1, maxSamplesPerFrame);
+        minDotDistanceFromCamera = Mathf.Max(0f, minDotDistanceFromCamera);
+        groundDotChance = Mathf.Clamp01(groundDotChance);
+        ceilingDotChance = Mathf.Clamp01(ceilingDotChance);
+        wallAndObjectDotChance = Mathf.Clamp01(wallAndObjectDotChance);
+        horizontalSurfaceNormalThreshold = Mathf.Clamp(horizontalSurfaceNormalThreshold, 0.1f, 0.95f);
+        // 카메라가 비어 있으면 메인 카메라를 사용한다.
         if (scanCamera == null)
         {
             scanCamera = Camera.main;
         }
 
-        if (instancedDotRenderer == null)
+        // 오디오 설정을 정리한다.
+        if (scanPulseSource != null)
         {
-            instancedDotRenderer = GetComponent<InstancedScanDotRenderer>();
+            scanPulseSource.playOnAwake = false;
+            scanPulseSource.loop = false;
         }
-
-        CacheSelfRoot();
     }
 
-    // 매 프레임 입력과 파동 진행을 처리한다.
     private void Update()
     {
+        // 준비가 안 되었으면 종료한다.
         if (!CanUseScanner())
         {
             return;
         }
 
+        // 입력을 처리한다.
         HandlePulseInput();
+
+        // 진행 중인 파동을 갱신한다.
         UpdateActivePulses();
-    }
-
-    // 자기 자신 루트를 캐시한다.
-    private void CacheSelfRoot()
-    {
-        if (selfRootOverride != null)
-        {
-            cachedSelfRoot = selfRootOverride;
-            return;
-        }
-
-        cachedSelfRoot = transform.root;
     }
 
     // 스캐너를 사용할 수 있는지 확인하는 함수이다.
@@ -151,32 +166,16 @@ public class LidarSpotScanner : MonoBehaviour
             return false;
         }
 
-        if (cachedSelfRoot == null)
-        {
-            CacheSelfRoot();
-        }
-
         return true;
     }
 
     // 우클릭 입력을 처리하는 함수이다.
     private void HandlePulseInput()
     {
-        // 토글형 반복이면 누르고 있는 동안 쿨타임마다 처리한다.
-        if (holdToRepeat)
+        // 우클릭 순간만 처리한다.
+        if (!Input.GetMouseButtonDown(1))
         {
-            if (!Input.GetMouseButton(1))
-            {
-                return;
-            }
-        }
-        // 기존 방식이면 누른 순간 한 번만 처리한다.
-        else
-        {
-            if (!Input.GetMouseButtonDown(1))
-            {
-                return;
-            }
+            return;
         }
 
         // 쿨타임 중이면 종료한다.
@@ -276,8 +275,8 @@ public class LidarSpotScanner : MonoBehaviour
             // 카메라 기준 레이를 만든다.
             Ray ray = scanCamera.ViewportPointToRay(new Vector3(viewportPoint.x, viewportPoint.y, 0f));
 
-            // 자기 자신을 제외한 유효 히트를 찾지 못하면 다음 시도다.
-            if (!TryGetFirstValidHit(ray, out RaycastHit hit))
+            // 표면을 맞추지 못하면 다음 시도다.
+            if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, scanMask, triggerInteraction))
             {
                 continue;
             }
@@ -292,6 +291,12 @@ public class LidarSpotScanner : MonoBehaviour
                 continue;
             }
 
+            // 가독성 필터를 통과하지 못하면 제외한다.
+            if (!ShouldKeepHitForReadability(hit))
+            {
+                continue;
+            }
+
             // 표면에서 살짝 띄운 위치를 계산한다.
             Vector3 spawnPosition = hit.point + hit.normal * surfaceOffset;
 
@@ -299,70 +304,60 @@ public class LidarSpotScanner : MonoBehaviour
             ScanDotColorGroup colorGroup = ResolveDotColorGroup(hit);
 
             // 실제 점은 GPU 인스턴싱 렌더러에 넘긴다.
+            // 거리별 점 크기 조절은 제거하고, 렌더러의 기본 dotScale만 사용한다.
             instancedDotRenderer.AddDot(spawnPosition, hit.normal, colorGroup);
             return;
         }
     }
 
-    // 레이 위에서 자기 자신을 제외한 가장 가까운 유효 히트를 찾는다.
-    private bool TryGetFirstValidHit(Ray ray, out RaycastHit bestHit)
+    // 스캔 표면의 큰 분류이다.
+    private enum HitSurfaceClass
     {
-        bestHit = default;
-
-        int hitCount = Physics.RaycastNonAlloc(ray, raycastHits, maxDistance, scanMask, triggerInteraction);
-        if (hitCount <= 0)
-        {
-            return false;
-        }
-
-        bool found = false;
-        float closestDistance = float.MaxValue;
-
-        for (int i = 0; i < hitCount; i++)
-        {
-            RaycastHit candidate = raycastHits[i];
-
-            if (candidate.collider == null)
-            {
-                continue;
-            }
-
-            // 자기 자신의 히트면 무시한다.
-            if (ignoreSelfHits && IsSelfCollider(candidate.collider))
-            {
-                continue;
-            }
-
-            if (candidate.distance < closestDistance)
-            {
-                closestDistance = candidate.distance;
-                bestHit = candidate;
-                found = true;
-            }
-        }
-
-        return found;
+        WallOrObject,
+        Ground,
+        Ceiling
     }
 
-    // 전달받은 콜라이더가 자기 자신 루트 소속인지 판정한다.
-    private bool IsSelfCollider(Collider targetCollider)
+    // 현재 히트를 점으로 남길지 결정하는 함수이다.
+    private bool ShouldKeepHitForReadability(RaycastHit hit)
     {
-        if (targetCollider == null)
+        // 너무 가까운 점은 화면을 가리므로 제외한다.
+        if (hit.distance < minDotDistanceFromCamera)
         {
             return false;
         }
 
-        if (cachedSelfRoot == null)
+        // 표면 분류에 따라 생성 확률을 다르게 적용한다.
+        HitSurfaceClass surfaceClass = ResolveHitSurfaceClass(hit.normal);
+
+        float keepChance = wallAndObjectDotChance;
+
+        if (surfaceClass == HitSurfaceClass.Ground)
         {
-            CacheSelfRoot();
+            keepChance = groundDotChance;
+        }
+        else if (surfaceClass == HitSurfaceClass.Ceiling)
+        {
+            keepChance = ceilingDotChance;
         }
 
-        if (cachedSelfRoot == null)
+        return Random.value <= keepChance;
+    }
+
+    // 표면 노멀을 기준으로 바닥/천장/벽을 구분하는 함수이다.
+    private HitSurfaceClass ResolveHitSurfaceClass(Vector3 normal)
+    {
+        if (normal.y >= horizontalSurfaceNormalThreshold)
         {
-            return false;
+            return HitSurfaceClass.Ground;
         }
 
-        return targetCollider.transform.root == cachedSelfRoot;
+        if (normal.y <= -horizontalSurfaceNormalThreshold)
+        {
+            return HitSurfaceClass.Ceiling;
+        }
+
+        return HitSurfaceClass.WallOrObject;
     }
 
     // 화면 넓은 범위에서 랜덤 뷰포트 좌표를 뽑는 함수이다.
@@ -382,7 +377,7 @@ public class LidarSpotScanner : MonoBehaviour
     {
         if (hit.collider == null)
         {
-            return ScanDotColorGroup.Default;
+            return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
         // 자기 자신에서 먼저 찾는다.
@@ -394,41 +389,62 @@ public class LidarSpotScanner : MonoBehaviour
             surfaceInfo = hit.collider.GetComponentInParent<ScanSurfaceInfo>();
         }
 
-        // 없으면 기본 색이다.
+        // 없으면 표면 노멀 기준으로 바닥/벽을 자동 분리한다.
         if (surfaceInfo == null)
         {
-            return ScanDotColorGroup.Default;
+            return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
         switch (surfaceInfo.surfaceType)
         {
-            case ScanSurfaceType.Ground:
-                return ScanDotColorGroup.Ground;
+            case ScanSurfaceType.Floor:
+                return ScanDotColorGroup.Floor;
 
-            case ScanSurfaceType.Rock:
-                return ScanDotColorGroup.Rock;
+            case ScanSurfaceType.Wall:
+                return ScanDotColorGroup.Wall;
 
-            case ScanSurfaceType.TreeTrunk:
-                return ScanDotColorGroup.TreeTrunk;
+            case ScanSurfaceType.Metal:
+                return ScanDotColorGroup.Metal;
 
-            case ScanSurfaceType.TreeLeaf:
-                return ScanDotColorGroup.TreeLeaf;
+            case ScanSurfaceType.Glass:
+                return ScanDotColorGroup.Glass;
 
-            case ScanSurfaceType.Branch:
-                return ScanDotColorGroup.Branch;
+            case ScanSurfaceType.AccessCore:
+                return ScanDotColorGroup.AccessCore;
 
-            case ScanSurfaceType.Bush:
-                return ScanDotColorGroup.Bush;
+            case ScanSurfaceType.SecurityTerminal:
+                return ScanDotColorGroup.SecurityTerminal;
 
-            case ScanSurfaceType.EscapeItem:
-                return ScanDotColorGroup.EscapeItem;
+            case ScanSurfaceType.EmergencyExit:
+                return ScanDotColorGroup.EmergencyExit;
 
-            case ScanSurfaceType.ExitDoor:
-                return ScanDotColorGroup.ExitDoor;
-                
+            case ScanSurfaceType.PlayerBody:
+                return ScanDotColorGroup.PlayerBody;
+
+            case ScanSurfaceType.Creature:
+                return ScanDotColorGroup.Creature;
+
             default:
-                return ScanDotColorGroup.Default;
+                return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
+    }
+
+    // ScanSurfaceInfo가 없는 오브젝트를 노멀 기준으로 최소한 바닥/벽 구분하는 함수이다.
+    private ScanDotColorGroup ResolveFallbackDotColorGroupByNormal(Vector3 normal)
+    {
+        HitSurfaceClass surfaceClass = ResolveHitSurfaceClass(normal);
+
+        if (surfaceClass == HitSurfaceClass.Ground)
+        {
+            return ScanDotColorGroup.Floor;
+        }
+
+        if (surfaceClass == HitSurfaceClass.Ceiling)
+        {
+            return ScanDotColorGroup.Wall;
+        }
+
+        return ScanDotColorGroup.Wall;
     }
 
     // 현재 스캔이 사용 가능한지 반환하는 프로퍼티이다.
