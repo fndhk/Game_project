@@ -27,7 +27,7 @@ public class GameSessionManager : NetworkBehaviour
 
     private void StartGame()
     {
-        // ╟тюс ╥Гф╬ ╫цюш ╧в ╬ю юЭх╞ ╥наВ
-        Debug.Log("цж╪р юн©Ь цФа╥: ╟тюсю╩ ╫цюшгу╢о╢ы.");
+        // О©╫О©╫О©╫О©╫ О©╫О©╫ф╬ О©╫О©╫О©╫О©╫ О©╫О©╫ О©╫О©╫ О©╫О©╫х╞ О©╫О©╫О©╫О©╫
+        Debug.Log(".");
     }
 }
