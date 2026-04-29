@@ -6,12 +6,18 @@ using UnityEngine.Rendering;
 public enum ScanDotColorGroup
 {
     Default = 0,
-    Ground = 1,
-    Rock = 2,
-    TreeTrunk = 3,
-    TreeLeaf = 4,
-    Branch = 5,
-    Bush = 6
+
+    // 연구소 맵에서 쓰는 색상 그룹이다.
+    // 숫자는 이전 버전과 호환되도록 유지한다.
+    Floor = 7,
+    Wall = 8,
+    Metal = 9,
+    Glass = 10,
+    AccessCore = 11,
+    SecurityTerminal = 12,
+    EmergencyExit = 13,
+    PlayerBody = 14,
+    Creature = 15
 }
 
 // 점을 GameObject로 만들지 않고 GPU 인스턴싱으로 그리는 렌더러이다.
@@ -25,7 +31,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
     [Header("Dot Shape")]
     // 점 크기이다.
-    [SerializeField] private float dotScale = 0.06f;
+    [SerializeField] private float dotScale = 0.042f;
 
     // 원본 메쉬를 표면 노멀에 맞춰 회전할지 여부이다.
     // Sphere를 쓸 거면 꺼도 된다.
@@ -45,27 +51,41 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 그림자 받기 여부이다.
     [SerializeField] private bool receiveShadows = false;
 
+    [Header("Readability Colors")]
+    // 시작할 때 가독성용 회백색 프리셋을 적용할지 여부이다.
+    [SerializeField] private bool applyReadabilityColorPresetOnAwake = true;
+
     [Header("Dot Colors")]
     // 기본 점 색이다.
-    [SerializeField] private Color defaultDotColor = Color.white;
+    [SerializeField] private Color defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
 
-    // 바닥용 점 색이다.
-    [SerializeField] private Color groundDotColor = new Color(0.72f, 0.72f, 0.69f, 1f);
+    [Header("Laboratory Dot Colors")]
+    // 연구소 바닥용 점 색이다.
+    [SerializeField] private Color floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
 
-    // 바위용 점 색이다.
-    [SerializeField] private Color rockDotColor = new Color(0.56f, 0.59f, 0.63f, 1f);
+    // 연구소 벽용 점 색이다.
+    [SerializeField] private Color wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
 
-    // 나무 줄기용 점 색이다.
-    [SerializeField] private Color treeTrunkDotColor = new Color(0.43f, 0.35f, 0.28f, 1f);
+    // 금속/기계류용 점 색이다.
+    [SerializeField] private Color metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
 
-    // 나뭇잎용 점 색이다.
-    [SerializeField] private Color treeLeafDotColor = new Color(0.36f, 0.45f, 0.34f, 1f);
+    // 유리용 점 색이다.
+    [SerializeField] private Color glassDotColor = new Color(0.42f, 0.72f, 0.86f, 1f);
 
-    // 브런치용 점 색이다.
-    [SerializeField] private Color branchDotColor = new Color(0.45f, 0.41f, 0.36f, 1f);
+    // 탈출 핵심 오브젝트용 점 색이다.
+    [SerializeField] private Color accessCoreDotColor = new Color(0.12f, 0.88f, 0.82f, 1f);
 
-    // 부시용 점 색이다.
-    [SerializeField] private Color bushDotColor = new Color(0.36f, 0.45f, 0.34f, 1f);
+    // 보안 단말기용 점 색이다.
+    [SerializeField] private Color securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
+
+    // 탈출구용 점 색이다.
+    [SerializeField] private Color emergencyExitDotColor = new Color(0.95f, 0.78f, 0.20f, 1f);
+
+    // 플레이어 신체용 점 색이다.
+    [SerializeField] private Color playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
+
+    // 생명체/괴물용 점 색이다.
+    [SerializeField] private Color creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
 
     // 원본 프리팹에서 가져온 메쉬이다.
     private Mesh instanceMesh;
@@ -115,7 +135,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
     // 색상 그룹 개수이다.
-    private const int ColorGroupCount = 7;
+    private const int ColorGroupCount = 16;
 
     private void Awake()
     {
@@ -123,6 +143,11 @@ public class InstancedScanDotRenderer : MonoBehaviour
         maxActiveDots = Mathf.Max(1, maxActiveDots);
         cellSize = Mathf.Max(0.01f, cellSize);
         dotScale = Mathf.Max(0.001f, dotScale);
+        // 가독성용 점 색 프리셋을 적용한다.
+        if (applyReadabilityColorPresetOnAwake)
+        {
+            ApplyReadabilityColorPreset();
+        }
 
         // 그룹별 프레임 리스트를 준비한다.
         InitializeFrameLists();
@@ -189,6 +214,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         }
 
         // 인스턴싱용 행렬을 만든다.
+        // 거리별 점 크기 조절은 제거하고 항상 기본 dotScale만 사용한다.
         Matrix4x4 matrix = Matrix4x4.TRS(
             worldPosition,
             rotation,
@@ -209,6 +235,13 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
         // 재사용 순서를 기록한다.
         activeOrder.Enqueue(dotIndex);
+    }
+
+    // 예전 버전과의 코드 호환성을 위한 함수이다.
+    // 현재 버전에서는 scaleMultiplier를 사용하지 않고 기본 dotScale만 사용한다.
+    public void AddDot(Vector3 worldPosition, Vector3 surfaceNormal, ScanDotColorGroup colorGroup, float scaleMultiplier)
+    {
+        AddDot(worldPosition, surfaceNormal, colorGroup);
     }
 
     // 전체 점을 비우는 함수이다.
@@ -243,6 +276,28 @@ public class InstancedScanDotRenderer : MonoBehaviour
         }
 
         return count;
+    }
+
+    // 가독성용 회백색 점 색 프리셋을 적용하는 함수이다.
+    private void ApplyReadabilityColorPreset()
+    {
+        // 기본 구조물은 완전 흰색보다 낮은 회백색을 쓴다.
+        defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
+
+        // 연구소 기본 구조물은 기존 공포감을 유지하기 위해 낮은 채도의 회색 계열로 둔다.
+        floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
+        wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
+        metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
+        glassDotColor = new Color(0.42f, 0.72f, 0.86f, 1f);
+
+        // 목표 오브젝트만 색이 확실히 보이게 한다.
+        accessCoreDotColor = new Color(0.12f, 0.88f, 0.82f, 1f);
+        securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
+        emergencyExitDotColor = new Color(0.95f, 0.78f, 0.20f, 1f);
+
+        // 플레이어와 생명체는 역할 구분이 아니라 생체 신호 느낌만 준다.
+        playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
+        creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
     }
 
     // 그룹별 리스트를 준비하는 함수이다.
@@ -371,12 +426,21 @@ public class InstancedScanDotRenderer : MonoBehaviour
         return new Color[]
         {
             defaultDotColor,
-            groundDotColor,
-            rockDotColor,
-            treeTrunkDotColor,
-            treeLeafDotColor,
-            branchDotColor,
-            bushDotColor
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            floorDotColor,
+            wallDotColor,
+            metalDotColor,
+            glassDotColor,
+            accessCoreDotColor,
+            securityTerminalDotColor,
+            emergencyExitDotColor,
+            playerBodyDotColor,
+            creatureDotColor
         };
     }
 
