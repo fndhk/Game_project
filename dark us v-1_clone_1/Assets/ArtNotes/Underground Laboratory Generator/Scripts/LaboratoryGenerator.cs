@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace ArtNotes.UndergroundLaboratoryGenerator
 {
@@ -60,6 +62,96 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("시작방은 1층 출구에만 붙게 할지 여부")]
         public bool StartRoomsOnlyOnFirstFloor = true;
 
+        [Tooltip("켜면 예전 방식처럼 플레이어 수만큼 전용 시작방을 따로 생성함. 지금 방식에서는 끄는 것을 추천")]
+        public bool GenerateDedicatedStartRooms = false;
+
+        [Header("Player Spawn Points")]
+        [Tooltip("방 프리팹 안에 직접 배치할 플레이어 스폰 포인트 이름 접두어")]
+        public string PlayerSpawnPointPrefix = "PlayerSpawnPoint";
+
+        [Tooltip("비활성화된 PlayerSpawnPoint도 후보에 포함")]
+        public bool IncludeInactivePlayerSpawnPoints = true;
+
+        [Tooltip("플레이어 스폰은 방 타입에서만 허용. 복도 스폰을 막고 싶으면 켜둠")]
+        public bool PlayerSpawnOnlyInRooms = true;
+
+        [Tooltip("플레이어끼리 같은 방에서 시작하지 못하게 함")]
+        public bool OnePlayerPerRoom = true;
+
+        [Tooltip("탈출구가 붙은 방에서는 플레이어가 시작하지 못하게 함")]
+        public bool AvoidExitRoomForPlayerSpawn = true;
+
+        [Header("Player Spawn")]
+        [Tooltip("맵 생성 후 PlayerSpawnPoint 중 하나로 플레이어를 이동/생성")]
+        public bool SpawnPlayersAfterGeneration = true;
+
+        [Tooltip("씬에 이미 있는 플레이어 1명을 옮길 때 사용")]
+        public Transform ExistingPlayer;
+
+        [Tooltip("씬에 이미 있는 여러 플레이어를 옮길 때 사용")]
+        public Transform[] ExistingPlayers;
+
+        [Tooltip("기존 플레이어가 부족할 때 생성할 플레이어 프리팹. 싱글 테스트면 비워도 됨")]
+        public GameObject PlayerPrefab;
+
+        [Tooltip("0이면 자동. 기존 플레이어가 있으면 그 수만큼, 없고 PlayerPrefab이 있으면 PlayerCount만큼 생성")]
+        [Range(0, 12)]
+        public int PlayerSpawnCount = 0;
+
+        [Tooltip("생성된 플레이어의 부모. 비워두면 씬 루트에 생성")]
+        public Transform PlayerParent;
+
+        [Tooltip("ExistingPlayer를 비워도 Player 태그를 가진 오브젝트를 자동으로 찾음")]
+        public bool AutoFindExistingPlayerByTag = true;
+
+        [Tooltip("PlayerSpawnPoint 위치에서 추가로 보정할 값")]
+        public Vector3 PlayerSpawnPositionOffset = Vector3.zero;
+
+        [Tooltip("PlayerSpawnPoint의 회전을 플레이어에게 적용")]
+        public bool AlignPlayerRotationToSpawnPoint = true;
+
+        [Tooltip("켜면 SpawnPoint 회전 대신 플레이어 Y축 회전을 무작위로 설정")]
+        public bool RandomizePlayerSpawnYaw = false;
+
+        [Header("Item Spawn Points")]
+        [Tooltip("방 프리팹 안에 직접 배치할 아이템 스폰 포인트 이름 접두어")]
+        public string ItemSpawnPointPrefix = "ItemSpawnPoint";
+
+        [Tooltip("비활성화된 ItemSpawnPoint도 후보에 포함")]
+        public bool IncludeInactiveItemSpawnPoints = true;
+
+        [Tooltip("아이템 스폰은 방 타입에서만 허용. 복도 아이템 스폰을 막고 싶으면 켜둠")]
+        public bool ItemSpawnOnlyInRooms = true;
+
+        [Header("Item Spawn")]
+        [Tooltip("맵 생성 후 ItemSpawnPoint 중 무작위 위치에 아이템 생성")]
+        public bool SpawnItemsAfterGeneration = false;
+
+        [Tooltip("생성할 아이템 프리팹 배열. Access Core 하나만 넣고 ItemSpawnCount를 4로 두면 4개 생성 가능")]
+        public GameObject[] ItemPrefabs;
+
+        [Tooltip("생성할 아이템 개수")]
+        [Range(0, 100)]
+        public int ItemSpawnCount = 4;
+
+        [Tooltip("플레이어가 스폰된 방에도 아이템이 생성될 수 있게 허용")]
+        public bool AllowItemSpawnInPlayerRooms = true;
+
+        [Tooltip("아이템이 플레이어 스폰 위치와 너무 가까우면 제외. 0이면 거리 제한 없음")]
+        public float MinItemDistanceFromPlayerSpawn = 2f;
+
+        [Tooltip("같은 ItemSpawnPoint에 아이템이 중복 생성되지 않게 함")]
+        public bool PreventDuplicateItemSpawnPointUse = true;
+
+        [Tooltip("생성된 아이템의 부모. 비워두면 이 Generator 밑에 생성")]
+        public Transform ItemParent;
+
+        [Tooltip("ItemSpawnPoint 위치에서 추가로 보정할 값")]
+        public Vector3 ItemSpawnPositionOffset = Vector3.zero;
+
+        [Tooltip("ItemSpawnPoint의 회전을 아이템에게 적용")]
+        public bool AlignItemRotationToSpawnPoint = true;
+
         [Header("Exit Door")]
         [Tooltip("탈출구가 시작방에서 이 거리보다 가까우면 생성 금지")]
         public float ExitMinDistanceFromStart = 25f;
@@ -81,73 +173,85 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("방과 방이 연결될 때 놓을 문 프리팹")]
         public GameObject[] DoorPrefabs;
 
-        [Header("Door Placement")]
-        [Tooltip("연결 문 위치 보정값. 출구 기준 로컬 좌표")]
-        public Vector3 ConnectedDoorPositionOffset = Vector3.zero;
-
-        [Tooltip("연결 문 회전 보정값. 출구 회전에 추가됨")]
-        public Vector3 ConnectedDoorRotationOffset = Vector3.zero;
-
-        [Tooltip("막힌 문/벽 위치 보정값. 출구 기준 로컬 좌표. Cube 막는 벽이면 보통 Y 1.5")]
-        public Vector3 BlockDoorPositionOffset = new Vector3(0f, 1.5f, 0f);
-
-        [Tooltip("막힌 문/벽 회전 보정값. 방향이 틀어지면 Y 90 또는 -90을 테스트")]
-        public Vector3 BlockDoorRotationOffset = Vector3.zero;
-
-        [Tooltip("탈출구 위치 보정값. 출구 기준 로컬 좌표")]
-        public Vector3 ExitDoorPositionOffset = Vector3.zero;
-
-        [Tooltip("탈출구 회전 보정값. 출구 회전에 추가됨")]
-        public Vector3 ExitDoorRotationOffset = Vector3.zero;
-
-        [Header("Exit Visual Cleanup")]
-        [Tooltip("DoorPoint가 사용되거나 막히면 Cell.ExitVisuals의 같은 순서 마커도 같이 끔")]
-        public bool HideExitVisualsWhenExitUsed = true;
-
-        [Tooltip("ExitVisuals를 끌 때 비활성화가 아니라 완전 삭제")]
-        public bool DestroyExitVisualsInsteadOfDisable = false;
-
-        [Tooltip("ExitVisuals를 직접 안 넣어도 출구 주변의 빨간 Renderer를 찾아 자동으로 끔")]
-        public bool AutoHideRedExitMarkers = true;
-
-        [Tooltip("빨간 출구 마커 자동 탐색 반경")]
-        public float RedExitMarkerSearchRadius = 3.2f;
-
-        [Tooltip("빨간 출구 마커 자동 탐색 시 Y 높이 차이 허용값")]
-        public float RedExitMarkerMaxHeightDifference = 1.2f;
-
-        [Header("Runtime Visibility")]
-        [Tooltip("게임 시작 후 생성된 맵의 Renderer만 꺼서 보이지 않게 함. Collider는 유지됨")]
-        public bool HideGeneratedVisualsInGame = true;
-
-        [Tooltip("체크하면 Play Mode일 때만 Renderer를 끔. 에디터에서 맵 확인할 때는 보임")]
-        public bool HideGeneratedVisualsOnlyInPlayMode = true;
-
-        [Tooltip("생성된 일반문/막는벽/탈출구 문 Renderer도 같이 끔. 스캔 게임에서는 보통 켜는 것을 추천")]
-        public bool HideGeneratedDoorVisualsToo = true;
-
-        [Header("Runtime Lighting")]
-        [Tooltip("게임 시작 후 생성된 맵 안의 Light 컴포넌트를 꺼서 그림자 경고와 성능 낭비를 줄임")]
-        public bool DisableGeneratedLightsInGame = true;
-
-        [Tooltip("체크하면 Play Mode일 때만 생성된 맵 조명을 끔. 에디터에서 맵 확인할 때는 조명이 유지됨")]
-        public bool DisableGeneratedLightsOnlyInPlayMode = true;
-
-        [Tooltip("Light 자체를 끄기 전에 Shadows만 먼저 None으로 바꿈")]
-        public bool DisableGeneratedLightShadows = true;
-
-        [Tooltip("생성된 일반문/막는벽/탈출구 문 안에 Light가 있으면 같이 끔")]
-        public bool DisableGeneratedDoorLightsToo = true;
-
         [Tooltip("일반 방, 큰방, 복도, 계단방, 수직복도 등을 전부 넣는 배열")]
         public Cell[] CellPrefabs;
 
         [Tooltip("시작방 후보 프리팹. 비워두면 CellPrefabs에서 StartRoom 타입을 자동으로 찾음")]
         public Cell[] StartRoomPrefabs;
 
+        [Header("Door Placement Offset")]
+        [Tooltip("일반 연결 문 생성 위치 보정값. DoorPoint 기준 로컬 좌표")]
+        public Vector3 ConnectedDoorPositionOffset = Vector3.zero;
+
+        [Tooltip("일반 연결 문 생성 회전 보정값")]
+        public Vector3 ConnectedDoorRotationOffset = Vector3.zero;
+
+        [Tooltip("막힌 문/막힌 벽 생성 위치 보정값. Cube 벽 프리팹이면 보통 Y를 벽 높이의 절반 정도로 올림")]
+        public Vector3 BlockDoorPositionOffset = new Vector3(0f, 1.5f, 0f);
+
+        [Tooltip("막힌 문/막힌 벽 생성 회전 보정값. 방향이 90도 틀어지면 Y를 90 또는 -90으로 조정")]
+        public Vector3 BlockDoorRotationOffset = Vector3.zero;
+
+        [Tooltip("탈출구 문 생성 위치 보정값")]
+        public Vector3 ExitDoorPositionOffset = Vector3.zero;
+
+        [Tooltip("탈출구 문 생성 회전 보정값")]
+        public Vector3 ExitDoorRotationOffset = Vector3.zero;
+
+        [Header("Runtime Visibility")]
+        [Tooltip("게임 시작 후 생성된 맵의 Renderer를 꺼서 직접 보이지 않게 함. Collider는 유지되므로 스캔은 가능")]
+        public bool HideGeneratedVisualsInGame = true;
+
+        [Tooltip("켜면 Play Mode에서만 Renderer를 끔. 에디터에서 Generate했을 때는 계속 보이게 두기 좋음")]
+        public bool HideGeneratedVisualsOnlyInPlayMode = true;
+
+        [Header("Generated Light Optimization")]
+        [Tooltip("생성된 방/복도/문 안에 있는 Light의 그림자 설정을 자동으로 정리해서 URP shadow atlas 경고를 줄임")]
+        public bool OptimizeGeneratedLightShadows = true;
+
+        [Tooltip("켜면 생성된 모든 Light의 Shadows를 None으로 바꿔서 Reduced additional punctual light shadows 경고를 막음")]
+        public bool DisableGeneratedLightShadows = true;
+
+        [Header("Block Door Fallback")]
+        [Tooltip("InsteadDoor가 비어있어도 남은 출구를 임시 큐브 벽으로 막음")]
+        public bool CreateFallbackBlockDoorWhenPrefabMissing = true;
+
+        [Tooltip("InsteadDoor가 없을 때 생성할 임시 막는 벽 큐브 크기")]
+        public Vector3 FallbackBlockDoorLocalScale = new Vector3(3.0f, 3.0f, 0.25f);
+
+        [Tooltip("InsteadDoor가 없을 때 생성할 임시 막는 벽 큐브 머티리얼")]
+        public Material FallbackBlockDoorMaterial;
+
+        [Tooltip("Cell.Exits 배열에 빠져있는 남은 문 포인트도 이름으로 찾아서 막음")]
+        public bool BlockExtraExitObjectsByName = true;
+
+        [Tooltip("남은 출구 오브젝트로 판단할 이름 키워드. Underground Laboratory Generator 기본값은 보통 TempPortal 계열임")]
+        public string[] ExtraExitObjectNameKeywords = { "TempPortal", "Portal", "DoorPoint", "ExitPoint" };
+
+        [Tooltip("켜면 Cell BoxCollider 경계 근처에 있는 출구만 막음. 방/복도 한가운데 생기는 막힌 벽을 줄이기 위한 안전장치")]
+        public bool OnlyBlockExitsNearCellBounds = true;
+
+        [Tooltip("출구가 Cell BoxCollider 경계에서 이 거리 안에 있을 때만 진짜 출구로 인정. 빨간 포탈이 안 막히면 1.5~2.5 사이로 올림")]
+        public float ExitBoundsTolerance = 1.5f;
+
+        [Tooltip("켜면 남은 출구를 막을 때 어떤 오브젝트를 처리했는지 Console에 출력")]
+        public bool LogBlockedExitCleanup = false;
+
         [Header("Cleanup")]
         [Tooltip("생성 전에 이 오브젝트의 기존 자식들을 삭제")]
         public bool ClearPreviousGeneratedChildren = true;
+
+        [Header("BFS Expansion Shape")]
+        [Tooltip("켜면 가장 안쪽 깊이의 열린 출구부터 처리해서 일자형 생성을 줄이고 가지가 퍼지는 형태로 생성")]
+        public bool UseBfsExpansion = true;
+
+        [Tooltip("0이면 완전 BFS. 1 이상이면 현재 깊이 근처 출구도 섞어서 조금 더 자연스럽게 생성")]
+        [Range(0, 5)]
+        public int BfsDepthRandomSpread = 0;
+
+        [Tooltip("특정 열린 출구에서 배치 실패가 이 횟수 이상이면 그 출구는 확장 후보에서 제외")]
+        [Range(1, 20)]
+        public int MaxFailedAttemptsPerOpenExit = 2;
 
         // 생성된 방 목록을 저장한다.
         private readonly List<Cell> generatedCells = new List<Cell>();
@@ -158,19 +262,51 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         // 프리팹별 생성 개수를 저장한다.
         private readonly Dictionary<string, int> spawnedCountByPrefabName = new Dictionary<string, int>();
 
-        // 생성된 문/막는벽/탈출구 오브젝트를 저장한다.
-        private readonly List<GameObject> generatedDoorObjects = new List<GameObject>();
+        // 플레이어가 실제로 스폰된 방 목록을 저장한다.
+        private readonly List<Cell> playerSpawnedCells = new List<Cell>();
+
+        // 플레이어가 실제로 스폰된 위치 목록을 저장한다.
+        private readonly List<Vector3> playerSpawnedPositions = new List<Vector3>();
+
+        // 탈출구가 붙은 방을 저장해서 플레이어 스폰 후보에서 제외할 수 있게 한다.
+        private Cell exitDoorOwnerCell;
+
+        // 탈출구 위치를 저장한다.
+        private Vector3 exitDoorPosition;
+
+        // 탈출구 생성 여부를 저장한다.
+        private bool hasExitDoorPosition;
+
+        // 연결에 이미 사용된 출구를 저장해서 마지막 정리 단계에서 중간 벽이 생기지 않게 한다.
+        private readonly HashSet<int> consumedExitInstanceIds = new HashSet<int>();
 
         // 아직 막히지 않은 출구 정보를 저장한다.
         private class OpenExit
         {
             public Transform Exit;
             public Cell Owner;
+            public int Depth;
+            public int FailCount;
 
-            public OpenExit(Transform exit, Cell owner)
+            public OpenExit(Transform exit, Cell owner, int depth)
             {
                 Exit = exit;
                 Owner = owner;
+                Depth = depth;
+                FailCount = 0;
+            }
+        }
+
+        // 방 안에 직접 배치한 PlayerSpawnPoint / ItemSpawnPoint 정보를 저장한다.
+        private class SpawnPointRecord
+        {
+            public Transform Point;
+            public Cell OwnerCell;
+
+            public SpawnPointRecord(Transform point, Cell ownerCell)
+            {
+                Point = point;
+                OwnerCell = ownerCell;
             }
         }
 
@@ -179,6 +315,11 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             if (GenerateOnStart)
             {
                 StartCoroutine(StartGeneration());
+            }
+            else
+            {
+                // 미리 생성해 둔 맵을 그대로 쓰는 경우에도 게임 시작 시에는 보이지 않게 처리한다.
+                ApplyRuntimeVisualState();
             }
         }
 
@@ -233,7 +374,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return false;
             }
 
-            AddOpenExitsFromCell(openExits, firstRoom, null);
+            AddOpenExitsFromCell(openExits, firstRoom, null, 0);
 
             int createdMainCells = 1;
             int failStreak = 0;
@@ -247,7 +388,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                     break;
                 }
 
-                OpenExit targetExit = openExits[Random.Range(0, openExits.Count)];
+                OpenExit targetExit = SelectOpenExitForExpansion(openExits);
+
+                if (targetExit == null)
+                {
+                    break;
+                }
 
                 Cell placedCell;
                 Transform selectedExit;
@@ -261,16 +407,24 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                     InstantiateConnectedDoor(targetExit.Exit);
 
-                    AddOpenExitsFromCell(openExits, placedCell, selectedExit);
+                    AddOpenExitsFromCell(openExits, placedCell, selectedExit, targetExit.Depth + 1);
 
                     RemoveOpenExit(openExits, targetExit);
 
-                    DestroyExitObject(targetExit.Owner, targetExit.Exit);
-                    DestroyExitObject(placedCell, selectedExit);
+                    DestroyExitObject(targetExit.Exit);
+                    DestroyExitObject(selectedExit);
                 }
                 else
                 {
                     failStreak++;
+                    targetExit.FailCount++;
+
+                    // 한 출구에서 계속 실패하면 그 출구는 더 이상 확장하지 않는다.
+                    // DoorPoint는 삭제하지 않기 때문에 마지막에 막힌 문으로 정리된다.
+                    if (targetExit.FailCount >= Mathf.Max(1, MaxFailedAttemptsPerOpenExit))
+                    {
+                        RemoveOpenExit(openExits, targetExit);
+                    }
                 }
             }
 
@@ -280,12 +434,15 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return false;
             }
 
-            bool startRoomsOk = GenerateStartRooms(openExits);
-
-            if (!startRoomsOk)
+            if (GenerateDedicatedStartRooms)
             {
-                Debug.LogWarning("[LaboratoryGenerator] 시작방 생성 실패.");
-                return false;
+                bool startRoomsOk = GenerateStartRooms(openExits);
+
+                if (!startRoomsOk)
+                {
+                    Debug.LogWarning("[LaboratoryGenerator] 시작방 생성 실패.");
+                    return false;
+                }
             }
 
             bool exitDoorOk = GenerateExitDoor(openExits);
@@ -297,10 +454,117 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             BlockRemainingExits();
-            DisableGeneratedLightsForGameplay();
-            HideGeneratedVisualsForGameplay();
+            ApplyRuntimeVisualState();
+            SpawnPlayersAfterGeneratedMap();
+            SpawnItemsAfterGeneratedMap();
 
             return true;
+        }
+
+        // 메인 맵 확장에 사용할 열린 출구를 고른다.
+        private OpenExit SelectOpenExitForExpansion(List<OpenExit> openExits)
+        {
+            CleanupOpenExits(openExits);
+
+            if (openExits.Count <= 0)
+            {
+                return null;
+            }
+
+            if (!UseBfsExpansion)
+            {
+                return openExits[Random.Range(0, openExits.Count)];
+            }
+
+            int maxFail = Mathf.Max(1, MaxFailedAttemptsPerOpenExit);
+            int minDepth = int.MaxValue;
+
+            for (int i = 0; i < openExits.Count; i++)
+            {
+                OpenExit openExit = openExits[i];
+
+                if (!IsValidOpenExit(openExit))
+                {
+                    continue;
+                }
+
+                if (openExit.FailCount >= maxFail)
+                {
+                    continue;
+                }
+
+                if (openExit.Depth < minDepth)
+                {
+                    minDepth = openExit.Depth;
+                }
+            }
+
+            if (minDepth == int.MaxValue)
+            {
+                return null;
+            }
+
+            int allowedMaxDepth = minDepth + Mathf.Max(0, BfsDepthRandomSpread);
+            List<OpenExit> candidates = new List<OpenExit>();
+
+            for (int i = 0; i < openExits.Count; i++)
+            {
+                OpenExit openExit = openExits[i];
+
+                if (!IsValidOpenExit(openExit))
+                {
+                    continue;
+                }
+
+                if (openExit.FailCount >= maxFail)
+                {
+                    continue;
+                }
+
+                if (openExit.Depth <= allowedMaxDepth)
+                {
+                    candidates.Add(openExit);
+                }
+            }
+
+            if (candidates.Count <= 0)
+            {
+                return null;
+            }
+
+            return candidates[Random.Range(0, candidates.Count)];
+        }
+
+        // 시작방 연결에 사용할 열린 출구를 고른다.
+        private OpenExit SelectOpenExitForStartRoom(List<OpenExit> openExits)
+        {
+            CleanupOpenExits(openExits);
+
+            List<OpenExit> candidates = new List<OpenExit>();
+
+            for (int i = 0; i < openExits.Count; i++)
+            {
+                OpenExit openExit = openExits[i];
+
+                if (!IsValidOpenExit(openExit))
+                {
+                    continue;
+                }
+
+                if (StartRoomsOnlyOnFirstFloor && GetWorldFloor(openExit.Exit.position) != 1)
+                {
+                    continue;
+                }
+
+                candidates.Add(openExit);
+            }
+
+            if (candidates.Count <= 0)
+            {
+                return null;
+            }
+
+            return candidates[Random.Range(0, candidates.Count)];
         }
 
         // 일반 방/복도/계단방 하나를 열린 출구에 붙인다.
@@ -327,10 +591,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 if (TryInstantiateAndAttach(candidatePrefab, targetExit, false, out placedCell, out selectedExit))
                 {
-                    // 일반 방/복도는 여기서 바로 생성 목록에 등록한다.
-                    // 이 등록이 빠지면 BlockRemainingExits()가 해당 Cell의 남은 빨간 출구를 못 찾아서
-                    // 막는 벽이 생성되지 않는다.
-                    PrepareCreatedCell(placedCell, candidatePrefab);
                     return true;
                 }
             }
@@ -382,7 +642,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                     return false;
                 }
 
-                OpenExit mainTargetExit = openExits[Random.Range(0, openExits.Count)];
+                OpenExit mainTargetExit = SelectOpenExitForStartRoom(openExits);
+
+                if (mainTargetExit == null)
+                {
+                    return false;
+                }
 
                 if (StartRoomsOnlyOnFirstFloor && GetWorldFloor(mainTargetExit.Exit.position) != 1)
                 {
@@ -417,7 +682,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                     continue;
                 }
 
-                OpenExit startTargetExit = new OpenExit(corridorExitForStart, placedCorridor);
+                OpenExit startTargetExit = new OpenExit(corridorExitForStart, placedCorridor, mainTargetExit.Depth + 1);
                 Cell startPrefab = GetWeightedRandomCell(startCandidates);
 
                 Cell placedStartRoom;
@@ -446,10 +711,10 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 RemoveOpenExit(openExits, mainTargetExit);
 
-                DestroyExitObject(mainTargetExit.Owner, mainTargetExit.Exit);
-                DestroyExitObject(placedCorridor, corridorExitConnectedToMain);
-                DestroyExitObject(placedCorridor, corridorExitForStart);
-                DestroyExitObject(placedStartRoom, startRoomSelectedExit);
+                DestroyExitObject(mainTargetExit.Exit);
+                DestroyExitObject(corridorExitConnectedToMain);
+                DestroyExitObject(corridorExitForStart);
+                DestroyExitObject(startRoomSelectedExit);
 
                 // 시작방은 더 이상 맵을 확장하지 않게 한다.
                 // 복도의 남은 출구도 나중에 BlockRemainingExits에서 막힌다.
@@ -505,15 +770,19 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
             OpenExit selectedExit = candidates[Random.Range(0, candidates.Count)];
 
+            exitDoorOwnerCell = selectedExit.Owner;
+            exitDoorPosition = selectedExit.Exit.position;
+            hasExitDoorPosition = true;
+
             GameObject prefab = ExitDoorPrefab != null ? ExitDoorPrefab : InsteadDoor;
 
             if (prefab != null)
             {
-                InstantiateDoorObject(prefab, selectedExit.Exit, ExitDoorPositionOffset, ExitDoorRotationOffset);
+                InstantiateDoorPrefab(prefab, selectedExit.Exit, ExitDoorPositionOffset, ExitDoorRotationOffset);
             }
 
             RemoveOpenExit(openExits, selectedExit);
-            DestroyExitObject(selectedExit.Owner, selectedExit.Exit);
+            DestroyExitObject(selectedExit.Exit);
 
             return true;
         }
@@ -635,7 +904,8 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 }
             }
 
-            // 복도 - 복도 직접 연결 금지
+            // 복도 - 복도 직접 연결을 막는다.
+            // 이렇게 하면 복도가 한 줄로 길게 이어지는 구조를 줄일 수 있다.
             if (BlockCorridorToCorridor)
             {
                 if (targetExit.Owner.IsCorridorLike && prefab.IsCorridorLike)
@@ -851,11 +1121,13 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 generatedCells.Add(cell);
             }
 
+            ApplyGeneratedLightOptimization(cell.gameObject);
+
             IncreaseSpawnCount(sourcePrefab);
         }
 
         // Cell의 사용 가능한 출구들을 열린 출구 목록에 추가한다.
-        private void AddOpenExitsFromCell(List<OpenExit> openExits, Cell cell, Transform exceptExit)
+        private void AddOpenExitsFromCell(List<OpenExit> openExits, Cell cell, Transform exceptExit, int depth)
         {
             if (cell == null || cell.Exits == null)
             {
@@ -881,7 +1153,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                     continue;
                 }
 
-                openExits.Add(new OpenExit(exitObject.transform, cell));
+                openExits.Add(new OpenExit(exitObject.transform, cell, depth));
             }
         }
 
@@ -1152,6 +1424,499 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             spawnedCountByPrefabName[prefab.name]++;
         }
 
+        // 맵 생성 후 플레이어를 PlayerSpawnPoint 중 랜덤 위치에 배치한다.
+        private void SpawnPlayersAfterGeneratedMap()
+        {
+            if (!SpawnPlayersAfterGeneration)
+            {
+                return;
+            }
+
+            int desiredSpawnCount = GetDesiredPlayerSpawnCount();
+
+            if (desiredSpawnCount <= 0)
+            {
+                return;
+            }
+
+            List<SpawnPointRecord> spawnPoints = CollectSpawnPoints(PlayerSpawnPointPrefix, IncludeInactivePlayerSpawnPoints, PlayerSpawnOnlyInRooms);
+
+            if (spawnPoints.Count <= 0)
+            {
+                Debug.LogWarning("[LaboratoryGenerator] PlayerSpawnPoint를 찾지 못함. 방 프리팹 안에 빈 오브젝트 이름을 PlayerSpawnPoint_01 같은 방식으로 만들어야 함.");
+                return;
+            }
+
+            List<Transform> existingPlayers = CollectExistingPlayers();
+            List<SpawnPointRecord> usedPoints = new List<SpawnPointRecord>();
+            HashSet<Cell> usedRooms = new HashSet<Cell>();
+
+            int spawnedCount = 0;
+
+            for (int i = 0; i < desiredSpawnCount; i++)
+            {
+                SpawnPointRecord selectedPoint = SelectPlayerSpawnPoint(spawnPoints, usedPoints, usedRooms);
+
+                if (selectedPoint == null)
+                {
+                    Debug.LogWarning("[LaboratoryGenerator] 플레이어를 배치할 수 있는 PlayerSpawnPoint가 부족함.");
+                    break;
+                }
+
+                Transform playerTransform = GetOrCreatePlayerTransform(i, existingPlayers);
+
+                if (playerTransform == null)
+                {
+                    Debug.LogWarning("[LaboratoryGenerator] 배치할 플레이어가 없고 PlayerPrefab도 비어 있음.");
+                    break;
+                }
+
+                MovePlayerToSpawnPoint(playerTransform, selectedPoint.Point);
+
+                usedPoints.Add(selectedPoint);
+                usedRooms.Add(selectedPoint.OwnerCell);
+                playerSpawnedCells.Add(selectedPoint.OwnerCell);
+                playerSpawnedPositions.Add(playerTransform.position);
+                spawnedCount++;
+            }
+
+            Debug.Log("[LaboratoryGenerator] Player spawn finished. Count: " + spawnedCount);
+        }
+
+        // 맵 생성 후 아이템을 ItemSpawnPoint 중 랜덤 위치에 생성한다.
+        private void SpawnItemsAfterGeneratedMap()
+        {
+            if (!SpawnItemsAfterGeneration)
+            {
+                return;
+            }
+
+            List<GameObject> validItemPrefabs = GetValidItemPrefabs();
+
+            if (validItemPrefabs.Count <= 0)
+            {
+                Debug.LogWarning("[LaboratoryGenerator] ItemPrefabs가 비어 있어서 아이템을 생성하지 않음.");
+                return;
+            }
+
+            if (ItemSpawnCount <= 0)
+            {
+                return;
+            }
+
+            List<SpawnPointRecord> spawnPoints = CollectSpawnPoints(ItemSpawnPointPrefix, IncludeInactiveItemSpawnPoints, ItemSpawnOnlyInRooms);
+
+            if (spawnPoints.Count <= 0)
+            {
+                Debug.LogWarning("[LaboratoryGenerator] ItemSpawnPoint를 찾지 못함. 방 프리팹 안에 빈 오브젝트 이름을 ItemSpawnPoint_01 같은 방식으로 만들어야 함.");
+                return;
+            }
+
+            List<SpawnPointRecord> usedPoints = new List<SpawnPointRecord>();
+            int spawnedCount = 0;
+
+            for (int i = 0; i < ItemSpawnCount; i++)
+            {
+                SpawnPointRecord selectedPoint = SelectItemSpawnPoint(spawnPoints, usedPoints);
+
+                if (selectedPoint == null)
+                {
+                    Debug.LogWarning("[LaboratoryGenerator] 아이템을 배치할 수 있는 ItemSpawnPoint가 부족함.");
+                    break;
+                }
+
+                GameObject itemPrefab = validItemPrefabs[Random.Range(0, validItemPrefabs.Count)];
+                Vector3 spawnPosition = selectedPoint.Point.position + ItemSpawnPositionOffset;
+                Quaternion spawnRotation = AlignItemRotationToSpawnPoint ? selectedPoint.Point.rotation : Quaternion.identity;
+                Transform parent = ItemParent != null ? ItemParent : transform;
+
+                Instantiate(itemPrefab, spawnPosition, spawnRotation, parent);
+
+                usedPoints.Add(selectedPoint);
+                spawnedCount++;
+            }
+
+            Debug.Log("[LaboratoryGenerator] Item spawn finished. Count: " + spawnedCount);
+        }
+
+        // 이름 접두어로 생성된 Cell 내부의 스폰 포인트를 수집한다.
+        private List<SpawnPointRecord> CollectSpawnPoints(string pointNamePrefix, bool includeInactive, bool onlyRoomLike)
+        {
+            List<SpawnPointRecord> result = new List<SpawnPointRecord>();
+
+            if (string.IsNullOrEmpty(pointNamePrefix))
+            {
+                return result;
+            }
+
+            for (int i = 0; i < generatedCells.Count; i++)
+            {
+                Cell cell = generatedCells[i];
+
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                if (onlyRoomLike && !cell.IsRoomLike)
+                {
+                    continue;
+                }
+
+                Transform[] children = cell.GetComponentsInChildren<Transform>(includeInactive);
+
+                for (int j = 0; j < children.Length; j++)
+                {
+                    Transform child = children[j];
+
+                    if (child == null)
+                    {
+                        continue;
+                    }
+
+                    if (child == cell.transform)
+                    {
+                        continue;
+                    }
+
+                    if (child.name.StartsWith(pointNamePrefix))
+                    {
+                        result.Add(new SpawnPointRecord(child, cell));
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // 이번 실행에서 실제로 몇 명의 플레이어를 배치할지 계산한다.
+        private int GetDesiredPlayerSpawnCount()
+        {
+            if (PlayerSpawnCount > 0)
+            {
+                return PlayerSpawnCount;
+            }
+
+            int existingCount = CountConfiguredExistingPlayers();
+
+            if (existingCount > 0)
+            {
+                return existingCount;
+            }
+
+            if (AutoFindExistingPlayerByTag && HasPlayerTaggedObject())
+            {
+                return 1;
+            }
+
+            if (PlayerPrefab != null)
+            {
+                return Mathf.Max(1, PlayerCount);
+            }
+
+            return 0;
+        }
+
+        // 인스펙터에 등록된 기존 플레이어 수를 센다.
+        private int CountConfiguredExistingPlayers()
+        {
+            int count = 0;
+            HashSet<Transform> uniquePlayers = new HashSet<Transform>();
+
+            if (ExistingPlayer != null)
+            {
+                uniquePlayers.Add(ExistingPlayer);
+            }
+
+            if (ExistingPlayers != null)
+            {
+                for (int i = 0; i < ExistingPlayers.Length; i++)
+                {
+                    if (ExistingPlayers[i] != null)
+                    {
+                        uniquePlayers.Add(ExistingPlayers[i]);
+                    }
+                }
+            }
+
+            foreach (Transform player in uniquePlayers)
+            {
+                if (player != null)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        // Player 태그 오브젝트가 있는지 안전하게 검사한다.
+        private bool HasPlayerTaggedObject()
+        {
+            try
+            {
+                GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+                return playerObject != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // 기존 플레이어들을 수집한다.
+        private List<Transform> CollectExistingPlayers()
+        {
+            List<Transform> result = new List<Transform>();
+            HashSet<Transform> uniquePlayers = new HashSet<Transform>();
+
+            if (ExistingPlayer != null)
+            {
+                uniquePlayers.Add(ExistingPlayer);
+            }
+
+            if (ExistingPlayers != null)
+            {
+                for (int i = 0; i < ExistingPlayers.Length; i++)
+                {
+                    if (ExistingPlayers[i] != null)
+                    {
+                        uniquePlayers.Add(ExistingPlayers[i]);
+                    }
+                }
+            }
+
+            if (AutoFindExistingPlayerByTag)
+            {
+                try
+                {
+                    GameObject[] taggedPlayers = GameObject.FindGameObjectsWithTag("Player");
+
+                    for (int i = 0; i < taggedPlayers.Length; i++)
+                    {
+                        if (taggedPlayers[i] != null)
+                        {
+                            uniquePlayers.Add(taggedPlayers[i].transform);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Player 태그가 프로젝트에 없으면 Unity가 예외를 던질 수 있으므로 무시한다.
+                }
+            }
+
+            foreach (Transform player in uniquePlayers)
+            {
+                if (player != null)
+                {
+                    result.Add(player);
+                }
+            }
+
+            return result;
+        }
+
+        // 기존 플레이어를 가져오거나 부족하면 프리팹으로 새로 생성한다.
+        private Transform GetOrCreatePlayerTransform(int index, List<Transform> existingPlayers)
+        {
+            if (existingPlayers != null && index >= 0 && index < existingPlayers.Count)
+            {
+                return existingPlayers[index];
+            }
+
+            if (PlayerPrefab == null)
+            {
+                return null;
+            }
+
+            Transform parent = PlayerParent != null ? PlayerParent : null;
+            GameObject playerObject = Instantiate(PlayerPrefab, Vector3.zero, Quaternion.identity, parent);
+            playerObject.name = PlayerPrefab.name + "_" + (index + 1);
+            return playerObject.transform;
+        }
+
+        // 플레이어 스폰 포인트 하나를 고른다.
+        private SpawnPointRecord SelectPlayerSpawnPoint(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints, HashSet<Cell> usedRooms)
+        {
+            List<SpawnPointRecord> candidates = new List<SpawnPointRecord>();
+
+            AddPlayerSpawnCandidates(allPoints, usedPoints, usedRooms, candidates, true, true);
+
+            if (candidates.Count <= 0)
+            {
+                AddPlayerSpawnCandidates(allPoints, usedPoints, usedRooms, candidates, false, true);
+            }
+
+            if (candidates.Count <= 0)
+            {
+                AddPlayerSpawnCandidates(allPoints, usedPoints, usedRooms, candidates, false, false);
+            }
+
+            if (candidates.Count <= 0)
+            {
+                return null;
+            }
+
+            return candidates[Random.Range(0, candidates.Count)];
+        }
+
+        // 플레이어 후보 목록을 조건에 맞춰 추가한다.
+        private void AddPlayerSpawnCandidates(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints, HashSet<Cell> usedRooms, List<SpawnPointRecord> candidates, bool useStrictRules, bool keepOnePlayerPerRoom)
+        {
+            for (int i = 0; i < allPoints.Count; i++)
+            {
+                SpawnPointRecord point = allPoints[i];
+
+                if (point == null || point.Point == null || point.OwnerCell == null)
+                {
+                    continue;
+                }
+
+                if (usedPoints.Contains(point))
+                {
+                    continue;
+                }
+
+                if (keepOnePlayerPerRoom && OnePlayerPerRoom && usedRooms.Contains(point.OwnerCell))
+                {
+                    continue;
+                }
+
+                if (useStrictRules && AvoidExitRoomForPlayerSpawn && hasExitDoorPosition && point.OwnerCell == exitDoorOwnerCell)
+                {
+                    continue;
+                }
+
+                candidates.Add(point);
+            }
+        }
+
+        // 실제 플레이어 Transform을 스폰 포인트로 이동시킨다.
+        private void MovePlayerToSpawnPoint(Transform playerTransform, Transform spawnPoint)
+        {
+            if (playerTransform == null || spawnPoint == null)
+            {
+                return;
+            }
+
+            CharacterController characterController = playerTransform.GetComponent<CharacterController>();
+
+            if (characterController != null)
+            {
+                characterController.enabled = false;
+            }
+
+            playerTransform.position = spawnPoint.position + PlayerSpawnPositionOffset;
+
+            if (RandomizePlayerSpawnYaw)
+            {
+                playerTransform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+            }
+            else if (AlignPlayerRotationToSpawnPoint)
+            {
+                playerTransform.rotation = spawnPoint.rotation;
+            }
+
+            if (characterController != null)
+            {
+                characterController.enabled = true;
+            }
+        }
+
+        // 유효한 아이템 프리팹만 수집한다.
+        private List<GameObject> GetValidItemPrefabs()
+        {
+            List<GameObject> result = new List<GameObject>();
+
+            if (ItemPrefabs == null)
+            {
+                return result;
+            }
+
+            for (int i = 0; i < ItemPrefabs.Length; i++)
+            {
+                if (ItemPrefabs[i] != null)
+                {
+                    result.Add(ItemPrefabs[i]);
+                }
+            }
+
+            return result;
+        }
+
+        // 아이템 스폰 포인트 하나를 고른다.
+        private SpawnPointRecord SelectItemSpawnPoint(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints)
+        {
+            List<SpawnPointRecord> candidates = new List<SpawnPointRecord>();
+
+            AddItemSpawnCandidates(allPoints, usedPoints, candidates, true);
+
+            if (candidates.Count <= 0)
+            {
+                AddItemSpawnCandidates(allPoints, usedPoints, candidates, false);
+            }
+
+            if (candidates.Count <= 0)
+            {
+                return null;
+            }
+
+            return candidates[Random.Range(0, candidates.Count)];
+        }
+
+        // 아이템 후보 목록을 조건에 맞춰 추가한다.
+        private void AddItemSpawnCandidates(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints, List<SpawnPointRecord> candidates, bool useStrictRules)
+        {
+            for (int i = 0; i < allPoints.Count; i++)
+            {
+                SpawnPointRecord point = allPoints[i];
+
+                if (point == null || point.Point == null || point.OwnerCell == null)
+                {
+                    continue;
+                }
+
+                if (PreventDuplicateItemSpawnPointUse && usedPoints.Contains(point))
+                {
+                    continue;
+                }
+
+                if (useStrictRules && !AllowItemSpawnInPlayerRooms && playerSpawnedCells.Contains(point.OwnerCell))
+                {
+                    continue;
+                }
+
+                if (useStrictRules && IsTooCloseToPlayerSpawn(point.Point.position))
+                {
+                    continue;
+                }
+
+                candidates.Add(point);
+            }
+        }
+
+        // 아이템 위치가 플레이어 시작 위치와 너무 가까운지 검사한다.
+        private bool IsTooCloseToPlayerSpawn(Vector3 itemPosition)
+        {
+            if (MinItemDistanceFromPlayerSpawn <= 0f)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < playerSpawnedPositions.Count; i++)
+            {
+                float distance = Vector3.Distance(itemPosition, playerSpawnedPositions[i]);
+
+                if (distance < MinItemDistanceFromPlayerSpawn)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         // 연결된 방 사이에 문을 생성한다.
         private void InstantiateConnectedDoor(Transform exit)
         {
@@ -1164,29 +1929,129 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
             if (prefab != null)
             {
-                InstantiateDoorObject(prefab, exit, ConnectedDoorPositionOffset, ConnectedDoorRotationOffset);
+                InstantiateDoorPrefab(prefab, exit, ConnectedDoorPositionOffset, ConnectedDoorRotationOffset);
             }
         }
 
-        // 출구 기준으로 문/막는벽/탈출구를 생성하고 목록에 저장한다.
-        private GameObject InstantiateDoorObject(GameObject prefab, Transform exit, Vector3 localPositionOffset, Vector3 localRotationOffset)
+        // 막는 문은 빨간 바닥/TempPortal의 회전 전체를 쓰면 바닥처럼 누워버릴 수 있다.
+        // 그래서 Y축 방향만 사용하고, 높이는 월드 Y 기준으로 올려서 세운다.
+        private void GetBlockDoorPose(Transform exit, out Vector3 spawnPosition, out Quaternion spawnRotation)
+        {
+            Quaternion yawOnlyRotation = Quaternion.Euler(0f, exit.eulerAngles.y, 0f);
+
+            Vector3 horizontalOffset = yawOnlyRotation * new Vector3(BlockDoorPositionOffset.x, 0f, BlockDoorPositionOffset.z);
+            Vector3 verticalOffset = Vector3.up * BlockDoorPositionOffset.y;
+
+            spawnPosition = exit.position + horizontalOffset + verticalOffset;
+            spawnRotation = yawOnlyRotation * Quaternion.Euler(BlockDoorRotationOffset);
+        }
+
+        // 남은 빨간 출구를 InsteadDoor 하나로 막을 때 사용하는 전용 생성 함수다.
+        private GameObject InstantiateBlockDoorPrefab(GameObject prefab, Transform exit)
         {
             if (prefab == null || exit == null)
             {
                 return null;
             }
 
-            Vector3 position = exit.TransformPoint(localPositionOffset);
-            Quaternion rotation = exit.rotation * Quaternion.Euler(localRotationOffset);
+            GetBlockDoorPose(exit, out Vector3 spawnPosition, out Quaternion spawnRotation);
 
-            GameObject doorObject = Instantiate(prefab, position, rotation, transform);
+            GameObject createdDoor = Instantiate(prefab, spawnPosition, spawnRotation, transform);
+            ApplyGeneratedLightOptimization(createdDoor);
+            return createdDoor;
+        }
 
-            if (doorObject != null && !generatedDoorObjects.Contains(doorObject))
+        // DoorPoint 기준으로 문/막힌 벽 프리팹을 생성한다.
+        private GameObject InstantiateDoorPrefab(GameObject prefab, Transform exit, Vector3 localPositionOffset, Vector3 rotationOffset)
+        {
+            if (prefab == null || exit == null)
             {
-                generatedDoorObjects.Add(doorObject);
+                return null;
             }
 
-            return doorObject;
+            Vector3 spawnPosition = exit.TransformPoint(localPositionOffset);
+            Quaternion spawnRotation = exit.rotation * Quaternion.Euler(rotationOffset);
+
+            GameObject createdDoor = Instantiate(prefab, spawnPosition, spawnRotation, transform);
+            ApplyGeneratedLightOptimization(createdDoor);
+            return createdDoor;
+        }
+
+        // 생성된 오브젝트 안에 들어있는 Light 그림자를 꺼서 URP shadow atlas 경고를 막는다.
+        private void ApplyGeneratedLightOptimization(GameObject root)
+        {
+            if (!OptimizeGeneratedLightShadows || root == null)
+            {
+                return;
+            }
+
+            Light[] lights = root.GetComponentsInChildren<Light>(true);
+
+            for (int i = 0; i < lights.Length; i++)
+            {
+                if (lights[i] == null)
+                {
+                    continue;
+                }
+
+                if (DisableGeneratedLightShadows)
+                {
+                    lights[i].shadows = LightShadows.None;
+                }
+            }
+        }
+
+        // 막는 문 프리팹이 비어있을 때 임시 검은 벽 큐브를 생성한다.
+        private GameObject CreateFallbackBlockDoor(Transform exit)
+        {
+            if (!CreateFallbackBlockDoorWhenPrefabMissing || exit == null)
+            {
+                return null;
+            }
+
+            GetBlockDoorPose(exit, out Vector3 spawnPosition, out Quaternion spawnRotation);
+
+            GameObject blocker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            blocker.name = "Generated_BlockDoor_Fallback";
+            blocker.transform.SetParent(transform, true);
+            blocker.transform.position = spawnPosition;
+            blocker.transform.rotation = spawnRotation;
+            blocker.transform.localScale = FallbackBlockDoorLocalScale;
+
+            Renderer renderer = blocker.GetComponent<Renderer>();
+            if (renderer != null && FallbackBlockDoorMaterial != null)
+            {
+                renderer.sharedMaterial = FallbackBlockDoorMaterial;
+            }
+
+            ApplyGeneratedLightOptimization(blocker);
+            return blocker;
+        }
+
+        // 생성된 맵의 Renderer를 꺼서 인게임에서 맵 본체가 직접 보이지 않게 한다.
+        private void ApplyRuntimeVisualState()
+        {
+            if (!HideGeneratedVisualsInGame)
+            {
+                return;
+            }
+
+            if (HideGeneratedVisualsOnlyInPlayMode && !Application.isPlaying)
+            {
+                return;
+            }
+
+            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] == null)
+                {
+                    continue;
+                }
+
+                renderers[i].enabled = false;
+            }
         }
 
         // 랜덤 문 프리팹을 가져온다.
@@ -1215,49 +2080,286 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             return validDoors[Random.Range(0, validDoors.Count)];
         }
 
-        // 남아 있는 모든 DoorPoint를 막힌 문으로 막는다.
+        // 남아 있는 모든 DoorPoint/TempPortal을 막힌 문으로 막는다.
         private void BlockRemainingExits()
         {
-            int blockedExitCount = 0;
+            HashSet<int> blockedExitInstanceIds = new HashSet<int>();
 
-            if (InsteadDoor == null)
+            for (int cellIndex = 0; cellIndex < generatedCells.Count; cellIndex++)
             {
-                Debug.LogWarning("[LaboratoryGenerator] InsteadDoor가 비어 있어서 남은 출구에 막는 벽을 생성할 수 없음.");
-            }
-
-            for (int i = 0; i < generatedCells.Count; i++)
-            {
-                Cell cell = generatedCells[i];
+                Cell cell = generatedCells[cellIndex];
 
                 if (cell == null || cell.Exits == null)
                 {
                     continue;
                 }
 
-                for (int j = 0; j < cell.Exits.Length; j++)
+                for (int exitIndex = 0; exitIndex < cell.Exits.Length; exitIndex++)
                 {
-                    GameObject exitObject = cell.Exits[j];
+                    GameObject exitObject = cell.Exits[exitIndex];
 
                     if (exitObject == null)
                     {
                         continue;
                     }
 
+                    // 이미 연결/탈출구에 사용된 출구는 Destroy가 프레임 끝에 처리되기 전이라도 다시 막지 않는다.
+                    if (IsConsumedExit(exitObject.transform))
+                    {
+                        continue;
+                    }
+
+                    // 연결된 출구는 DestroyExitObject에서 비활성화되므로 여기서 막으면 중간 벽이 생긴다.
                     if (!exitObject.activeInHierarchy)
                     {
                         continue;
                     }
 
-                    if (InsteadDoor != null)
-                    {
-                        InstantiateDoorObject(InsteadDoor, exitObject.transform, BlockDoorPositionOffset, BlockDoorRotationOffset);
-                        blockedExitCount++;
-                    }
-
-                    DestroyExitObject(cell, exitObject.transform);
+                    // Cell.Exits에 명시적으로 등록된 출구는 경계 검사 없이 무조건 막는다.
+                    // OnlyBlockExitsNearCellBounds 옵션은 이름으로 찾는 Extra 루프에만 적용한다.
+                    BlockSingleRemainingExit(exitObject.transform, blockedExitInstanceIds);
                 }
             }
-            Debug.Log("[LaboratoryGenerator] Blocked remaining exits: " + blockedExitCount);
+
+            BlockExtraRemainingExitObjectsByName(blockedExitInstanceIds);
+        }
+
+        // 출구 하나를 막는 문으로 바꾸고 기존 출구 표시 오브젝트를 삭제한다.
+        private void BlockSingleRemainingExit(Transform exitTransform, HashSet<int> blockedExitInstanceIds)
+        {
+            if (exitTransform == null)
+            {
+                return;
+            }
+
+            int instanceId = exitTransform.GetInstanceID();
+
+            if (blockedExitInstanceIds != null && blockedExitInstanceIds.Contains(instanceId))
+            {
+                return;
+            }
+
+            // 이미 방 연결, 시작방 연결, 탈출구 생성에 사용한 출구는 절대 막으면 안 된다.
+            if (IsConsumedExit(exitTransform))
+            {
+                return;
+            }
+
+            // 비활성화된 출구는 연결에 사용된 뒤 삭제 대기 중인 경우가 많다.
+            // 이것을 막아버리면 복도나 방 중간에 벽이 생긴다.
+            if (!exitTransform.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            if (blockedExitInstanceIds != null)
+            {
+                blockedExitInstanceIds.Add(instanceId);
+            }
+
+            // ★ 추가: BlockRemainingExits 경로에서도 ExitVisual을 끈다 (안전장치).
+            DisableMatchingExitVisual(exitTransform);
+
+            if (InsteadDoor != null)
+            {
+                InstantiateBlockDoorPrefab(InsteadDoor, exitTransform);
+            }
+            else
+            {
+                CreateFallbackBlockDoor(exitTransform);
+            }
+
+            if (LogBlockedExitCleanup)
+            {
+                Debug.Log("[LaboratoryGenerator] Blocked remaining exit: " + GetHierarchyPath(exitTransform));
+            }
+
+            DestroyExitObject(exitTransform);
+        }
+
+        // Cell.Exits 배열에 빠져있는 TempPortal/DoorPoint 같은 남은 출구도 찾아서 막는다.
+        private void BlockExtraRemainingExitObjectsByName(HashSet<int> blockedExitInstanceIds)
+        {
+            if (!BlockExtraExitObjectsByName)
+            {
+                return;
+            }
+
+            for (int cellIndex = 0; cellIndex < generatedCells.Count; cellIndex++)
+            {
+                Cell cell = generatedCells[cellIndex];
+
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                Transform[] children = cell.GetComponentsInChildren<Transform>(true);
+
+                for (int childIndex = 0; childIndex < children.Length; childIndex++)
+                {
+                    Transform child = children[childIndex];
+
+                    if (child == null || child == cell.transform)
+                    {
+                        continue;
+                    }
+
+                    if (!child.gameObject.activeInHierarchy)
+                    {
+                        continue;
+                    }
+
+                    if (!IsExtraExitObjectName(child.name))
+                    {
+                        continue;
+                    }
+
+                    // 빨간 바닥 Mesh 자체가 아니라, 가능하면 그 위의 DoorPoint/Portal 부모를 막는다.
+                    Transform exitRoot = ResolveExtraExitRoot(child, cell);
+
+                    if (exitRoot == null || exitRoot == cell.transform)
+                    {
+                        continue;
+                    }
+
+                    int instanceId = exitRoot.GetInstanceID();
+
+                    if (blockedExitInstanceIds != null && blockedExitInstanceIds.Contains(instanceId))
+                    {
+                        continue;
+                    }
+
+                    if (IsConsumedExit(exitRoot))
+                    {
+                        continue;
+                    }
+
+                    if (!exitRoot.gameObject.activeInHierarchy)
+                    {
+                        continue;
+                    }
+
+                    // 핵심 안전장치:
+                    // 이름만 TempPortal/Portal이어도 Cell 경계 근처가 아니면 실제 출구가 아니라 장식/내부 오브젝트로 보고 막지 않는다.
+                    // 이것 때문에 복도나 방 중간에 갑자기 회색 벽이 생기는 문제를 줄일 수 있다.
+                    if (OnlyBlockExitsNearCellBounds && !IsExitNearCellBounds(exitRoot, cell))
+                    {
+                        if (LogBlockedExitCleanup)
+                        {
+                            Debug.Log("[LaboratoryGenerator] Skipped non-boundary extra exit object: " + GetHierarchyPath(exitRoot));
+                        }
+
+                        continue;
+                    }
+
+                    BlockSingleRemainingExit(exitRoot, blockedExitInstanceIds);
+                }
+            }
+        }
+
+        // TempPortal 같은 하위 Mesh가 잡혔을 때 실제 출구 기준 Transform을 찾는다.
+        private Transform ResolveExtraExitRoot(Transform found, Cell ownerCell)
+        {
+            if (found == null || ownerCell == null)
+            {
+                return found;
+            }
+
+            Transform current = found;
+            Transform best = found;
+
+            while (current != null && current != ownerCell.transform)
+            {
+                if (IsExtraExitObjectName(current.name))
+                {
+                    best = current;
+                }
+
+                current = current.parent;
+            }
+
+            return best;
+        }
+
+        // 출구 Transform이 해당 Cell의 BoxCollider 경계 근처에 있는지 확인한다.
+        private bool IsExitNearCellBounds(Transform exitTransform, Cell ownerCell)
+        {
+            if (exitTransform == null || ownerCell == null)
+            {
+                return false;
+            }
+
+            ownerCell.CacheTriggerBox();
+
+            if (ownerCell.TriggerBox == null)
+            {
+                // BoxCollider가 없는 예외 프리팹은 기존 동작을 유지한다.
+                return true;
+            }
+
+            Bounds localBounds = new Bounds(ownerCell.TriggerBox.center, ownerCell.TriggerBox.size);
+            Vector3 localPoint = ownerCell.transform.InverseTransformPoint(exitTransform.position);
+            Vector3 localDelta = localPoint - localBounds.center;
+            Vector3 extents = localBounds.extents;
+
+            // TempPortal처럼 납작한 Cube일 경우 중심이 경계에서 살짝 안쪽에 있을 수 있다.
+            // exitTransform의 lossyScale X/Z 절반을 추가 여유로 반영한다.
+            Vector3 exitScale = exitTransform.lossyScale;
+            float scaleMarginX = Mathf.Abs(exitScale.x) * 0.5f;
+            float scaleMarginZ = Mathf.Abs(exitScale.z) * 0.5f;
+
+            float tolerance = Mathf.Max(0.05f, ExitBoundsTolerance);
+
+            bool nearXSide = Mathf.Abs(Mathf.Abs(localDelta.x) - extents.x) <= tolerance + scaleMarginX;
+            bool nearZSide = Mathf.Abs(Mathf.Abs(localDelta.z) - extents.z) <= tolerance + scaleMarginZ;
+
+            return nearXSide || nearZSide;
+        }
+
+        // 이름이 남은 출구 오브젝트 키워드에 해당하는지 확인한다.
+        private bool IsExtraExitObjectName(string objectName)
+        {
+            if (string.IsNullOrEmpty(objectName))
+            {
+                return false;
+            }
+
+            // Inspector 배열이 기존 serialized 값 때문에 TempPortal 하나만 남아 있어도 기본 키워드를 같이 검사한다.
+            string[] defaultKeywords = { "TempPortal", "DoorPoint", "Portal", "ExitPoint" };
+
+            if (ContainsKeyword(objectName, defaultKeywords))
+            {
+                return true;
+            }
+
+            return ContainsKeyword(objectName, ExtraExitObjectNameKeywords);
+        }
+
+        // 문자열이 키워드 배열 중 하나를 포함하는지 확인한다.
+        private bool ContainsKeyword(string objectName, string[] keywords)
+        {
+            if (string.IsNullOrEmpty(objectName) || keywords == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < keywords.Length; i++)
+            {
+                string keyword = keywords[i];
+
+                if (string.IsNullOrEmpty(keyword))
+                {
+                    continue;
+                }
+
+                if (objectName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // 열린 출구 목록에서 유효하지 않은 출구를 제거한다.
@@ -1315,15 +2417,61 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
         }
 
-        // DoorPoint 오브젝트를 비활성화하고 제거한다.
-        private void DestroyExitObject(Cell owner, Transform exit)
+        // 출구가 이미 연결/탈출구로 사용됐음을 기록한다.
+        private void MarkExitAsConsumed(Transform exit)
         {
             if (exit == null)
             {
                 return;
             }
 
-            DisableExitVisualForExit(owner, exit);
+            consumedExitInstanceIds.Add(exit.GetInstanceID());
+        }
+
+        // 이미 사용한 출구인지 확인한다.
+        private bool IsConsumedExit(Transform exit)
+        {
+            if (exit == null)
+            {
+                return false;
+            }
+
+            return consumedExitInstanceIds.Contains(exit.GetInstanceID());
+        }
+
+        // Console 로그에서 어느 프리팹의 어느 출구가 막혔는지 보기 위한 경로를 만든다.
+        private string GetHierarchyPath(Transform target)
+        {
+            if (target == null)
+            {
+                return "null";
+            }
+
+            string path = target.name;
+            Transform current = target.parent;
+
+            while (current != null)
+            {
+                path = current.name + "/" + path;
+                current = current.parent;
+            }
+
+            return path;
+        }
+
+        // DoorPoint 오브젝트를 비활성화하고 제거한다.
+        private void DestroyExitObject(Transform exit)
+        {
+            if (exit == null)
+            {
+                return;
+            }
+
+            // ★ 수정: Exit에 대응하는 ExitVisual(빨간 바닥)도 함께 끈다.
+            DisableMatchingExitVisual(exit);
+
+            // Destroy는 프레임 끝에 처리될 수 있으므로 먼저 사용 완료 목록에 기록한다.
+            MarkExitAsConsumed(exit);
 
             exit.gameObject.SetActive(false);
 
@@ -1337,304 +2485,54 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
         }
 
-        // 사용된 DoorPoint와 같은 번호의 빨간 바닥/마커를 끈다.
-        private void DisableExitVisualForExit(Cell owner, Transform exit)
+        // Exit Transform에 대응하는 ExitVisual을 찾아서 비활성화한다.
+        // generatedCells 등록 여부와 무관하게 동작하도록 부모 계층을 직접 탐색한다.
+        private void DisableMatchingExitVisual(Transform exit)
         {
-            if (!HideExitVisualsWhenExitUsed || owner == null || exit == null)
+            if (exit == null)
             {
                 return;
             }
 
-            int exitIndex = GetExitIndex(owner, exit);
+            // exit의 부모 계층을 타고 올라가며 Cell 컴포넌트를 찾는다.
+            Transform current = exit.parent;
 
-            if (exitIndex >= 0 && owner.ExitVisuals != null && exitIndex < owner.ExitVisuals.Length)
+            while (current != null)
             {
-                GameObject visual = owner.ExitVisuals[exitIndex];
+                Cell cell = current.GetComponent<Cell>();
 
-                if (visual != null)
+                if (cell != null)
                 {
-                    RemoveOrDisableGameObject(visual);
-                }
-            }
-
-            if (AutoHideRedExitMarkers)
-            {
-                AutoHideRedExitMarkersNearExit(owner, exit.position);
-            }
-        }
-
-        // Cell.Exits 배열에서 특정 DoorPoint의 번호를 찾는다.
-        private int GetExitIndex(Cell owner, Transform exit)
-        {
-            if (owner == null || owner.Exits == null || exit == null)
-            {
-                return -1;
-            }
-
-            for (int i = 0; i < owner.Exits.Length; i++)
-            {
-                GameObject exitObject = owner.Exits[i];
-
-                if (exitObject == null)
-                {
-                    continue;
-                }
-
-                if (exitObject.transform == exit)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        // 출구 근처에 있는 빨간 Renderer를 찾아 끈다. ExitVisuals를 수동 연결하지 않았을 때의 보조 기능이다.
-        private void AutoHideRedExitMarkersNearExit(Cell owner, Vector3 exitPosition)
-        {
-            if (owner == null)
-            {
-                return;
-            }
-
-            Renderer[] renderers = owner.GetComponentsInChildren<Renderer>(true);
-            float radius = Mathf.Max(0.1f, RedExitMarkerSearchRadius);
-            float maxHeight = Mathf.Max(0.1f, RedExitMarkerMaxHeightDifference);
-
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                Renderer renderer = renderers[i];
-
-                if (renderer == null)
-                {
-                    continue;
-                }
-
-                if (!IsRedExitMarkerRenderer(renderer))
-                {
-                    continue;
-                }
-
-                Vector3 center = renderer.bounds.center;
-                Vector2 flatA = new Vector2(center.x, center.z);
-                Vector2 flatB = new Vector2(exitPosition.x, exitPosition.z);
-
-                if (Vector2.Distance(flatA, flatB) > radius)
-                {
-                    continue;
-                }
-
-                if (Mathf.Abs(center.y - exitPosition.y) > maxHeight)
-                {
-                    continue;
-                }
-
-                RemoveOrDisableGameObject(renderer.gameObject);
-            }
-        }
-
-        // Renderer의 머티리얼 색이 빨간 출구 마커로 보이는지 확인한다.
-        private bool IsRedExitMarkerRenderer(Renderer renderer)
-        {
-            if (renderer == null || renderer.sharedMaterials == null)
-            {
-                return false;
-            }
-
-            Material[] materials = renderer.sharedMaterials;
-
-            for (int i = 0; i < materials.Length; i++)
-            {
-                Color color;
-
-                if (TryGetMaterialColor(materials[i], out color))
-                {
-                    if (color.r >= 0.55f && color.g <= 0.35f && color.b <= 0.35f)
+                    if (cell.Exits == null)
                     {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        // URP Lit/Unlit과 Built-in Standard의 대표 색상 프로퍼티를 읽는다.
-        private bool TryGetMaterialColor(Material material, out Color color)
-        {
-            color = Color.white;
-
-            if (material == null)
-            {
-                return false;
-            }
-
-            if (material.HasProperty("_BaseColor"))
-            {
-                color = material.GetColor("_BaseColor");
-                return true;
-            }
-
-            if (material.HasProperty("_Color"))
-            {
-                color = material.GetColor("_Color");
-                return true;
-            }
-
-            return false;
-        }
-
-        // 오브젝트를 끄거나 삭제한다.
-        private void RemoveOrDisableGameObject(GameObject target)
-        {
-            if (target == null)
-            {
-                return;
-            }
-
-            if (DestroyExitVisualsInsteadOfDisable)
-            {
-                if (Application.isPlaying)
-                {
-                    Destroy(target);
-                }
-                else
-                {
-                    DestroyImmediate(target);
-                }
-            }
-            else
-            {
-                target.SetActive(false);
-            }
-        }
-
-        // 인게임에서 생성된 맵 조명을 꺼서 그림자 경고와 성능 낭비를 줄인다.
-        private void DisableGeneratedLightsForGameplay()
-        {
-            if (!DisableGeneratedLightsInGame)
-            {
-                return;
-            }
-
-            if (DisableGeneratedLightsOnlyInPlayMode && !Application.isPlaying)
-            {
-                return;
-            }
-
-            for (int i = 0; i < generatedCells.Count; i++)
-            {
-                Cell cell = generatedCells[i];
-
-                if (cell == null)
-                {
-                    continue;
-                }
-
-                SetLightsEnabled(cell.gameObject, false);
-            }
-
-            if (DisableGeneratedDoorLightsToo)
-            {
-                for (int i = 0; i < generatedDoorObjects.Count; i++)
-                {
-                    GameObject doorObject = generatedDoorObjects[i];
-
-                    if (doorObject == null)
-                    {
-                        continue;
+                        return;
                     }
 
-                    SetLightsEnabled(doorObject, false);
-                }
-            }
-        }
-
-        // Light만 켜고 끈다. Collider와 Renderer는 건드리지 않는다.
-        private void SetLightsEnabled(GameObject root, bool enabled)
-        {
-            if (root == null)
-            {
-                return;
-            }
-
-            Light[] lights = root.GetComponentsInChildren<Light>(true);
-
-            for (int i = 0; i < lights.Length; i++)
-            {
-                Light targetLight = lights[i];
-
-                if (targetLight == null)
-                {
-                    continue;
-                }
-
-                if (!enabled && DisableGeneratedLightShadows)
-                {
-                    targetLight.shadows = LightShadows.None;
-                }
-
-                targetLight.enabled = enabled;
-            }
-        }
-
-        // 인게임에서 맵 모델은 보이지 않게 하고 Collider는 그대로 둔다.
-        private void HideGeneratedVisualsForGameplay()
-        {
-            if (!HideGeneratedVisualsInGame)
-            {
-                return;
-            }
-
-            if (HideGeneratedVisualsOnlyInPlayMode && !Application.isPlaying)
-            {
-                return;
-            }
-
-            for (int i = 0; i < generatedCells.Count; i++)
-            {
-                Cell cell = generatedCells[i];
-
-                if (cell == null)
-                {
-                    continue;
-                }
-
-                SetRenderersEnabled(cell.gameObject, false);
-            }
-
-            if (HideGeneratedDoorVisualsToo)
-            {
-                for (int i = 0; i < generatedDoorObjects.Count; i++)
-                {
-                    GameObject doorObject = generatedDoorObjects[i];
-
-                    if (doorObject == null)
+                    for (int i = 0; i < cell.Exits.Length; i++)
                     {
-                        continue;
+                        if (cell.Exits[i] == null)
+                        {
+                            continue;
+                        }
+
+                        if (cell.Exits[i].transform == exit)
+                        {
+                            if (cell.ExitVisuals != null &&
+                                i < cell.ExitVisuals.Length &&
+                                cell.ExitVisuals[i] != null)
+                            {
+                                cell.ExitVisuals[i].SetActive(false);
+                            }
+
+                            return;
+                        }
                     }
 
-                    SetRenderersEnabled(doorObject, false);
+                    // Cell을 찾았지만 배열에 없는 exit이면 더 올라갈 필요 없다.
+                    return;
                 }
-            }
-        }
 
-        // Renderer만 켜고 끈다. Collider는 건드리지 않는다.
-        private void SetRenderersEnabled(GameObject root, bool enabled)
-        {
-            if (root == null)
-            {
-                return;
-            }
-
-            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
-
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null)
-                {
-                    renderers[i].enabled = enabled;
-                }
+                current = current.parent;
             }
         }
 
@@ -1680,7 +2578,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             generatedCells.Clear();
             startRoomPositions.Clear();
             spawnedCountByPrefabName.Clear();
-            generatedDoorObjects.Clear();
+            playerSpawnedCells.Clear();
+            playerSpawnedPositions.Clear();
+            exitDoorOwnerCell = null;
+            exitDoorPosition = Vector3.zero;
+            hasExitDoorPosition = false;
+            consumedExitInstanceIds.Clear();
         }
 
         // Scene View에서 80x80 같은 맵 제한 범위를 보여준다.

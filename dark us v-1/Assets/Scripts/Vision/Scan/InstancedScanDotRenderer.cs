@@ -60,11 +60,9 @@ public class InstancedScanDotRenderer : MonoBehaviour
     [SerializeField] private Color defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
 
     [Header("Laboratory Dot Colors")]
-    // 연구소 바닥용 점 색이다.
-    [SerializeField] private Color floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
-
-    // 연구소 벽용 점 색이다.
-    [SerializeField] private Color wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
+    // 연구소 바닥/벽 공통 구조물 점 색이다.
+    // Floor 7번과 Wall 8번을 여기 하나로 묶어서 같은 색으로 출력한다.
+    [SerializeField] private Color structureDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
 
     // 금속/기계류용 점 색이다.
     [SerializeField] private Color metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
@@ -143,6 +141,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         maxActiveDots = Mathf.Max(1, maxActiveDots);
         cellSize = Mathf.Max(0.01f, cellSize);
         dotScale = Mathf.Max(0.001f, dotScale);
+
         // 가독성용 점 색 프리셋을 적용한다.
         if (applyReadabilityColorPresetOnAwake)
         {
@@ -214,7 +213,6 @@ public class InstancedScanDotRenderer : MonoBehaviour
         }
 
         // 인스턴싱용 행렬을 만든다.
-        // 거리별 점 크기 조절은 제거하고 항상 기본 dotScale만 사용한다.
         Matrix4x4 matrix = Matrix4x4.TRS(
             worldPosition,
             rotation,
@@ -281,12 +279,13 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 가독성용 회백색 점 색 프리셋을 적용하는 함수이다.
     private void ApplyReadabilityColorPreset()
     {
-        // 기본 구조물은 완전 흰색보다 낮은 회백색을 쓴다.
+        // 기본 점은 완전 흰색보다 낮은 회백색을 쓴다.
         defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
 
-        // 연구소 기본 구조물은 기존 공포감을 유지하기 위해 낮은 채도의 회색 계열로 둔다.
-        floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
-        wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
+        // 바닥과 벽은 구분하지 않고 같은 구조물 색으로 쓴다.
+        structureDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
+
+        // 나머지 색은 기존 연구소 컬러 구분을 유지한다.
         metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
         glassDotColor = new Color(0.42f, 0.72f, 0.86f, 1f);
 
@@ -295,7 +294,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
         emergencyExitDotColor = new Color(0.95f, 0.78f, 0.20f, 1f);
 
-        // 플레이어와 생명체는 역할 구분이 아니라 생체 신호 느낌만 준다.
+        // 플레이어와 생명체는 생체 신호 느낌으로 구분한다.
         playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
         creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
     }
@@ -425,22 +424,24 @@ public class InstancedScanDotRenderer : MonoBehaviour
     {
         return new Color[]
         {
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            floorDotColor,
-            wallDotColor,
-            metalDotColor,
-            glassDotColor,
-            accessCoreDotColor,
-            securityTerminalDotColor,
-            emergencyExitDotColor,
-            playerBodyDotColor,
-            creatureDotColor
+            defaultDotColor,          // 0 Default
+            defaultDotColor,          // 1 unused
+            defaultDotColor,          // 2 unused
+            defaultDotColor,          // 3 unused
+            defaultDotColor,          // 4 unused
+            defaultDotColor,          // 5 unused
+            defaultDotColor,          // 6 unused
+
+            structureDotColor,        // 7 Floor
+            structureDotColor,        // 8 Wall
+
+            metalDotColor,            // 9 Metal
+            glassDotColor,            // 10 Glass
+            accessCoreDotColor,       // 11 AccessCore
+            securityTerminalDotColor, // 12 SecurityTerminal
+            emergencyExitDotColor,    // 13 EmergencyExit
+            playerBodyDotColor,       // 14 PlayerBody
+            creatureDotColor          // 15 Creature
         };
     }
 
