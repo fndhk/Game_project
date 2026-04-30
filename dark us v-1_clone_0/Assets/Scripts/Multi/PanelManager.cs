@@ -1,10 +1,15 @@
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public class PanelManager : MonoBehaviour
 {
     // 연결할 패널 (FindRoomPanel)
     [Header("UI Panels")]
     [SerializeField] private GameObject findRoomPanel;
+
+    [Header("Input Sync")]
+    [SerializeField] private TMP_InputField roomInputField;
 
     void Start()
     {
@@ -34,5 +39,11 @@ public class PanelManager : MonoBehaviour
             findRoomPanel.SetActive(false);
             Debug.Log("Find Room 패널이 닫혔습니다.");
         }
+    }
+
+    public void ClickInsertButton()
+    {
+        // InputField에 엔터(Submit)가 입력된 것과 동일한 이벤트를 강제로 발생시킵니다.
+        roomInputField.onSubmit.Invoke(roomInputField.text);
     }
 }
