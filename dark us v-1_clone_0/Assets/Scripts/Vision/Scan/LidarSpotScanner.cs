@@ -172,22 +172,22 @@ public class LidarSpotScanner : MonoBehaviour
     // 우클릭 입력을 처리하는 함수이다.
     private void HandlePulseInput()
     {
-        // 우클릭 순간만 처리한다.
-        if (!Input.GetMouseButtonDown(1))
+        // 우클릭을 누르고 있는 동안 계속 처리한다.
+        if (!Input.GetMouseButton(1))
         {
             return;
         }
 
-        // 쿨타임 중이면 종료한다.
+        // 쿨타임 중이면 새 파동을 만들지 않는다.
         if (Time.time < nextPulseTime)
         {
             return;
         }
 
-        // 새 파동을 시작한다.
+        // 새 스캔 파동을 시작한다.
         StartPulse();
 
-        // 다음 사용 시간을 갱신한다.
+        // 우클릭을 계속 누르고 있으면 쿨타임마다 다시 스캔되게 한다.
         nextPulseTime = Time.time + pulseCooldown;
     }
 
@@ -423,6 +423,12 @@ public class LidarSpotScanner : MonoBehaviour
 
             case ScanSurfaceType.Creature:
                 return ScanDotColorGroup.Creature;
+
+            case ScanSurfaceType.WrongComputer:
+                return ScanDotColorGroup.WrongComputer;
+
+            case ScanSurfaceType.RestoredEscapeComputer:
+                return ScanDotColorGroup.RestoredEscapeComputer;
 
             default:
                 return ResolveFallbackDotColorGroupByNormal(hit.normal);

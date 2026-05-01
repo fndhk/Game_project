@@ -66,7 +66,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d69ad4160b0ab544db17b70859ecbc84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScanSurfaceInfo
-  surfaceType: 11
+  surfaceType: 9
 --- !u!1 &2419732191914845473
 GameObject:
   m_ObjectHideFlags: 0
