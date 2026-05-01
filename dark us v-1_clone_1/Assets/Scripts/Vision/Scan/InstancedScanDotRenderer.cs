@@ -17,7 +17,13 @@ public enum ScanDotColorGroup
     SecurityTerminal = 12,
     EmergencyExit = 13,
     PlayerBody = 14,
-    Creature = 15
+    Creature = 15,
+
+    // 가짜 컴퓨터를 복구했을 때 쓰는 빨간색 점 그룹이다.
+    WrongComputer = 16,
+
+    // 진짜 탈출 시스템 컴퓨터를 복구했을 때 쓰는 파란색 점 그룹이다.
+    RestoredEscapeComputer = 17
 }
 
 // 점을 GameObject로 만들지 않고 GPU 인스턴싱으로 그리는 렌더러이다.
@@ -60,9 +66,11 @@ public class InstancedScanDotRenderer : MonoBehaviour
     [SerializeField] private Color defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
 
     [Header("Laboratory Dot Colors")]
-    // 연구소 바닥/벽 공통 구조물 점 색이다.
-    // Floor 7번과 Wall 8번을 여기 하나로 묶어서 같은 색으로 출력한다.
-    [SerializeField] private Color structureDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
+    // 연구소 바닥용 점 색이다.
+    [SerializeField] private Color floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
+
+    // 연구소 벽용 점 색이다.
+    [SerializeField] private Color wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
 
     // 금속/기계류용 점 색이다.
     [SerializeField] private Color metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
@@ -84,6 +92,12 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
     // 생명체/괴물용 점 색이다.
     [SerializeField] private Color creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
+
+    // 가짜 컴퓨터 복구 완료용 점 색이다.
+    [SerializeField] private Color wrongComputerDotColor = new Color(1.00f, 0.10f, 0.08f, 1f);
+
+    // 진짜 탈출 시스템 컴퓨터 복구 완료용 점 색이다.
+    [SerializeField] private Color restoredEscapeComputerDotColor = new Color(0.16f, 0.50f, 1.00f, 1f);
 
     // 원본 프리팹에서 가져온 메쉬이다.
     private Mesh instanceMesh;
@@ -133,7 +147,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
     // 색상 그룹 개수이다.
-    private const int ColorGroupCount = 16;
+    private const int ColorGroupCount = 18;
 
     private void Awake()
     {
@@ -141,7 +155,6 @@ public class InstancedScanDotRenderer : MonoBehaviour
         maxActiveDots = Mathf.Max(1, maxActiveDots);
         cellSize = Mathf.Max(0.01f, cellSize);
         dotScale = Mathf.Max(0.001f, dotScale);
-
         // 가독성용 점 색 프리셋을 적용한다.
         if (applyReadabilityColorPresetOnAwake)
         {
@@ -213,6 +226,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         }
 
         // 인스턴싱용 행렬을 만든다.
+        // 거리별 점 크기 조절은 제거하고 항상 기본 dotScale만 사용한다.
         Matrix4x4 matrix = Matrix4x4.TRS(
             worldPosition,
             rotation,
@@ -233,6 +247,75 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
         // 재사용 순서를 기록한다.
         activeOrder.Enqueue(dotIndex);
+    }
+
+    // 특정 반경 안에 이미 찍혀 있는 점의 색상 그룹을 즉시 바꾼다.
+    // 컴퓨터 복구 완료 후 기존 초록색 점을 빨간색/파란색으로 바꿀 때 사용한다.
+    public int RecolorDotsInSphere(Vector3 center, float radius, ScanDotColorGroup newColorGroup, params ScanDotColorGroup[] sourceGroups)
+    {
+        // 반경이 0 이하이면 처리하지 않는다.
+        if (radius <= 0f)
+        {
+            return 0;
+        }
+
+        // 거리 비교 비용을 줄이기 위해 제곱 반경을 사용한다.
+        float sqrRadius = radius * radius;
+
+        // 원래 색상 그룹 필터를 사용할지 확인한다.
+        bool useSourceFilter = sourceGroups != null && sourceGroups.Length > 0;
+
+        // 변경된 점 개수를 저장한다.
+        int changedCount = 0;
+
+        // 모든 활성 점을 검사한다.
+        for (int i = 0; i < dots.Count; i++)
+        {
+            DotRecord record = dots[i];
+
+            // 비활성 점은 건너뛴다.
+            if (!record.isActive)
+            {
+                continue;
+            }
+
+            // 원래 색상 그룹 필터가 있으면 해당 그룹만 바꾼다.
+            if (useSourceFilter && !IsColorGroupInFilter(record.colorGroupIndex, sourceGroups))
+            {
+                continue;
+            }
+
+            // Matrix의 4번째 컬럼에는 월드 위치가 들어 있다.
+            Vector4 positionColumn = record.matrix.GetColumn(3);
+            Vector3 dotPosition = new Vector3(positionColumn.x, positionColumn.y, positionColumn.z);
+
+            // 반경 밖의 점은 건너뛴다.
+            if ((dotPosition - center).sqrMagnitude > sqrRadius)
+            {
+                continue;
+            }
+
+            // 색상 그룹만 바꿔도 다음 LateUpdate에서 즉시 다른 색으로 그려진다.
+            record.colorGroupIndex = (int)newColorGroup;
+            dots[i] = record;
+            changedCount++;
+        }
+
+        return changedCount;
+    }
+
+    // 특정 색상 그룹이 필터 배열에 들어 있는지 확인한다.
+    private bool IsColorGroupInFilter(int colorGroupIndex, ScanDotColorGroup[] sourceGroups)
+    {
+        for (int i = 0; i < sourceGroups.Length; i++)
+        {
+            if (colorGroupIndex == (int)sourceGroups[i])
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // 예전 버전과의 코드 호환성을 위한 함수이다.
@@ -279,13 +362,12 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 가독성용 회백색 점 색 프리셋을 적용하는 함수이다.
     private void ApplyReadabilityColorPreset()
     {
-        // 기본 점은 완전 흰색보다 낮은 회백색을 쓴다.
+        // 기본 구조물은 완전 흰색보다 낮은 회백색을 쓴다.
         defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
 
-        // 바닥과 벽은 구분하지 않고 같은 구조물 색으로 쓴다.
-        structureDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
-
-        // 나머지 색은 기존 연구소 컬러 구분을 유지한다.
+        // 연구소 기본 구조물은 기존 공포감을 유지하기 위해 낮은 채도의 회색 계열로 둔다.
+        floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
+        wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
         metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
         glassDotColor = new Color(0.42f, 0.72f, 0.86f, 1f);
 
@@ -294,9 +376,13 @@ public class InstancedScanDotRenderer : MonoBehaviour
         securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
         emergencyExitDotColor = new Color(0.95f, 0.78f, 0.20f, 1f);
 
-        // 플레이어와 생명체는 생체 신호 느낌으로 구분한다.
+        // 플레이어와 생명체는 역할 구분이 아니라 생체 신호 느낌만 준다.
         playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
         creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
+
+        // 컴퓨터 복구 결과는 게임 목표 판단이 바로 되도록 색 대비를 크게 둔다.
+        wrongComputerDotColor = new Color(1.00f, 0.10f, 0.08f, 1f);
+        restoredEscapeComputerDotColor = new Color(0.16f, 0.50f, 1.00f, 1f);
     }
 
     // 그룹별 리스트를 준비하는 함수이다.
@@ -424,24 +510,24 @@ public class InstancedScanDotRenderer : MonoBehaviour
     {
         return new Color[]
         {
-            defaultDotColor,          // 0 Default
-            defaultDotColor,          // 1 unused
-            defaultDotColor,          // 2 unused
-            defaultDotColor,          // 3 unused
-            defaultDotColor,          // 4 unused
-            defaultDotColor,          // 5 unused
-            defaultDotColor,          // 6 unused
-
-            structureDotColor,        // 7 Floor
-            structureDotColor,        // 8 Wall
-
-            metalDotColor,            // 9 Metal
-            glassDotColor,            // 10 Glass
-            accessCoreDotColor,       // 11 AccessCore
-            securityTerminalDotColor, // 12 SecurityTerminal
-            emergencyExitDotColor,    // 13 EmergencyExit
-            playerBodyDotColor,       // 14 PlayerBody
-            creatureDotColor          // 15 Creature
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            defaultDotColor,
+            floorDotColor,
+            wallDotColor,
+            metalDotColor,
+            glassDotColor,
+            accessCoreDotColor,
+            securityTerminalDotColor,
+            emergencyExitDotColor,
+            playerBodyDotColor,
+            creatureDotColor,
+            wrongComputerDotColor,
+            restoredEscapeComputerDotColor
         };
     }
 

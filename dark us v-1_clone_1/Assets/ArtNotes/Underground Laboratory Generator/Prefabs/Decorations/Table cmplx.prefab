@@ -2031,6 +2031,7 @@ GameObject:
   - component: {fileID: 4389200492995576886}
   - component: {fileID: 1768488995408941632}
   - component: {fileID: 1321868377067269247}
+  - component: {fileID: 240106907095952866}
   m_Layer: 0
   m_Name: Comp mesh
   m_TagString: Untagged
@@ -2067,8 +2068,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7939606da92c0a48afb3b69f7670dc2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  EnableChance: 1
-  CreateChance: 80
+  EnableChance: 0
+  CreateChance: 100
   EnableChildrensDestroy: 1
   ChildrensLeft: 1
   EnableAlbedoRandom: 0
@@ -2085,7 +2086,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d69ad4160b0ab544db17b70859ecbc84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScanSurfaceInfo
-  surfaceType: 10
+  surfaceType: 12
+--- !u!114 &240106907095952866
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7518182667579403522}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de66935504d530646af5b26f683fca9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObjectiveComputer
+  isSelectedObjective: 0
+  isRestored: 0
+  restoreDuration: 6
+  resetProgressWhenCancelled: 1
+  maxInteractorMoveDistance: 0.45
+  requireCitizenRole: 0
+  inactiveVisualRoot: {fileID: 0}
+  activeVisualRoot: {fileID: 0}
+  restoredVisualRoot: {fileID: 0}
+  revealSelectedVisualBeforeRestore: 0
+  scanSurfaceInfos: []
+  beforeRestoreScanType: 11
+  fakeRestoredScanType: 16
+  escapeRestoredScanType: 17
+  recolorExistingDotsOnRestore: 1
+  existingDotRecolorRadius: 1.25
+  existingDotRecolorCenter: {fileID: 0}
+  scanDotRenderers: []
+  startAudioSource: {fileID: 0}
+  loopAudioSource: {fileID: 0}
+  completeAudioSource: {fileID: 0}
+  restoreProgress: 0
 --- !u!1 &7903986833460510749
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,15 +1,30 @@
 using UnityEngine;
 using TMPro;
 
+// 연구소 목표 흐름 종류이다.
+public enum LabObjectiveFlow
+{
+    AccessCore,
+    ComputerRestore
+}
+
 // 연구소 탈출 목표 흐름을 관리한다.
-// 흐름: Access Core 획득 -> Security Terminal에 삽입 -> Exit Door 잠금 해제.
+// 기존 Access Core 방식과 새 Computer 복구 방식을 모두 지원한다.
 public class LabObjectiveManager : MonoBehaviour
 {
     public static LabObjectiveManager Instance { get; private set; }
 
-    [Header("Objective Rules")]
+    [Header("Objective Flow")]
+    // 현재 사용할 목표 방식이다.
+    public LabObjectiveFlow objectiveFlow = LabObjectiveFlow.ComputerRestore;
+
+    [Header("Access Core Rules")]
     // 탈출구를 열기 위해 필요한 Access Core 총 개수이다.
     public int requiredCoreCount = 4;
+
+    [Header("Computer Rules")]
+    // 탈출구를 열기 위해 복구해야 하는 컴퓨터 수이다.
+    public int requiredComputerCount = 4;
 
     [Header("Optional HUD")]
     // 직접 연결하면 이 텍스트를 자동으로 갱신한다.
@@ -18,13 +33,21 @@ public class LabObjectiveManager : MonoBehaviour
     // 직접 연결하면 현재 상호작용 안내 문구를 표시한다.
     public TMP_Text promptText;
 
-    [Header("Debug")]
+    [Header("Access Core Debug")]
     // 현재 플레이어가 들고 있는 Access Core 개수이다.
     [SerializeField] private int carriedCoreCount = 0;
 
     // Security Terminal에 이미 삽입된 Access Core 개수이다.
     [SerializeField] private int installedCoreCount = 0;
 
+    [Header("Computer Debug")]
+    // 현재 목표로 선택된 컴퓨터 목록이다.
+    [SerializeField] private ObjectiveComputer[] selectedObjectiveComputers = new ObjectiveComputer[0];
+
+    // 복구 완료된 컴퓨터 개수이다.
+    [SerializeField] private int restoredComputerCount = 0;
+
+    [Header("Exit Debug")]
     // 탈출구가 열렸는지 저장한다.
     [SerializeField] private bool exitUnlocked = false;
 
@@ -34,17 +57,39 @@ public class LabObjectiveManager : MonoBehaviour
     public int RequiredCoreCount => Mathf.Max(1, requiredCoreCount);
     public int CarriedCoreCount => carriedCoreCount;
     public int InstalledCoreCount => installedCoreCount;
+    public int RequiredComputerCount => Mathf.Max(1, requiredComputerCount);
+    public int RestoredComputerCount => restoredComputerCount;
     public bool ExitUnlocked => exitUnlocked;
 
-    // 새로 생성된 맵 기준으로 목표 진행도를 초기화한다.
+    // 새로 생성된 맵 기준으로 Access Core 목표 진행도를 초기화한다.
     public void ResetObjectiveState(int requiredCount)
     {
+        objectiveFlow = LabObjectiveFlow.AccessCore;
         requiredCoreCount = Mathf.Max(1, requiredCount);
         carriedCoreCount = 0;
         installedCoreCount = 0;
         exitUnlocked = false;
-        registeredExitDoor = null;
         RefreshHud();
+    }
+
+    // 새로 생성된 맵 기준으로 컴퓨터 목표를 설정한다.
+    public void SetupComputerObjectives(ObjectiveComputer[] selectedComputers, int requiredCount)
+    {
+        objectiveFlow = LabObjectiveFlow.ComputerRestore;
+        requiredComputerCount = Mathf.Max(1, requiredCount);
+        selectedObjectiveComputers = selectedComputers != null ? selectedComputers : new ObjectiveComputer[0];
+        exitUnlocked = false;
+
+        RecountRestoredComputers();
+
+        if (restoredComputerCount >= RequiredComputerCount)
+        {
+            UnlockExit();
+        }
+        else
+        {
+            RefreshHud();
+        }
     }
 
     // 싱글톤 참조를 준비한다.
@@ -116,6 +161,51 @@ public class LabObjectiveManager : MonoBehaviour
         return installedNow;
     }
 
+    // 컴퓨터 하나가 복구 완료되었을 때 호출된다.
+    public void CompleteComputer(ObjectiveComputer computer)
+    {
+        if (computer == null)
+        {
+            return;
+        }
+
+        if (exitUnlocked)
+        {
+            RefreshHud();
+            return;
+        }
+
+        objectiveFlow = LabObjectiveFlow.ComputerRestore;
+        RecountRestoredComputers();
+
+        if (restoredComputerCount >= RequiredComputerCount)
+        {
+            UnlockExit();
+            return;
+        }
+
+        RefreshHud();
+    }
+
+    // 선택된 목표 컴퓨터 중 복구 완료된 개수를 다시 계산한다.
+    private void RecountRestoredComputers()
+    {
+        restoredComputerCount = 0;
+
+        if (selectedObjectiveComputers == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < selectedObjectiveComputers.Length; i++)
+        {
+            if (selectedObjectiveComputers[i] != null && selectedObjectiveComputers[i].IsRestored)
+            {
+                restoredComputerCount++;
+            }
+        }
+    }
+
     // 탈출구를 등록한다.
     public void RegisterExitDoor(EmergencyExitDoor exitDoor)
     {
@@ -153,6 +243,28 @@ public class LabObjectiveManager : MonoBehaviour
     // HUD 목표 문구를 반환한다.
     public string GetHudObjectiveText()
     {
+        if (objectiveFlow == LabObjectiveFlow.ComputerRestore)
+        {
+            return GetComputerHudObjectiveText();
+        }
+
+        return GetAccessCoreHudObjectiveText();
+    }
+
+    // 컴퓨터 복구 방식의 HUD 문구를 반환한다.
+    private string GetComputerHudObjectiveText()
+    {
+        if (exitUnlocked)
+        {
+            return "Exit Unlocked";
+        }
+
+        return "Restore Computers " + restoredComputerCount + "/" + RequiredComputerCount;
+    }
+
+    // Access Core 방식의 HUD 문구를 반환한다.
+    private string GetAccessCoreHudObjectiveText()
+    {
         if (exitUnlocked)
         {
             return "Exit Unlocked";
@@ -175,6 +287,12 @@ public class LabObjectiveManager : MonoBehaviour
     public string GetTerminalProgressText()
     {
         return installedCoreCount + "/" + RequiredCoreCount;
+    }
+
+    // 컴퓨터 진행 문구를 반환한다.
+    public string GetComputerProgressText()
+    {
+        return restoredComputerCount + "/" + RequiredComputerCount;
     }
 
     // HUD 텍스트를 갱신한다.

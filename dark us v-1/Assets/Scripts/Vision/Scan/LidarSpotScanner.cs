@@ -424,6 +424,12 @@ public class LidarSpotScanner : MonoBehaviour
             case ScanSurfaceType.Creature:
                 return ScanDotColorGroup.Creature;
 
+            case ScanSurfaceType.WrongComputer:
+                return ScanDotColorGroup.WrongComputer;
+
+            case ScanSurfaceType.RestoredEscapeComputer:
+                return ScanDotColorGroup.RestoredEscapeComputer;
+
             default:
                 return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
