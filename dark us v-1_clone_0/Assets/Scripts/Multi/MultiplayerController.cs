@@ -11,18 +11,18 @@ public class MultiplayerController : NetworkBehaviour
     public static MultiplayerController Instance;
 
     [Header("Panels")]
-    [SerializeField] private GameObject lobbyPanel;  // ½ÃÀÛ È­¸é (¹æ¸¸µé±â/ÀÔÀå)
-    [SerializeField] private GameObject roomPanel;   // ´ë±â½Ç (ÄÚµåÇ¥½Ã/½ÃÀÛ/³ª°¡±â)
-    [SerializeField] private GameObject loadingPanel; // "¿¬°á Áß..." ¸Þ½ÃÁö ÆÐ³Î
-    [SerializeField] private GameObject errorPanel;   // ¿¡·¯ ÆË¾÷
+    [SerializeField] private GameObject lobbyPanel;  // ï¿½ï¿½ï¿½ï¿½ È­ï¿½ï¿½ (ï¿½æ¸¸ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½)
+    [SerializeField] private GameObject roomPanel;   // ï¿½ï¿½ï¿½ï¿½ (ï¿½Úµï¿½Ç¥ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
+    [SerializeField] private GameObject loadingPanel; // "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½..." ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½Ð³ï¿½
+    [SerializeField] private GameObject errorPanel;   // ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¾ï¿½
     [SerializeField] private GameObject backgroundPanel;
 
     [Header("UI References")]
-    [SerializeField] private TMP_InputField codeInputField; // ¹æ ¹øÈ£ ÀÔ·ÂÃ¢
-    [SerializeField] private TMP_Text roomCodeText;        // ³» ¹æ ¹øÈ£ Ç¥½Ã
-    [SerializeField] private TMP_Text errorText;           // ¿¡·¯ ¸Þ½ÃÁö ³»¿ë
-    [SerializeField] private Button startButton;           // °ÔÀÓ ½ÃÀÛ ¹öÆ°
-    [SerializeField] private Button leaveButton;           // ¹æ ³ª°¡±â ¹öÆ°
+    [SerializeField] private TMP_InputField codeInputField; // ï¿½ï¿½ ï¿½ï¿½È£ ï¿½Ô·ï¿½Ã¢
+    [SerializeField] private TMP_Text roomCodeText;        // ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È£ Ç¥ï¿½ï¿½
+    [SerializeField] private TMP_Text errorText;           // ï¿½ï¿½ï¿½ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    [SerializeField] private Button startButton;           // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ°
+    [SerializeField] private Button leaveButton;           // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ°
 
     [Header("Settings")]
     [SerializeField] private int minPlayers = 2;
@@ -35,17 +35,17 @@ public class MultiplayerController : NetworkBehaviour
         Instance = this;
         transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
 
-        // ÀÎÇ²ÇÊµå ¿£ÅÍÅ° ÀÌº¥Æ® ¿¬°á
+        // ï¿½ï¿½Ç²ï¿½Êµï¿½ ï¿½ï¿½ï¿½ï¿½Å° ï¿½Ìºï¿½Æ® ï¿½ï¿½ï¿½ï¿½
         if (codeInputField != null)
         {
             codeInputField.onSubmit.AddListener(delegate { JoinRoomWithCode(); });
         }
 
-        // ÃÊ±â È­¸é ¼³Á¤
+        // ï¿½Ê±ï¿½ È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         ShowLobby();
     }
 
-    // --- [ÆÐ³Î Á¦¾î ÇÔ¼ö] ---
+    // --- [ï¿½Ð³ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½] ---
     private void ShowLobby()
     {
         lobbyPanel?.SetActive(true);
@@ -62,13 +62,13 @@ public class MultiplayerController : NetworkBehaviour
         backgroundPanel?.SetActive(false);
     }
 
-    // --- [¹æ ¸¸µé±â - Host] ---
+    // --- [ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ - Host] ---
     public void CreateRoom()
     {
         ushort randomCode = (ushort)UnityEngine.Random.Range(10000, 99999);
         transport.ConnectionData.Port = randomCode;
 
-        if (roomCodeText != null) roomCodeText.text = $"¹æÄÚµå\n{randomCode}";
+        if (roomCodeText != null) roomCodeText.text = $"ï¿½ï¿½ï¿½Úµï¿½\n{randomCode}";
 
         if (NetworkManager.Singleton.StartHost())
         {
@@ -78,20 +78,20 @@ public class MultiplayerController : NetworkBehaviour
         }
     }
 
-    // --- [¹æ ÀÔÀå - Client] ---
+    // --- [ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - Client] ---
     public void JoinRoomWithCode()
     {
-        // 1. ÀÌ¹Ì ¿¬°á ½Ãµµ ÁßÀÎÁö Ã¼Å©
+        // 1. ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã¼Å©
         if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer) return;
 
-        // 2. ÀÔ·Â°ª À¯È¿¼º °Ë»ç
+        // 2. ï¿½Ô·Â°ï¿½ ï¿½ï¿½È¿ï¿½ï¿½ ï¿½Ë»ï¿½
         if (!ushort.TryParse(codeInputField.text, out ushort port))
         {
-            ShowErrorPopup("¼ýÀÚ 5ÀÚ¸®¸¦ ÀÔ·ÂÇØÁÖ¼¼¿ä.");
+            ShowErrorPopup("ï¿½ï¿½ï¿½ï¿½ 5ï¿½Ú¸ï¿½ï¿½ï¿½ ï¿½Ô·ï¿½ï¿½ï¿½ï¿½Ö¼ï¿½ï¿½ï¿½.");
             return;
         }
 
-        // 3. ·ÎµùÃ¢ ¶ç¿ì±â
+        // 3. ï¿½Îµï¿½Ã¢ ï¿½ï¿½ï¿½ï¿½
         if (loadingPanel != null) loadingPanel.SetActive(true);
 
         transport.ConnectionData.Address = DEFAULT_IP;
@@ -105,11 +105,11 @@ public class MultiplayerController : NetworkBehaviour
         else
         {
             CancelConnection();
-            ShowErrorPopup("¿¬°á ½Ãµµ¸¦ ½ÃÀÛÇÒ ¼ö ¾ø½À´Ï´Ù.");
+            ShowErrorPopup("ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.");
         }
     }
 
-    // --- [¿¬°á Ãë¼Ò ¹öÆ° ·ÎÁ÷] ---
+    // --- [ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Æ° ï¿½ï¿½ï¿½ï¿½] ---
     public void CancelConnection()
     {
         StopAllCoroutines();
@@ -119,10 +119,10 @@ public class MultiplayerController : NetworkBehaviour
         ShowLobby();
     }
 
-    // --- [ÀÎ¿ø¼ö Ã¼Å©] ---
+    // --- [ï¿½Î¿ï¿½ï¿½ï¿½ Ã¼Å©] ---
     private void Update()
     {
-        // ¹æÀåÀÎ °æ¿ì¿¡¸¸ ½ÃÀÛ ¹öÆ° È°¼ºÈ­/ºñÈ°¼ºÈ­ Á¦¾î
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ì¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ° È°ï¿½ï¿½È­/ï¿½ï¿½È°ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½
         if (IsServer && startButton != null && startButton.gameObject.activeSelf)
         {
             int count = NetworkManager.Singleton.ConnectedClientsList.Count;
@@ -139,24 +139,24 @@ public class MultiplayerController : NetworkBehaviour
         {
             if (NetworkManager.Singleton.IsConnectedClient)
             {
-                // Á¢¼Ó ¼º°ø
+                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 ShowRoom();
-                if (startButton != null) startButton.gameObject.SetActive(false); // Âü¿©ÀÚ´Â ½ÃÀÛ¹öÆ°X
+                if (startButton != null) startButton.gameObject.SetActive(false); // ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ ï¿½ï¿½ï¿½Û¹ï¿½Æ°X
                 yield break;
             }
             timer += Time.deltaTime;
             yield return null;
         }
 
-        // Å¸ÀÓ¾Æ¿ô ¹ß»ý
+        // Å¸ï¿½Ó¾Æ¿ï¿½ ï¿½ß»ï¿½
         if (!NetworkManager.Singleton.IsConnectedClient)
         {
             CancelConnection();
-            ShowErrorPopup("¼­¹ö¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.");
+            ShowErrorPopup("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.");
         }
     }
 
-    // --- [¿¡·¯ Ã³¸®] ---
+    // --- [ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½] ---
     private void ShowErrorPopup(string message)
     {
         if (errorPanel != null)
@@ -166,74 +166,74 @@ public class MultiplayerController : NetworkBehaviour
         }
     }
 
-    // ¿¡·¯ Ã¢ÀÇ 'È®ÀÎ' ¹öÆ°¿¡ ¿¬°áµÈ ÇÔ¼ö
+    // ï¿½ï¿½ï¿½ï¿½ Ã¢ï¿½ï¿½ 'È®ï¿½ï¿½' ï¿½ï¿½Æ°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
     public void CloseErrorPopup()
     {
         if (errorPanel != null)
         {
-            errorPanel.SetActive(false); // ¿¡·¯ ÆÐ³Î ºñÈ°¼ºÈ­
+            errorPanel.SetActive(false); // ï¿½ï¿½ï¿½ï¿½ ï¿½Ð³ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­
         }
 
-        // ¿¡·¯¸¦ È®ÀÎÇßÀ¸´Ï ·Îºñ ÆÐ³ÎÀÌ È®½ÇÈ÷ º¸ÀÌµµ·Ï Ã³¸®
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Îºï¿½ ï¿½Ð³ï¿½ï¿½ï¿½ È®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìµï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
         ShowLobby();
 
-        // ÀÎÇ²ÇÊµå ÃÊ±âÈ­ (¼±ÅÃ »çÇ×: ´Ù½Ã ÀÔ·ÂÇÏ±â ÆíÇÏ°Ô)
+        // ï¿½ï¿½Ç²ï¿½Êµï¿½ ï¿½Ê±ï¿½È­ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: ï¿½Ù½ï¿½ ï¿½Ô·ï¿½ï¿½Ï±ï¿½ ï¿½ï¿½ï¿½Ï°ï¿½)
         if (codeInputField != null)
         {
             codeInputField.text = "";
-            codeInputField.ActivateInputField(); // ¹Ù·Î Å¸ÀÌÇÎ °¡´ÉÇÏ°Ô Æ÷Ä¿½º ÁÖ±â
+            codeInputField.ActivateInputField(); // ï¿½Ù·ï¿½ Å¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½Ö±ï¿½
         }
     }
 
-    // --- [¹æ ³ª°¡±â - ¿ÏÀü ÃÊ±âÈ­] ---
+    // --- [ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­] ---
     public void LeaveRoom()
     {
         if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
 
-        // ¾ÀÀ» »õ·Î°íÄ§ÇÏ¿© ¸ðµç ³×Æ®¿öÅ© »óÅÂ¿Í UI ÀÜ»óÀ» ÇÑ ¹ø¿¡ Á¦°Å
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Î°ï¿½Ä§ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½Â¿ï¿½ UI ï¿½Ü»ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
-    // --- [°ÔÀÓ ½ÃÀÛ - ¾À ÀüÈ¯] ---
+    // --- [ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ ï¿½ï¿½È¯] ---
     public void OnStartButtonPressed()
     {
-        // 1. ¿ÀÁ÷ ¹æÀå(Server)¸¸ ¾ÀÀ» ³Ñ±æ ±ÇÇÑÀÌ ÀÖÀ½
+        // 1. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(Server)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ±ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (IsServer)
         {
-            Debug.Log("°ÔÀÓ ½ÃÀÛ! ¸ðµç ÇÃ·¹ÀÌ¾î¸¦ ÀÌµ¿½ÃÅµ´Ï´Ù.");
+            Debug.Log("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½! ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î¸¦ ï¿½Ìµï¿½ï¿½ï¿½Åµï¿½Ï´ï¿½.");
 
-            // 2. Netcode Àü¿ë ¾À ¸Å´ÏÀú¸¦ »ç¿ëÇÏ¿© µ¿±âÈ­µÈ ¾À ÀüÈ¯ ½ÇÇà
-            // ¿©±â¼­ "GameScene"Àº Build Settings¿¡ µî·ÏµÈ ÀÌ¸§°ú Á¤È®È÷ °°¾Æ¾ß ÇÔ
+            // 2. Netcode ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Å´ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È¯ ï¿½ï¿½ï¿½ï¿½
+            // ï¿½ï¿½ï¿½â¼­ "GameScene"ï¿½ï¿½ Build Settingsï¿½ï¿½ ï¿½ï¿½Ïµï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½ï¿½È®ï¿½ï¿½ ï¿½ï¿½ï¿½Æ¾ï¿½ ï¿½ï¿½
             var status = NetworkManager.Singleton.SceneManager.LoadScene(
-                "GameScene",
+                "labor",
                 UnityEngine.SceneManagement.LoadSceneMode.Single
             );
 
             if (status != SceneEventProgressStatus.Started)
             {
-                Debug.LogWarning($"¾À ·Îµå ½ÇÆÐ: {status}");
+                Debug.LogWarning($"ï¿½ï¿½ ï¿½Îµï¿½ ï¿½ï¿½ï¿½ï¿½: {status}");
             }
         }
     }
 
     public void QuitGame()
     {
-        Debug.Log("°ÔÀÓ Á¾·á ½Ãµµ Áß...");
+        Debug.Log("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½ ï¿½ï¿½...");
 
-        // 1. ³×Æ®¿öÅ© ¿¬°áÀÌ µÇ¾î ÀÖ´Ù¸é ¸ÕÀú ¾ÈÀüÇÏ°Ô ²÷±â
+        // 1. ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ç¾ï¿½ ï¿½Ö´Ù¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (NetworkManager.Singleton != null)
         {
-            // ³»°¡ ¹æÀå(Host)ÀÌ¶ó¸é ¹æÀ» ÆøÆÄÇÏ°í, Âü¿©ÀÚ(Client)¶ó¸é ³ª¸¸ ³ª°©´Ï´Ù.
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(Host)ï¿½Ì¶ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(Client)ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.
             NetworkManager.Singleton.Shutdown();
-            Debug.Log("³×Æ®¿öÅ© ¿¬°áÀ» ¼º°øÀûÀ¸·Î Á¾·áÇß½À´Ï´Ù.");
+            Debug.Log("ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ß½ï¿½ï¿½Ï´ï¿½.");
         }
 
-        // 2. ÇÃ·§Æû¿¡ µû¸¥ Á¾·á Ã³¸®
+        // 2. ï¿½Ã·ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
         #if UNITY_EDITOR
-    // À¯´ÏÆ¼ ¿¡µðÅÍ¿¡¼­ ÇÃ·¹ÀÌ ¸ðµå¸¦ ¼öµ¿À¸·Î ²ô´Â È¿°ú
+    // ï¿½ï¿½ï¿½ï¿½Æ¼ ï¿½ï¿½ï¿½ï¿½ï¿½Í¿ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½å¸¦ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È¿ï¿½ï¿½
     UnityEditor.EditorApplication.isPlaying = false;
         #else
-        // ½ÇÁ¦ ºôµåµÈ °ÔÀÓ ÇÁ·Î±×·¥ Á¾·á
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Î±×·ï¿½ ï¿½ï¿½ï¿½ï¿½
         Application.Quit();
         #endif
     }

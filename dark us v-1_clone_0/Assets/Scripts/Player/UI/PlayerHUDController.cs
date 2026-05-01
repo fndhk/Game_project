@@ -96,6 +96,7 @@ public class PlayerHUDController : MonoBehaviour
         HandleSlotInput();
         UpdateSlotMarkerFade();
         UpdateCenterScanCooldown();
+        UpdateObjectiveText();
     }
 
     // 비어 있는 참조를 자동으로 찾아 넣는 함수이다.
@@ -150,6 +151,23 @@ public class PlayerHUDController : MonoBehaviour
     {
         UpdateBars(true);
         UpdateCenterScanCooldown();
+        UpdateObjectiveText();
+    }
+
+    // 목표 텍스트를 현재 진행도에 맞게 갱신한다.
+    private void UpdateObjectiveText()
+    {
+        if (objectiveText == null)
+        {
+            return;
+        }
+
+        if (LabObjectiveManager.Instance == null)
+        {
+            return;
+        }
+
+        objectiveText.text = LabObjectiveManager.Instance.GetHudObjectiveText();
     }
 
     // 체력과 스태미나 블록을 갱신하는 함수이다.
