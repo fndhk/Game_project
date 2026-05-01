@@ -71,11 +71,23 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 복구 시작 시 재생할 소리이다.
     public AudioSource startAudioSource;
 
-    // 복구 중 반복 재생할 소리이다.
+    // 복구 진행 중 재생할 소리이다.
+    // 이름은 기존 Inspector 호환을 위해 loopAudioSource로 유지하지만, 아래 옵션으로 루프 여부를 정한다.
     public AudioSource loopAudioSource;
 
-    // 복구 완료 시 재생할 소리이다.
+    // 진행 중 소리를 실제로 반복 재생할지 정한다.
+    // 6초짜리 상승음처럼 한 번만 재생할 사운드는 꺼둔다.
+    public bool loopProgressAudio = false;
+
+    // 복구를 다시 시작할 때 진행 중 소리를 처음부터 다시 재생할지 정한다.
+    public bool restartProgressAudioOnBegin = true;
+
+    // 진짜 탈출 시스템 컴퓨터 복구 완료 시 재생할 소리이다.
     public AudioSource completeAudioSource;
+
+    // 가짜 컴퓨터 복구 완료 시 재생할 소리이다.
+    // 비워두면 completeAudioSource를 대신 재생한다.
+    public AudioSource fakeCompleteAudioSource;
 
     // 현재 복구 진행도이다. 0~1 값이다.
     [SerializeField] private float restoreProgress = 0f;
@@ -285,7 +297,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         currentInteractor = null;
 
         StopLoopAudio();
-        PlayCompleteAudio();
+        PlayResultAudio();
         RefreshVisualState();
         RecolorExistingScanDots();
 
@@ -426,7 +438,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         }
     }
 
-    // 반복 소리를 재생한다.
+    // 진행 중 소리를 재생한다.
     private void PlayLoopAudio()
     {
         if (loopAudioSource == null)
@@ -434,7 +446,15 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
             return;
         }
 
-        loopAudioSource.loop = true;
+        // 기존 이름은 Loop Audio Source지만, 실제 루프 여부는 옵션으로 정한다.
+        loopAudioSource.loop = loopProgressAudio;
+
+        if (restartProgressAudioOnBegin)
+        {
+            loopAudioSource.Stop();
+            loopAudioSource.Play();
+            return;
+        }
 
         if (!loopAudioSource.isPlaying)
         {
@@ -442,7 +462,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         }
     }
 
-    // 반복 소리를 멈춘다.
+    // 진행 중 소리를 멈춘다.
     private void StopLoopAudio()
     {
         if (loopAudioSource != null && loopAudioSource.isPlaying)
@@ -451,12 +471,20 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         }
     }
 
-    // 완료 소리를 재생한다.
-    private void PlayCompleteAudio()
+    // 복구 결과에 맞는 완료 소리를 재생한다.
+    private void PlayResultAudio()
     {
-        if (completeAudioSource != null)
+        AudioSource targetAudioSource = isSelectedObjective ? completeAudioSource : fakeCompleteAudioSource;
+
+        // 가짜 완료음이 비어 있으면 기존 완료음을 대신 사용한다.
+        if (targetAudioSource == null)
         {
-            completeAudioSource.Play();
+            targetAudioSource = completeAudioSource;
+        }
+
+        if (targetAudioSource != null)
+        {
+            targetAudioSource.Play();
         }
     }
 }

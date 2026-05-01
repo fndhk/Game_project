@@ -505,19 +505,19 @@ MonoBehaviour:
   cellSize: 0.03
   shadowCastingMode: 0
   receiveShadows: 0
-  applyReadabilityColorPresetOnAwake: 1
+  applyReadabilityColorPresetOnAwake: 0
   defaultDotColor: {r: 0.7735849, g: 0.7735849, b: 0.77254903, a: 1}
   floorDotColor: {r: 0.7607843, g: 0.7607843, b: 0.7411765, a: 1}
   wallDotColor: {r: 0.76, g: 0.76, b: 0.74, a: 1}
   metalDotColor: {r: 0.5671057, g: 0.63719296, b: 0.6792453, a: 1}
   glassDotColor: {r: 0.5742702, g: 0.75670004, b: 0.8396226, a: 1}
   accessCoreDotColor: {r: 0.8679245, g: 0.86174536, b: 0.46262014, a: 1}
-  securityTerminalDotColor: {r: 0.3, g: 0.9, b: 0.42, a: 1}
-  emergencyExitDotColor: {r: 0.95, g: 0.78, b: 0.2, a: 1}
-  playerBodyDotColor: {r: 0.95, g: 0.24, b: 0.2, a: 1}
+  securityTerminalDotColor: {r: 0.16078432, g: 0.5019608, b: 1, a: 1}
+  emergencyExitDotColor: {r: 1, g: 0, b: 0, a: 1}
+  playerBodyDotColor: {r: 1, g: 1, b: 0.30588236, a: 1}
   creatureDotColor: {r: 0.72, g: 0.08, b: 0.08, a: 1}
   wrongComputerDotColor: {r: 1, g: 0.1, b: 0.08, a: 1}
-  restoredEscapeComputerDotColor: {r: 0.16, g: 0.5, b: 1, a: 1}
+  restoredEscapeComputerDotColor: {r: 0.29803923, g: 0.9019608, b: 0.41960785, a: 1}
 --- !u!114 &49013751
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3703,6 +3703,8 @@ MonoBehaviour:
   InsteadDoor: {fileID: 2130471771715180275, guid: 73278eca9bd804840a07ee5926b9acf0, type: 3}
   DoorPrefabs:
   - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
+  - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
+  - {fileID: 3448587255341618831, guid: 5ec566e85fa59834cb93903674af2a8b, type: 3}
   CellPrefabs:
   - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
   - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
@@ -3757,6 +3759,12 @@ MonoBehaviour:
   ExtraExitObjectNameKeywords:
   - TempPortal
   - DoorPoint
+  SkipBlockDoorWhenAnotherCellIsNearby: 1
+  BlockDoorNeighborCheckDistance: 2.6
+  BlockDoorNeighborCheckStep: 0.35
+  BlockDoorNeighborCheckRadius: 0.45
+  BlockDoorNeighborCheckHeight: 0.65
+  DrawSkippedBlockDoorGizmos: 0
   ClearPreviousGeneratedChildren: 1
   UseBfsExpansion: 1
   BfsDepthRandomSpread: 0
