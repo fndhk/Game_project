@@ -302,7 +302,9 @@ MonoBehaviour:
   Exits:
   - {fileID: 3531458180210598151}
   - {fileID: 8076140725131136408}
-  ExitVisuals: []
+  ExitVisuals:
+  - {fileID: 3531458180210598151}
+  - {fileID: 8076140725131136408}
   CellType: 1
   CellSize: 0
   FloorRule: 0

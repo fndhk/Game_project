@@ -79,7 +79,11 @@ MonoBehaviour:
   - {fileID: 2803057452979001185}
   - {fileID: 8490837620251185128}
   - {fileID: 2457428932475862068}
-  ExitVisuals: []
+  ExitVisuals:
+  - {fileID: 535533283476215497}
+  - {fileID: 2803057452979001185}
+  - {fileID: 8490837620251185128}
+  - {fileID: 2457428932475862068}
   CellType: 1
   CellSize: 0
   FloorRule: 0

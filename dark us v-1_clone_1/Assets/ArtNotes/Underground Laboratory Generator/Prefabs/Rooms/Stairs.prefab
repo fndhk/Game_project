@@ -413,7 +413,12 @@ MonoBehaviour:
   - {fileID: 7243584655698203151}
   - {fileID: 9018003851689662546}
   - {fileID: 7714896665725484978}
-  ExitVisuals: []
+  ExitVisuals:
+  - {fileID: 7755556178665310929}
+  - {fileID: 6641726036183773278}
+  - {fileID: 7243584655698203151}
+  - {fileID: 9018003851689662546}
+  - {fileID: 7714896665725484978}
   CellType: 4
   CellSize: 1
   FloorRule: 1

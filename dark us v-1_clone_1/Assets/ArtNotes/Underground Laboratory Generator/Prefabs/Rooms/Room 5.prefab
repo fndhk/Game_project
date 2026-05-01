@@ -280,7 +280,9 @@ MonoBehaviour:
   Exits:
   - {fileID: 1347728967076465932}
   - {fileID: 5041099005827149753}
-  ExitVisuals: []
+  ExitVisuals:
+  - {fileID: 1347728967076465932}
+  - {fileID: 5041099005827149753}
   CellType: 2
   CellSize: 1
   FloorRule: 0

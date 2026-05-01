@@ -3633,7 +3633,7 @@ MonoBehaviour:
   MapSize: {x: 120, y: 120}
   MapBoundsPadding: 0
   DrawMapBoundsGizmo: 0
-  FloorHeight: 4
+  FloorHeight: 10
   BlockBigRoomToBigRoom: 1
   BlockCorridorToCorridor: 1
   ForceCorridorBetweenRooms: 0
@@ -3648,10 +3648,9 @@ MonoBehaviour:
   AvoidExitRoomForPlayerSpawn: 1
   SpawnPlayersAfterGeneration: 1
   ExistingPlayer: {fileID: 0}
-  ExistingPlayers:
-  - {fileID: 49013741}
+  ExistingPlayers: []
   PlayerPrefab: {fileID: 0}
-  PlayerSpawnCount: 1
+  PlayerSpawnCount: 0
   PlayerParent: {fileID: 0}
   AutoFindExistingPlayerByTag: 1
   PlayerSpawnPositionOffset: {x: 0, y: 0, z: 0}
@@ -3659,7 +3658,7 @@ MonoBehaviour:
   RandomizePlayerSpawnYaw: 0
   ItemSpawnPointPrefix: ItemSpawnPoint
   IncludeInactiveItemSpawnPoints: 1
-  ItemSpawnOnlyInRooms: 0
+  ItemSpawnOnlyInRooms: 1
   SpawnItemsAfterGeneration: 0
   ItemPrefabs: []
   ItemSpawnCount: 4
@@ -3677,7 +3676,6 @@ MonoBehaviour:
   DoorPrefabs:
   - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
   - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
-  - {fileID: 3448587255341618831, guid: 5ec566e85fa59834cb93903674af2a8b, type: 3}
   CellPrefabs:
   - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
   - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
@@ -3717,23 +3715,21 @@ MonoBehaviour:
   - {fileID: 7392582032655661870, guid: e25d900929cc02e4fb99c38afb67631d, type: 3}
   ConnectedDoorPositionOffset: {x: 0, y: 0, z: 0}
   ConnectedDoorRotationOffset: {x: 0, y: 0, z: 0}
-  BlockDoorPositionOffset: {x: 0, y: 1.5, z: 0}
+  BlockDoorPositionOffset: {x: 0, y: 0, z: -2}
   BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
-  ExitDoorPositionOffset: {x: 0, y: 1.5, z: 0}
+  ExitDoorPositionOffset: {x: 0, y: 0, z: 0}
   ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
   HideGeneratedVisualsInGame: 0
   HideGeneratedVisualsOnlyInPlayMode: 0
   OptimizeGeneratedLightShadows: 1
   DisableGeneratedLightShadows: 1
   CreateFallbackBlockDoorWhenPrefabMissing: 1
-  FallbackBlockDoorLocalScale: {x: 0, y: 0, z: 0}
+  FallbackBlockDoorLocalScale: {x: 3, y: 3, z: 0.25}
   FallbackBlockDoorMaterial: {fileID: 0}
   BlockExtraExitObjectsByName: 1
   ExtraExitObjectNameKeywords:
   - TempPortal
-  OnlyBlockExitsNearCellBounds: 1
-  ExitBoundsTolerance: 1.5
-  LogBlockedExitCleanup: 1
+  - DoorPoint
   ClearPreviousGeneratedChildren: 1
   UseBfsExpansion: 1
   BfsDepthRandomSpread: 0

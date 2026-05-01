@@ -226,16 +226,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         public bool BlockExtraExitObjectsByName = true;
 
         [Tooltip("남은 출구 오브젝트로 판단할 이름 키워드. Underground Laboratory Generator 기본값은 보통 TempPortal 계열임")]
-        public string[] ExtraExitObjectNameKeywords = { "TempPortal", "Portal", "DoorPoint", "ExitPoint" };
-
-        [Tooltip("켜면 Cell BoxCollider 경계 근처에 있는 출구만 막음. 방/복도 한가운데 생기는 막힌 벽을 줄이기 위한 안전장치")]
-        public bool OnlyBlockExitsNearCellBounds = true;
-
-        [Tooltip("출구가 Cell BoxCollider 경계에서 이 거리 안에 있을 때만 진짜 출구로 인정. 빨간 포탈이 안 막히면 1.5~2.5 사이로 올림")]
-        public float ExitBoundsTolerance = 1.5f;
-
-        [Tooltip("켜면 남은 출구를 막을 때 어떤 오브젝트를 처리했는지 Console에 출력")]
-        public bool LogBlockedExitCleanup = false;
+        public string[] ExtraExitObjectNameKeywords = { "TempPortal", "DoorPoint" };
 
         [Header("Cleanup")]
         [Tooltip("생성 전에 이 오브젝트의 기존 자식들을 삭제")]
@@ -255,6 +246,10 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
         // 생성된 방 목록을 저장한다.
         private readonly List<Cell> generatedCells = new List<Cell>();
+
+        // 이미 방 연결, 시작방 연결, 탈출구 생성에 사용된 출구를 저장한다.
+        // Destroy는 Play Mode에서 즉시 사라지지 않기 때문에, 사용된 출구를 따로 기록해서 중간 벽 생성을 막는다.
+        private readonly HashSet<Transform> consumedExitTransforms = new HashSet<Transform>();
 
         // 시작방 위치를 저장한다.
         private readonly List<Vector3> startRoomPositions = new List<Vector3>();
@@ -276,9 +271,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
         // 탈출구 생성 여부를 저장한다.
         private bool hasExitDoorPosition;
-
-        // 연결에 이미 사용된 출구를 저장해서 마지막 정리 단계에서 중간 벽이 생기지 않게 한다.
-        private readonly HashSet<int> consumedExitInstanceIds = new HashSet<int>();
 
         // 아직 막히지 않은 출구 정보를 저장한다.
         private class OpenExit
@@ -404,6 +396,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 {
                     createdMainCells++;
                     failStreak = 0;
+
+                    MarkExitAsConsumed(targetExit.Exit);
+                    MarkExitAsConsumed(selectedExit);
 
                     InstantiateConnectedDoor(targetExit.Exit);
 
@@ -591,6 +586,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 if (TryInstantiateAndAttach(candidatePrefab, targetExit, false, out placedCell, out selectedExit))
                 {
+                    PrepareCreatedCell(placedCell, candidatePrefab);
                     return true;
                 }
             }
@@ -706,6 +702,11 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 startRoomPositions.Add(placedStartRoom.transform.position);
 
+                MarkExitAsConsumed(mainTargetExit.Exit);
+                MarkExitAsConsumed(corridorExitConnectedToMain);
+                MarkExitAsConsumed(corridorExitForStart);
+                MarkExitAsConsumed(startRoomSelectedExit);
+
                 InstantiateConnectedDoor(mainTargetExit.Exit);
                 InstantiateConnectedDoor(corridorExitForStart);
 
@@ -775,6 +776,8 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             hasExitDoorPosition = true;
 
             GameObject prefab = ExitDoorPrefab != null ? ExitDoorPrefab : InsteadDoor;
+
+            MarkExitAsConsumed(selectedExit.Exit);
 
             if (prefab != null)
             {
@@ -2080,10 +2083,10 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             return validDoors[Random.Range(0, validDoors.Count)];
         }
 
-        // 남아 있는 모든 DoorPoint/TempPortal을 막힌 문으로 막는다.
+        // 남아 있는 모든 DoorPoint를 막힌 문으로 막는다.
         private void BlockRemainingExits()
         {
-            HashSet<int> blockedExitInstanceIds = new HashSet<int>();
+            HashSet<Transform> blockedExits = new HashSet<Transform>();
 
             for (int cellIndex = 0; cellIndex < generatedCells.Count; cellIndex++)
             {
@@ -2103,63 +2106,43 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                         continue;
                     }
 
-                    // 이미 연결/탈출구에 사용된 출구는 Destroy가 프레임 끝에 처리되기 전이라도 다시 막지 않는다.
-                    if (IsConsumedExit(exitObject.transform))
-                    {
-                        continue;
-                    }
-
-                    // 연결된 출구는 DestroyExitObject에서 비활성화되므로 여기서 막으면 중간 벽이 생긴다.
-                    if (!exitObject.activeInHierarchy)
-                    {
-                        continue;
-                    }
-
-                    // Cell.Exits에 명시적으로 등록된 출구는 경계 검사 없이 무조건 막는다.
-                    // OnlyBlockExitsNearCellBounds 옵션은 이름으로 찾는 Extra 루프에만 적용한다.
-                    BlockSingleRemainingExit(exitObject.transform, blockedExitInstanceIds);
+                    BlockSingleRemainingExit(exitObject.transform, blockedExits);
                 }
             }
 
-            BlockExtraRemainingExitObjectsByName(blockedExitInstanceIds);
+            BlockExtraRemainingExitObjectsByName(blockedExits);
         }
 
         // 출구 하나를 막는 문으로 바꾸고 기존 출구 표시 오브젝트를 삭제한다.
-        private void BlockSingleRemainingExit(Transform exitTransform, HashSet<int> blockedExitInstanceIds)
+        private void BlockSingleRemainingExit(Transform exitTransform, HashSet<Transform> blockedExits)
         {
             if (exitTransform == null)
             {
                 return;
             }
 
-            int instanceId = exitTransform.GetInstanceID();
-
-            if (blockedExitInstanceIds != null && blockedExitInstanceIds.Contains(instanceId))
+            if (blockedExits != null && blockedExits.Contains(exitTransform))
             {
                 return;
             }
 
-            // 이미 방 연결, 시작방 연결, 탈출구 생성에 사용한 출구는 절대 막으면 안 된다.
-            if (IsConsumedExit(exitTransform))
+            if (IsExitConsumed(exitTransform))
             {
+                if (blockedExits != null)
+                {
+                    blockedExits.Add(exitTransform);
+                }
+
                 return;
             }
 
-            // 비활성화된 출구는 연결에 사용된 뒤 삭제 대기 중인 경우가 많다.
-            // 이것을 막아버리면 복도나 방 중간에 벽이 생긴다.
-            if (!exitTransform.gameObject.activeInHierarchy)
+            if (blockedExits != null)
             {
-                return;
+                blockedExits.Add(exitTransform);
             }
 
-            if (blockedExitInstanceIds != null)
-            {
-                blockedExitInstanceIds.Add(instanceId);
-            }
-
-            // ★ 추가: BlockRemainingExits 경로에서도 ExitVisual을 끈다 (안전장치).
-            DisableMatchingExitVisual(exitTransform);
-
+            // activeInHierarchy를 검사하지 않는다.
+            // 프리팹에서 DoorPoint가 비활성화되어 있어도 남은 출구라면 무조건 막아야 한다.
             if (InsteadDoor != null)
             {
                 InstantiateBlockDoorPrefab(InsteadDoor, exitTransform);
@@ -2169,18 +2152,13 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 CreateFallbackBlockDoor(exitTransform);
             }
 
-            if (LogBlockedExitCleanup)
-            {
-                Debug.Log("[LaboratoryGenerator] Blocked remaining exit: " + GetHierarchyPath(exitTransform));
-            }
-
             DestroyExitObject(exitTransform);
         }
 
         // Cell.Exits 배열에 빠져있는 TempPortal/DoorPoint 같은 남은 출구도 찾아서 막는다.
-        private void BlockExtraRemainingExitObjectsByName(HashSet<int> blockedExitInstanceIds)
+        private void BlockExtraRemainingExitObjectsByName(HashSet<Transform> blockedExits)
         {
-            if (!BlockExtraExitObjectsByName)
+            if (!BlockExtraExitObjectsByName || ExtraExitObjectNameKeywords == null || ExtraExitObjectNameKeywords.Length == 0)
             {
                 return;
             }
@@ -2205,7 +2183,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                         continue;
                     }
 
-                    if (!child.gameObject.activeInHierarchy)
+                    if (blockedExits != null && blockedExits.Contains(child))
                     {
                         continue;
                     }
@@ -2215,138 +2193,22 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                         continue;
                     }
 
-                    // 빨간 바닥 Mesh 자체가 아니라, 가능하면 그 위의 DoorPoint/Portal 부모를 막는다.
-                    Transform exitRoot = ResolveExtraExitRoot(child, cell);
-
-                    if (exitRoot == null || exitRoot == cell.transform)
-                    {
-                        continue;
-                    }
-
-                    int instanceId = exitRoot.GetInstanceID();
-
-                    if (blockedExitInstanceIds != null && blockedExitInstanceIds.Contains(instanceId))
-                    {
-                        continue;
-                    }
-
-                    if (IsConsumedExit(exitRoot))
-                    {
-                        continue;
-                    }
-
-                    if (!exitRoot.gameObject.activeInHierarchy)
-                    {
-                        continue;
-                    }
-
-                    // 핵심 안전장치:
-                    // 이름만 TempPortal/Portal이어도 Cell 경계 근처가 아니면 실제 출구가 아니라 장식/내부 오브젝트로 보고 막지 않는다.
-                    // 이것 때문에 복도나 방 중간에 갑자기 회색 벽이 생기는 문제를 줄일 수 있다.
-                    if (OnlyBlockExitsNearCellBounds && !IsExitNearCellBounds(exitRoot, cell))
-                    {
-                        if (LogBlockedExitCleanup)
-                        {
-                            Debug.Log("[LaboratoryGenerator] Skipped non-boundary extra exit object: " + GetHierarchyPath(exitRoot));
-                        }
-
-                        continue;
-                    }
-
-                    BlockSingleRemainingExit(exitRoot, blockedExitInstanceIds);
+                    BlockSingleRemainingExit(child, blockedExits);
                 }
             }
-        }
-
-        // TempPortal 같은 하위 Mesh가 잡혔을 때 실제 출구 기준 Transform을 찾는다.
-        private Transform ResolveExtraExitRoot(Transform found, Cell ownerCell)
-        {
-            if (found == null || ownerCell == null)
-            {
-                return found;
-            }
-
-            Transform current = found;
-            Transform best = found;
-
-            while (current != null && current != ownerCell.transform)
-            {
-                if (IsExtraExitObjectName(current.name))
-                {
-                    best = current;
-                }
-
-                current = current.parent;
-            }
-
-            return best;
-        }
-
-        // 출구 Transform이 해당 Cell의 BoxCollider 경계 근처에 있는지 확인한다.
-        private bool IsExitNearCellBounds(Transform exitTransform, Cell ownerCell)
-        {
-            if (exitTransform == null || ownerCell == null)
-            {
-                return false;
-            }
-
-            ownerCell.CacheTriggerBox();
-
-            if (ownerCell.TriggerBox == null)
-            {
-                // BoxCollider가 없는 예외 프리팹은 기존 동작을 유지한다.
-                return true;
-            }
-
-            Bounds localBounds = new Bounds(ownerCell.TriggerBox.center, ownerCell.TriggerBox.size);
-            Vector3 localPoint = ownerCell.transform.InverseTransformPoint(exitTransform.position);
-            Vector3 localDelta = localPoint - localBounds.center;
-            Vector3 extents = localBounds.extents;
-
-            // TempPortal처럼 납작한 Cube일 경우 중심이 경계에서 살짝 안쪽에 있을 수 있다.
-            // exitTransform의 lossyScale X/Z 절반을 추가 여유로 반영한다.
-            Vector3 exitScale = exitTransform.lossyScale;
-            float scaleMarginX = Mathf.Abs(exitScale.x) * 0.5f;
-            float scaleMarginZ = Mathf.Abs(exitScale.z) * 0.5f;
-
-            float tolerance = Mathf.Max(0.05f, ExitBoundsTolerance);
-
-            bool nearXSide = Mathf.Abs(Mathf.Abs(localDelta.x) - extents.x) <= tolerance + scaleMarginX;
-            bool nearZSide = Mathf.Abs(Mathf.Abs(localDelta.z) - extents.z) <= tolerance + scaleMarginZ;
-
-            return nearXSide || nearZSide;
         }
 
         // 이름이 남은 출구 오브젝트 키워드에 해당하는지 확인한다.
         private bool IsExtraExitObjectName(string objectName)
         {
-            if (string.IsNullOrEmpty(objectName))
+            if (string.IsNullOrEmpty(objectName) || ExtraExitObjectNameKeywords == null)
             {
                 return false;
             }
 
-            // Inspector 배열이 기존 serialized 값 때문에 TempPortal 하나만 남아 있어도 기본 키워드를 같이 검사한다.
-            string[] defaultKeywords = { "TempPortal", "DoorPoint", "Portal", "ExitPoint" };
-
-            if (ContainsKeyword(objectName, defaultKeywords))
+            for (int i = 0; i < ExtraExitObjectNameKeywords.Length; i++)
             {
-                return true;
-            }
-
-            return ContainsKeyword(objectName, ExtraExitObjectNameKeywords);
-        }
-
-        // 문자열이 키워드 배열 중 하나를 포함하는지 확인한다.
-        private bool ContainsKeyword(string objectName, string[] keywords)
-        {
-            if (string.IsNullOrEmpty(objectName) || keywords == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < keywords.Length; i++)
-            {
-                string keyword = keywords[i];
+                string keyword = ExtraExitObjectNameKeywords[i];
 
                 if (string.IsNullOrEmpty(keyword))
                 {
@@ -2357,6 +2219,67 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 {
                     return true;
                 }
+            }
+
+            return false;
+        }
+
+        // 연결, 시작방 연결, 탈출구 생성에 이미 사용한 출구를 기록한다.
+        private void MarkExitAsConsumed(Transform exitTransform)
+        {
+            if (exitTransform == null)
+            {
+                return;
+            }
+
+            AddConsumedTransformWithChildren(exitTransform);
+
+            Transform parent = exitTransform.parent;
+
+            // DoorPoint와 TempPortal이 부모/자식 구조로 섞여 있는 프리팹을 대비한다.
+            if (parent != null && parent != transform && IsExtraExitObjectName(parent.name))
+            {
+                AddConsumedTransformWithChildren(parent);
+            }
+        }
+
+        // 대상 Transform과 그 자식들을 사용 완료 목록에 넣는다.
+        private void AddConsumedTransformWithChildren(Transform root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            Transform[] children = root.GetComponentsInChildren<Transform>(true);
+
+            for (int i = 0; i < children.Length; i++)
+            {
+                if (children[i] != null)
+                {
+                    consumedExitTransforms.Add(children[i]);
+                }
+            }
+        }
+
+        // 이 출구가 이미 연결/탈출구 처리에 사용된 출구인지 확인한다.
+        private bool IsExitConsumed(Transform exitTransform)
+        {
+            Transform current = exitTransform;
+
+            while (current != null)
+            {
+                if (consumedExitTransforms.Contains(current))
+                {
+                    return true;
+                }
+
+                if (current == transform)
+                {
+                    break;
+                }
+
+                current = current.parent;
             }
 
             return false;
@@ -2417,48 +2340,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
         }
 
-        // 출구가 이미 연결/탈출구로 사용됐음을 기록한다.
-        private void MarkExitAsConsumed(Transform exit)
-        {
-            if (exit == null)
-            {
-                return;
-            }
-
-            consumedExitInstanceIds.Add(exit.GetInstanceID());
-        }
-
-        // 이미 사용한 출구인지 확인한다.
-        private bool IsConsumedExit(Transform exit)
-        {
-            if (exit == null)
-            {
-                return false;
-            }
-
-            return consumedExitInstanceIds.Contains(exit.GetInstanceID());
-        }
-
-        // Console 로그에서 어느 프리팹의 어느 출구가 막혔는지 보기 위한 경로를 만든다.
-        private string GetHierarchyPath(Transform target)
-        {
-            if (target == null)
-            {
-                return "null";
-            }
-
-            string path = target.name;
-            Transform current = target.parent;
-
-            while (current != null)
-            {
-                path = current.name + "/" + path;
-                current = current.parent;
-            }
-
-            return path;
-        }
-
         // DoorPoint 오브젝트를 비활성화하고 제거한다.
         private void DestroyExitObject(Transform exit)
         {
@@ -2467,10 +2348,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return;
             }
 
-            // ★ 수정: Exit에 대응하는 ExitVisual(빨간 바닥)도 함께 끈다.
-            DisableMatchingExitVisual(exit);
-
-            // Destroy는 프레임 끝에 처리될 수 있으므로 먼저 사용 완료 목록에 기록한다.
             MarkExitAsConsumed(exit);
 
             exit.gameObject.SetActive(false);
@@ -2482,57 +2359,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             else
             {
                 DestroyImmediate(exit.gameObject);
-            }
-        }
-
-        // Exit Transform에 대응하는 ExitVisual을 찾아서 비활성화한다.
-        // generatedCells 등록 여부와 무관하게 동작하도록 부모 계층을 직접 탐색한다.
-        private void DisableMatchingExitVisual(Transform exit)
-        {
-            if (exit == null)
-            {
-                return;
-            }
-
-            // exit의 부모 계층을 타고 올라가며 Cell 컴포넌트를 찾는다.
-            Transform current = exit.parent;
-
-            while (current != null)
-            {
-                Cell cell = current.GetComponent<Cell>();
-
-                if (cell != null)
-                {
-                    if (cell.Exits == null)
-                    {
-                        return;
-                    }
-
-                    for (int i = 0; i < cell.Exits.Length; i++)
-                    {
-                        if (cell.Exits[i] == null)
-                        {
-                            continue;
-                        }
-
-                        if (cell.Exits[i].transform == exit)
-                        {
-                            if (cell.ExitVisuals != null &&
-                                i < cell.ExitVisuals.Length &&
-                                cell.ExitVisuals[i] != null)
-                            {
-                                cell.ExitVisuals[i].SetActive(false);
-                            }
-
-                            return;
-                        }
-                    }
-
-                    // Cell을 찾았지만 배열에 없는 exit이면 더 올라갈 필요 없다.
-                    return;
-                }
-
-                current = current.parent;
             }
         }
 
@@ -2576,6 +2402,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         private void ResetRuntimeData()
         {
             generatedCells.Clear();
+            consumedExitTransforms.Clear();
             startRoomPositions.Clear();
             spawnedCountByPrefabName.Clear();
             playerSpawnedCells.Clear();
@@ -2583,7 +2410,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             exitDoorOwnerCell = null;
             exitDoorPosition = Vector3.zero;
             hasExitDoorPosition = false;
-            consumedExitInstanceIds.Clear();
         }
 
         // Scene View에서 80x80 같은 맵 제한 범위를 보여준다.

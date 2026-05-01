@@ -111,7 +111,10 @@ MonoBehaviour:
   - {fileID: 3372385364895484325}
   - {fileID: 4390330145684968252}
   - {fileID: 1557358175803928804}
-  ExitVisuals: []
+  ExitVisuals:
+  - {fileID: 3372385364895484325}
+  - {fileID: 4390330145684968252}
+  - {fileID: 1557358175803928804}
   CellType: 1
   CellSize: 0
   FloorRule: 0
