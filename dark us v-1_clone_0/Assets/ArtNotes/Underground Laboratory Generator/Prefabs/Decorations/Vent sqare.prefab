@@ -124,7 +124,8 @@ GameObject:
   - component: {fileID: 4611213271616772387}
   - component: {fileID: 8437443897770700822}
   - component: {fileID: 4611213271616772412}
-  - component: {fileID: 1542204837912753339}
+  - component: {fileID: 3256971073200807014}
+  - component: {fileID: 7639643059735654508}
   m_Layer: 0
   m_Name: Vent sqare
   m_TagString: Untagged
@@ -216,19 +217,49 @@ MonoBehaviour:
   ChildrensLeft: 1
   EnableAlbedoRandom: 0
   Colors: []
---- !u!114 &1542204837912753339
-MonoBehaviour:
+--- !u!65 &3256971073200807014
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4611213271616772386}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d69ad4160b0ab544db17b70859ecbc84, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScanSurfaceInfo
-  surfaceType: 0
+  serializedVersion: 3
+  m_Size: {x: 0.6499045, y: 0.6247281, z: 0.105475426}
+  m_Center: {x: -0.000049948692, y: -0.0019981265, z: 0.0495677}
+--- !u!64 &7639643059735654508
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4611213271616772386}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
 --- !u!1 &7126444758507347497
 GameObject:
   m_ObjectHideFlags: 0

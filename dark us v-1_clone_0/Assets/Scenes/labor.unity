@@ -137,6 +137,8 @@ GameObject:
   - component: {fileID: 49013747}
   - component: {fileID: 49013749}
   - component: {fileID: 49013750}
+  - component: {fileID: 49013753}
+  - component: {fileID: 49013752}
   - component: {fileID: 49013751}
   - component: {fileID: 49013748}
   m_Layer: 3
@@ -505,19 +507,19 @@ MonoBehaviour:
   cellSize: 0.03
   shadowCastingMode: 0
   receiveShadows: 0
-  applyReadabilityColorPresetOnAwake: 1
+  applyReadabilityColorPresetOnAwake: 0
   defaultDotColor: {r: 0.7735849, g: 0.7735849, b: 0.77254903, a: 1}
   floorDotColor: {r: 0.7607843, g: 0.7607843, b: 0.7411765, a: 1}
   wallDotColor: {r: 0.76, g: 0.76, b: 0.74, a: 1}
   metalDotColor: {r: 0.5671057, g: 0.63719296, b: 0.6792453, a: 1}
   glassDotColor: {r: 0.5742702, g: 0.75670004, b: 0.8396226, a: 1}
   accessCoreDotColor: {r: 0.8679245, g: 0.86174536, b: 0.46262014, a: 1}
-  securityTerminalDotColor: {r: 0.3, g: 0.9, b: 0.42, a: 1}
-  emergencyExitDotColor: {r: 0.95, g: 0.78, b: 0.2, a: 1}
-  playerBodyDotColor: {r: 0.95, g: 0.24, b: 0.2, a: 1}
+  securityTerminalDotColor: {r: 0.16078432, g: 0.5019608, b: 1, a: 1}
+  emergencyExitDotColor: {r: 1, g: 0, b: 0, a: 1}
+  playerBodyDotColor: {r: 1, g: 1, b: 0.30588236, a: 1}
   creatureDotColor: {r: 0.72, g: 0.08, b: 0.08, a: 1}
   wrongComputerDotColor: {r: 1, g: 0.1, b: 0.08, a: 1}
-  restoredEscapeComputerDotColor: {r: 0.16, g: 0.5, b: 1, a: 1}
+  restoredEscapeComputerDotColor: {r: 0.29803923, g: 0.9019608, b: 0.41960785, a: 1}
 --- !u!114 &49013751
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -537,6 +539,72 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   interactKey: 101
+--- !u!114 &49013752
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 49013734}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef4eafccd60a5a544a58828fb5d9d215, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerItemUser
+  inventory: {fileID: 49013753}
+  playerCamera: {fileID: 330585545}
+  dotRenderer: {fileID: 49013750}
+  playerStats: {fileID: 49013746}
+  selfTarget: {fileID: 49013745}
+  useItemKey: 102
+  cameraPointCount: 700
+  cameraMaxDistance: 18
+  cameraScreenHalfWidth: 0.48
+  cameraScreenHalfHeight: 0.36
+  cameraAttemptsPerPoint: 4
+  cameraSurfaceOffset: 0.012
+  scanMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  knifeDamage: 100
+  knifeAttackDistance: 1.55
+  knifeAttackRadius: 0.55
+  knifeTargetMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  knifeObstacleMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  allowFriendlyFire: 1
+  consumeKnifeWhenMissed: 0
+  medkitHealAmount: 50
+  restoreStaminaWithMedkit: 0
+  cameraUseAudio: {fileID: 0}
+  knifeUseAudio: {fileID: 0}
+  medkitUseAudio: {fileID: 0}
+--- !u!114 &49013753
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 49013734}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 377e0049291fc7f4296cae2025c3c5ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  slots:
+  - itemType: 0
+    amount: 0
+  - itemType: 0
+    amount: 0
+  slot1Key: 49
+  slot2Key: 50
+  slot1Text: {fileID: 0}
+  slot2Text: {fileID: 0}
+  emptySlotLabel: '-'
+  selectedSlotIndex: 0
 --- !u!1 &55562254
 GameObject:
   m_ObjectHideFlags: 0
@@ -3687,9 +3755,12 @@ MonoBehaviour:
   ItemSpawnPointPrefix: ItemSpawnPoint
   IncludeInactiveItemSpawnPoints: 1
   ItemSpawnOnlyInRooms: 1
-  SpawnItemsAfterGeneration: 0
-  ItemPrefabs: []
-  ItemSpawnCount: 4
+  SpawnItemsAfterGeneration: 1
+  ItemPrefabs:
+  - {fileID: 9093964201704265226, guid: 2627aec742853344fb0d12b86dc08660, type: 3}
+  - {fileID: 16102674986232484, guid: 591a6ee990698f54f84efcfe73cd9cdf, type: 3}
+  - {fileID: 4352620015771260721, guid: ca94183ef2d5ab64e84fa6a52f9328fa, type: 3}
+  ItemSpawnCount: 58
   AllowItemSpawnInPlayerRooms: 1
   MinItemDistanceFromPlayerSpawn: 2
   PreventDuplicateItemSpawnPointUse: 1
@@ -3704,6 +3775,7 @@ MonoBehaviour:
   DoorPrefabs:
   - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
   - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
+  - {fileID: 3448587255341618831, guid: 5ec566e85fa59834cb93903674af2a8b, type: 3}
   CellPrefabs:
   - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
   - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
@@ -3747,8 +3819,8 @@ MonoBehaviour:
   BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
   ExitDoorPositionOffset: {x: 0, y: 0, z: 0}
   ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
-  HideGeneratedVisualsInGame: 1
-  HideGeneratedVisualsOnlyInPlayMode: 1
+  HideGeneratedVisualsInGame: 0
+  HideGeneratedVisualsOnlyInPlayMode: 0
   OptimizeGeneratedLightShadows: 1
   DisableGeneratedLightShadows: 1
   CreateFallbackBlockDoorWhenPrefabMissing: 1
@@ -3758,6 +3830,12 @@ MonoBehaviour:
   ExtraExitObjectNameKeywords:
   - TempPortal
   - DoorPoint
+  SkipBlockDoorWhenAnotherCellIsNearby: 1
+  BlockDoorNeighborCheckDistance: 2.6
+  BlockDoorNeighborCheckStep: 0.35
+  BlockDoorNeighborCheckRadius: 0.45
+  BlockDoorNeighborCheckHeight: 0.65
+  DrawSkippedBlockDoorGizmos: 0
   ClearPreviousGeneratedChildren: 1
   UseBfsExpansion: 1
   BfsDepthRandomSpread: 0
