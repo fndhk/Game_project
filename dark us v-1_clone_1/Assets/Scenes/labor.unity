@@ -515,11 +515,12 @@ MonoBehaviour:
   glassDotColor: {r: 0.5742702, g: 0.75670004, b: 0.8396226, a: 1}
   accessCoreDotColor: {r: 0.8679245, g: 0.86174536, b: 0.46262014, a: 1}
   securityTerminalDotColor: {r: 0.16078432, g: 0.5019608, b: 1, a: 1}
-  emergencyExitDotColor: {r: 1, g: 0, b: 0, a: 1}
-  playerBodyDotColor: {r: 1, g: 1, b: 0.30588236, a: 1}
+  emergencyExitDotColor: {r: 1, g: 0.9783717, b: 0, a: 1}
+  playerBodyDotColor: {r: 0.7075472, g: 0.7075472, b: 0.49061057, a: 1}
   creatureDotColor: {r: 0.72, g: 0.08, b: 0.08, a: 1}
   wrongComputerDotColor: {r: 1, g: 0.1, b: 0.08, a: 1}
   restoredEscapeComputerDotColor: {r: 0.29803923, g: 0.9019608, b: 0.41960785, a: 1}
+  itemDotColor: {r: 1, g: 0.72638464, b: 0, a: 1}
 --- !u!114 &49013751
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3757,16 +3758,20 @@ MonoBehaviour:
   ItemSpawnOnlyInRooms: 1
   SpawnItemsAfterGeneration: 1
   ItemPrefabs:
-  - {fileID: 9093964201704265226, guid: 2627aec742853344fb0d12b86dc08660, type: 3}
-  - {fileID: 16102674986232484, guid: 591a6ee990698f54f84efcfe73cd9cdf, type: 3}
-  - {fileID: 4352620015771260721, guid: ca94183ef2d5ab64e84fa6a52f9328fa, type: 3}
-  ItemSpawnCount: 58
-  AllowItemSpawnInPlayerRooms: 1
-  MinItemDistanceFromPlayerSpawn: 2
+  - {fileID: 7565169816916176742, guid: 0ed28fa42bd7a3b48bd3d4cb6829eb75, type: 3}
+  - {fileID: 3480559283670373739, guid: 884c53604683e3c4381a2db56d93eb2c, type: 3}
+  - {fileID: 8821532076256912300, guid: c5b18f3e02837c04892e540e29e8719b, type: 3}
+  ItemSpawnCount: 30
+  AllowItemSpawnInPlayerRooms: 0
+  MinItemDistanceFromPlayerSpawn: 12
   PreventDuplicateItemSpawnPointUse: 1
   ItemParent: {fileID: 0}
   ItemSpawnPositionOffset: {x: 0, y: 0, z: 0}
   AlignItemRotationToSpawnPoint: 1
+  HideSpawnedItemRenderers: 1
+  MaxItemsPerRoom: 2
+  SnapSpawnedItemsToSpawnPointGround: 1
+  ItemGroundOffset: 0.03
   ExitMinDistanceFromStart: 22
   ExitDoorPrefab: {fileID: 2130471771715180275, guid: 64a38a0084fa3bc44a4aedc5643d1ee6, type: 3}
   MaxPlacementAttempts: 31
@@ -3795,8 +3800,8 @@ MonoBehaviour:
   - {fileID: 4892643769144039951, guid: f497c844ac9af9d49b14f07299b092fe, type: 3}
   - {fileID: 1777275399059887341, guid: e4c345c465a9a1f4f932cf25a81d70fd, type: 3}
   - {fileID: 5208687295194357408, guid: 0d4593f281a0ce34aaed0fc28b8e6cd9, type: 3}
-  - {fileID: 5269122835788026001, guid: febd1a7afd34c7349b32936c24f255d0, type: 3}
-  - {fileID: 1775043387963847528, guid: c7f4c3999012062478f3b94ff24b5ea2, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
   - {fileID: 2004901786751058266, guid: 1011cbc0885fcee419031942e3c57c65, type: 3}
   - {fileID: 471047999014910823, guid: 93ca53315dd82534fa0d7baa526b2c61, type: 3}
   - {fileID: 500740190327199818, guid: 736565e83d2124d4899a2b5e51798507, type: 3}
@@ -3819,8 +3824,8 @@ MonoBehaviour:
   BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
   ExitDoorPositionOffset: {x: 0, y: 0, z: 0}
   ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
-  HideGeneratedVisualsInGame: 1
-  HideGeneratedVisualsOnlyInPlayMode: 1
+  HideGeneratedVisualsInGame: 0
+  HideGeneratedVisualsOnlyInPlayMode: 0
   OptimizeGeneratedLightShadows: 1
   DisableGeneratedLightShadows: 1
   CreateFallbackBlockDoorWhenPrefabMissing: 1
@@ -3830,12 +3835,6 @@ MonoBehaviour:
   ExtraExitObjectNameKeywords:
   - TempPortal
   - DoorPoint
-  SkipBlockDoorWhenAnotherCellIsNearby: 1
-  BlockDoorNeighborCheckDistance: 2.6
-  BlockDoorNeighborCheckStep: 0.35
-  BlockDoorNeighborCheckRadius: 0.45
-  BlockDoorNeighborCheckHeight: 0.65
-  DrawSkippedBlockDoorGizmos: 0
   ClearPreviousGeneratedChildren: 1
   UseBfsExpansion: 1
   BfsDepthRandomSpread: 0

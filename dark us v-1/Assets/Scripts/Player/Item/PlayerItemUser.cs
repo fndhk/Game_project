@@ -479,6 +479,15 @@ public class PlayerItemUser : MonoBehaviour
             case ScanSurfaceType.Creature:
                 return ScanDotColorGroup.Creature;
 
+            case ScanSurfaceType.WrongComputer:
+                return ScanDotColorGroup.WrongComputer;
+
+            case ScanSurfaceType.RestoredEscapeComputer:
+                return ScanDotColorGroup.RestoredEscapeComputer;
+
+            case ScanSurfaceType.Item:
+                return ScanDotColorGroup.Item;
+
             default:
                 return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }

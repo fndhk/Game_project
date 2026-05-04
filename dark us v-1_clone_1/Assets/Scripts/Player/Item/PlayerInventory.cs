@@ -215,6 +215,9 @@ public class PlayerInventory : MonoBehaviour
             case ItemType.Medkit:
                 return "Medkit";
 
+            case ItemType.ScannerBattery:
+                return "Scanner Battery";
+
             default:
                 return emptySlotLabel;
         }
