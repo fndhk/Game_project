@@ -3819,8 +3819,8 @@ MonoBehaviour:
   BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
   ExitDoorPositionOffset: {x: 0, y: 0, z: 0}
   ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
-  HideGeneratedVisualsInGame: 0
-  HideGeneratedVisualsOnlyInPlayMode: 0
+  HideGeneratedVisualsInGame: 1
+  HideGeneratedVisualsOnlyInPlayMode: 1
   OptimizeGeneratedLightShadows: 1
   DisableGeneratedLightShadows: 1
   CreateFallbackBlockDoorWhenPrefabMissing: 1
