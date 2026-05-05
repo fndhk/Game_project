@@ -558,16 +558,16 @@ MonoBehaviour:
   playerStats: {fileID: 49013746}
   selfTarget: {fileID: 49013745}
   useItemKey: 102
-  cameraPointCount: 700
-  cameraMaxDistance: 18
+  cameraPointCount: 3500
+  cameraMaxDistance: 100
   cameraScreenHalfWidth: 0.48
   cameraScreenHalfHeight: 0.36
-  cameraAttemptsPerPoint: 4
+  cameraAttemptsPerPoint: 14
   cameraSurfaceOffset: 0.012
   scanMask:
     serializedVersion: 2
-    m_Bits: 4294967295
-  knifeDamage: 100
+    m_Bits: 192
+  knifeDamage: 50
   knifeAttackDistance: 1.55
   knifeAttackRadius: 0.55
   knifeTargetMask:
@@ -3824,8 +3824,8 @@ MonoBehaviour:
   BlockDoorRotationOffset: {x: 0, y: 0, z: 0}
   ExitDoorPositionOffset: {x: 0, y: 0, z: 0}
   ExitDoorRotationOffset: {x: 0, y: 0, z: 0}
-  HideGeneratedVisualsInGame: 0
-  HideGeneratedVisualsOnlyInPlayMode: 0
+  HideGeneratedVisualsInGame: 1
+  HideGeneratedVisualsOnlyInPlayMode: 1
   OptimizeGeneratedLightShadows: 1
   DisableGeneratedLightShadows: 1
   CreateFallbackBlockDoorWhenPrefabMissing: 1
