@@ -287,7 +287,7 @@ public class PlayerHUDController : MonoBehaviour
     private void BuildInventoryModule()
     {
         RectTransform root = CreateRect("Inventory", hudRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 45f));
-        root.sizeDelta = new Vector2(128f, 58f);
+        root.sizeDelta = new Vector2(146f, 66f);
 
         slotRects = new RectTransform[2];
         slotFrames = new Image[2];
@@ -299,25 +299,25 @@ public class PlayerHUDController : MonoBehaviour
 
         for (int i = 0; i < 2; i++)
         {
-            RectTransform slot = CreateRect("Slot_" + (i + 1), root, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(25f + i * 57f, 0f));
-            slot.sizeDelta = new Vector2(42f, 42f);
+            RectTransform slot = CreateRect("Slot_" + (i + 1), root, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(29f + i * 64f, 0f));
+            slot.sizeDelta = new Vector2(48f, 48f);
             slotRects[i] = slot;
 
             slotFrames[i] = AddImage(slot, panelColor);
             AddOutline(slot, dimLineColor, new Vector2(1f, -1f));
 
             slotHighlightRects[i] = CreateRect("Highlight", slot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
-            slotHighlightRects[i].offsetMin = new Vector2(-3f, -3f);
-            slotHighlightRects[i].offsetMax = new Vector2(3f, 3f);
+            slotHighlightRects[i].offsetMin = new Vector2(-4f, -4f);
+            slotHighlightRects[i].offsetMax = new Vector2(4f, 4f);
             slotHighlights[i] = AddImage(slotHighlightRects[i], new Color(1f, 0.74f, 0.18f, 0.10f));
             AddOutline(slotHighlightRects[i], amberColor, new Vector2(1.2f, -1.2f));
 
             slotIcons[i] = AddImage(CreateRect("Icon", slot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero), Color.white);
-            slotIcons[i].rectTransform.offsetMin = new Vector2(8f, 8f);
-            slotIcons[i].rectTransform.offsetMax = new Vector2(-8f, -8f);
+            slotIcons[i].rectTransform.offsetMin = new Vector2(9f, 9f);
+            slotIcons[i].rectTransform.offsetMax = new Vector2(-9f, -9f);
 
-            slotCountTexts[i] = CreateLabel("x0", slot, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(4f, -2f), 13, lineColor, TextAlignmentOptions.Right);
-            slotKeyTexts[i] = CreateLabel("[" + (i + 1) + "]", slot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -4f), 13, amberColor, TextAlignmentOptions.Center);
+            slotCountTexts[i] = CreateLabel("x0", slot, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(5f, -2f), 14, lineColor, TextAlignmentOptions.Right);
+            slotKeyTexts[i] = CreateLabel("[" + (i + 1) + "]", slot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -4f), 14, amberColor, TextAlignmentOptions.Center);
         }
     }
 
