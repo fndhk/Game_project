@@ -17,12 +17,14 @@ public enum ScanSurfaceType
     PlayerBody = 14,
     Creature = 15,
 
-    // 컴퓨터 목표 시스템 전용 타입이다.
-    // 가짜 컴퓨터를 복구했을 때 빨간 점으로 표시한다.
+    // 복구 완료된 가짜 컴퓨터이다.
     WrongComputer = 16,
 
-    // 진짜 탈출 시스템 컴퓨터를 복구했을 때 파란 점으로 표시한다.
-    RestoredEscapeComputer = 17
+    // 복구 완료된 진짜 탈출 컴퓨터이다.
+    RestoredEscapeComputer = 17,
+
+    // 아이템 공통 타입이다.
+    Item = 18
 }
 
 // 이 컴포넌트는 월드 오브젝트에 붙여서
