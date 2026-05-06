@@ -19,11 +19,14 @@ public enum ScanDotColorGroup
     PlayerBody = 14,
     Creature = 15,
 
-    // 가짜 컴퓨터를 복구했을 때 쓰는 빨간색 점 그룹이다.
+    // 복구 완료된 가짜 컴퓨터용 점 색상 그룹이다.
     WrongComputer = 16,
 
-    // 진짜 탈출 시스템 컴퓨터를 복구했을 때 쓰는 파란색 점 그룹이다.
-    RestoredEscapeComputer = 17
+    // 복구 완료된 진짜 탈출 컴퓨터용 점 색상 그룹이다.
+    RestoredEscapeComputer = 17,
+
+    // 아이템 공통용 점 색상 그룹이다.
+    Item = 18
 }
 
 // 점을 GameObject로 만들지 않고 GPU 인스턴싱으로 그리는 렌더러이다.
@@ -81,7 +84,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 탈출 핵심 오브젝트용 점 색이다.
     [SerializeField] private Color accessCoreDotColor = new Color(0.12f, 0.88f, 0.82f, 1f);
 
-    // 보안 단말기용 점 색이다.
+    // 보안 단말기/복구 전 컴퓨터용 점 색이다.
     [SerializeField] private Color securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
 
     // 탈출구용 점 색이다.
@@ -94,10 +97,13 @@ public class InstancedScanDotRenderer : MonoBehaviour
     [SerializeField] private Color creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
 
     // 가짜 컴퓨터 복구 완료용 점 색이다.
-    [SerializeField] private Color wrongComputerDotColor = new Color(1.00f, 0.10f, 0.08f, 1f);
+    [SerializeField] private Color wrongComputerDotColor = new Color(0.95f, 0.16f, 0.16f, 1f);
 
-    // 진짜 탈출 시스템 컴퓨터 복구 완료용 점 색이다.
-    [SerializeField] private Color restoredEscapeComputerDotColor = new Color(0.16f, 0.50f, 1.00f, 1f);
+    // 진짜 탈출 컴퓨터 복구 완료용 점 색이다.
+    [SerializeField] private Color restoredEscapeComputerDotColor = new Color(0.18f, 0.55f, 1f, 1f);
+
+    // 아이템 공통용 점 색이다. 너무 튀지 않게 회색 계열로 둔다.
+    [SerializeField] private Color itemDotColor = new Color(0.68f, 0.68f, 0.66f, 1f);
 
     // 원본 프리팹에서 가져온 메쉬이다.
     private Mesh instanceMesh;
@@ -136,6 +142,9 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 가장 오래된 점부터 재사용하기 위한 큐이다.
     private readonly Queue<int> activeOrder = new Queue<int>();
 
+    // 제거된 점 슬롯을 다시 쓰기 위한 큐이다.
+    private readonly Queue<int> inactiveReusableOrder = new Queue<int>();
+
     // 프레임 렌더링용 그룹별 행렬 리스트이다.
     private List<Matrix4x4>[] frameMatricesByGroup;
 
@@ -147,7 +156,8 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
     // 색상 그룹 개수이다.
-    private const int ColorGroupCount = 18;
+    // Item이 18번까지 있으므로 총 19개가 필요하다.
+    private const int ColorGroupCount = 19;
 
     private void Awake()
     {
@@ -155,6 +165,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         maxActiveDots = Mathf.Max(1, maxActiveDots);
         cellSize = Mathf.Max(0.01f, cellSize);
         dotScale = Mathf.Max(0.001f, dotScale);
+
         // 가독성용 점 색 프리셋을 적용한다.
         if (applyReadabilityColorPresetOnAwake)
         {
@@ -238,7 +249,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         record.isActive = true;
         record.hasCell = true;
         record.cell = cell;
-        record.colorGroupIndex = (int)colorGroup;
+        record.colorGroupIndex = Mathf.Clamp((int)colorGroup, 0, ColorGroupCount - 1);
         record.matrix = matrix;
         dots[dotIndex] = record;
 
@@ -249,9 +260,16 @@ public class InstancedScanDotRenderer : MonoBehaviour
         activeOrder.Enqueue(dotIndex);
     }
 
-    // 특정 반경 안에 이미 찍혀 있는 점의 색상 그룹을 즉시 바꾼다.
-    // 컴퓨터 복구 완료 후 기존 초록색 점을 빨간색/파란색으로 바꿀 때 사용한다.
-    public int RecolorDotsInSphere(Vector3 center, float radius, ScanDotColorGroup newColorGroup, params ScanDotColorGroup[] sourceGroups)
+    // 예전 버전과의 코드 호환성을 위한 함수이다.
+    // 현재 버전에서는 scaleMultiplier를 사용하지 않고 기본 dotScale만 사용한다.
+    public void AddDot(Vector3 worldPosition, Vector3 surfaceNormal, ScanDotColorGroup colorGroup, float scaleMultiplier)
+    {
+        AddDot(worldPosition, surfaceNormal, colorGroup);
+    }
+
+    // 특정 반경 안의 기존 점 색을 바꾸는 함수이다.
+    // ObjectiveComputer가 복구 완료 순간 이미 찍힌 컴퓨터 점 색을 바꿀 때 사용한다.
+    public int RecolorDotsInSphere(Vector3 center, float radius, ScanDotColorGroup newColorGroup, ScanDotColorGroup onlyRecolorColorGroup)
     {
         // 반경이 0 이하이면 처리하지 않는다.
         if (radius <= 0f)
@@ -259,70 +277,155 @@ public class InstancedScanDotRenderer : MonoBehaviour
             return 0;
         }
 
-        // 거리 비교 비용을 줄이기 위해 제곱 반경을 사용한다.
+        int recoloredCount = 0;
         float sqrRadius = radius * radius;
+        int targetGroupIndex = Mathf.Clamp((int)newColorGroup, 0, ColorGroupCount - 1);
+        int filterGroupIndex = Mathf.Clamp((int)onlyRecolorColorGroup, 0, ColorGroupCount - 1);
 
-        // 원래 색상 그룹 필터를 사용할지 확인한다.
-        bool useSourceFilter = sourceGroups != null && sourceGroups.Length > 0;
-
-        // 변경된 점 개수를 저장한다.
-        int changedCount = 0;
-
-        // 모든 활성 점을 검사한다.
         for (int i = 0; i < dots.Count; i++)
         {
             DotRecord record = dots[i];
 
-            // 비활성 점은 건너뛴다.
+            // 비활성 점은 무시한다.
             if (!record.isActive)
             {
                 continue;
             }
 
-            // 원래 색상 그룹 필터가 있으면 해당 그룹만 바꾼다.
-            if (useSourceFilter && !IsColorGroupInFilter(record.colorGroupIndex, sourceGroups))
+            // 원하는 기존 색상 그룹만 바꾼다.
+            if (record.colorGroupIndex != filterGroupIndex)
             {
                 continue;
             }
 
-            // Matrix의 4번째 컬럼에는 월드 위치가 들어 있다.
-            Vector4 positionColumn = record.matrix.GetColumn(3);
-            Vector3 dotPosition = new Vector3(positionColumn.x, positionColumn.y, positionColumn.z);
+            // 행렬에서 월드 위치를 꺼낸다.
+            Vector3 dotPosition = GetPositionFromMatrix(record.matrix);
 
-            // 반경 밖의 점은 건너뛴다.
+            // 반경 밖이면 무시한다.
             if ((dotPosition - center).sqrMagnitude > sqrRadius)
             {
                 continue;
             }
 
-            // 색상 그룹만 바꿔도 다음 LateUpdate에서 즉시 다른 색으로 그려진다.
-            record.colorGroupIndex = (int)newColorGroup;
+            // 색상 그룹만 바꾼다. 위치/크기/셀 정보는 유지한다.
+            record.colorGroupIndex = targetGroupIndex;
             dots[i] = record;
-            changedCount++;
+            recoloredCount++;
         }
 
-        return changedCount;
+        return recoloredCount;
     }
 
-    // 특정 색상 그룹이 필터 배열에 들어 있는지 확인한다.
-    private bool IsColorGroupInFilter(int colorGroupIndex, ScanDotColorGroup[] sourceGroups)
+    // 필터 없이 특정 반경 안의 기존 점 색을 모두 바꾸는 오버로드이다.
+    public int RecolorDotsInSphere(Vector3 center, float radius, ScanDotColorGroup newColorGroup)
     {
-        for (int i = 0; i < sourceGroups.Length; i++)
+        // 반경이 0 이하이면 처리하지 않는다.
+        if (radius <= 0f)
         {
-            if (colorGroupIndex == (int)sourceGroups[i])
-            {
-                return true;
-            }
+            return 0;
         }
 
-        return false;
+        int recoloredCount = 0;
+        float sqrRadius = radius * radius;
+        int targetGroupIndex = Mathf.Clamp((int)newColorGroup, 0, ColorGroupCount - 1);
+
+        for (int i = 0; i < dots.Count; i++)
+        {
+            DotRecord record = dots[i];
+
+            if (!record.isActive)
+            {
+                continue;
+            }
+
+            Vector3 dotPosition = GetPositionFromMatrix(record.matrix);
+
+            if ((dotPosition - center).sqrMagnitude > sqrRadius)
+            {
+                continue;
+            }
+
+            record.colorGroupIndex = targetGroupIndex;
+            dots[i] = record;
+            recoloredCount++;
+        }
+
+        return recoloredCount;
     }
 
-    // 예전 버전과의 코드 호환성을 위한 함수이다.
-    // 현재 버전에서는 scaleMultiplier를 사용하지 않고 기본 dotScale만 사용한다.
-    public void AddDot(Vector3 worldPosition, Vector3 surfaceNormal, ScanDotColorGroup colorGroup, float scaleMultiplier)
+    // 특정 반경 안에 있는 기존 점을 제거하는 함수이다.
+    // 아이템을 주웠을 때 이미 찍혀 있던 아이템 점을 바로 지울 때 사용한다.
+    public int RemoveDotsInSphere(Vector3 center, float radius)
     {
-        AddDot(worldPosition, surfaceNormal, colorGroup);
+        if (radius <= 0f)
+        {
+            return 0;
+        }
+
+        int removedCount = 0;
+        float sqrRadius = radius * radius;
+
+        for (int i = 0; i < dots.Count; i++)
+        {
+            DotRecord record = dots[i];
+
+            if (!record.isActive)
+            {
+                continue;
+            }
+
+            Vector3 dotPosition = GetPositionFromMatrix(record.matrix);
+
+            if ((dotPosition - center).sqrMagnitude > sqrRadius)
+            {
+                continue;
+            }
+
+            RemoveDotAtIndex(i);
+            removedCount++;
+        }
+
+        return removedCount;
+    }
+
+    // 특정 반경 안에 있는 점 중 원하는 색상 그룹만 제거하는 함수이다.
+    public int RemoveDotsInSphere(Vector3 center, float radius, ScanDotColorGroup onlyRemoveColorGroup)
+    {
+        if (radius <= 0f)
+        {
+            return 0;
+        }
+
+        int removedCount = 0;
+        float sqrRadius = radius * radius;
+        int filterGroupIndex = Mathf.Clamp((int)onlyRemoveColorGroup, 0, ColorGroupCount - 1);
+
+        for (int i = 0; i < dots.Count; i++)
+        {
+            DotRecord record = dots[i];
+
+            if (!record.isActive)
+            {
+                continue;
+            }
+
+            if (record.colorGroupIndex != filterGroupIndex)
+            {
+                continue;
+            }
+
+            Vector3 dotPosition = GetPositionFromMatrix(record.matrix);
+
+            if ((dotPosition - center).sqrMagnitude > sqrRadius)
+            {
+                continue;
+            }
+
+            RemoveDotAtIndex(i);
+            removedCount++;
+        }
+
+        return removedCount;
     }
 
     // 전체 점을 비우는 함수이다.
@@ -332,6 +435,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         dots.Clear();
         occupiedCellToDotIndex.Clear();
         activeOrder.Clear();
+        inactiveReusableOrder.Clear();
 
         // 프레임 리스트도 비운다.
         if (frameMatricesByGroup != null)
@@ -380,9 +484,12 @@ public class InstancedScanDotRenderer : MonoBehaviour
         playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
         creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
 
-        // 컴퓨터 복구 결과는 게임 목표 판단이 바로 되도록 색 대비를 크게 둔다.
-        wrongComputerDotColor = new Color(1.00f, 0.10f, 0.08f, 1f);
-        restoredEscapeComputerDotColor = new Color(0.16f, 0.50f, 1.00f, 1f);
+        // 복구 결과 컴퓨터는 테스트 단계에서만 구분이 확실히 되게 둔다.
+        wrongComputerDotColor = new Color(0.95f, 0.16f, 0.16f, 1f);
+        restoredEscapeComputerDotColor = new Color(0.18f, 0.55f, 1f, 1f);
+
+        // 아이템은 게임 분위기를 해치지 않게 낮은 회색 계열로 둔다.
+        itemDotColor = new Color(0.68f, 0.68f, 0.66f, 1f);
     }
 
     // 그룹별 리스트를 준비하는 함수이다.
@@ -527,7 +634,8 @@ public class InstancedScanDotRenderer : MonoBehaviour
             playerBodyDotColor,
             creatureDotColor,
             wrongComputerDotColor,
-            restoredEscapeComputerDotColor
+            restoredEscapeComputerDotColor,
+            itemDotColor
         };
     }
 
@@ -630,6 +738,22 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 재사용할 점 인덱스를 가져오는 함수이다.
     private int GetReusableDotIndex()
     {
+        // 제거된 비활성 슬롯이 있으면 먼저 재사용한다.
+        while (inactiveReusableOrder.Count > 0)
+        {
+            int reusableIndex = inactiveReusableOrder.Dequeue();
+
+            if (reusableIndex < 0 || reusableIndex >= dots.Count)
+            {
+                continue;
+            }
+
+            if (!dots[reusableIndex].isActive)
+            {
+                return reusableIndex;
+            }
+        }
+
         // 아직 최대치 미만이면 새 슬롯을 만든다.
         if (dots.Count < maxActiveDots)
         {
@@ -662,6 +786,31 @@ public class InstancedScanDotRenderer : MonoBehaviour
         return -1;
     }
 
+    // 지정한 점 인덱스를 비활성화하고 셀 점유를 해제한다.
+    private void RemoveDotAtIndex(int dotIndex)
+    {
+        if (dotIndex < 0 || dotIndex >= dots.Count)
+        {
+            return;
+        }
+
+        DotRecord record = dots[dotIndex];
+
+        if (!record.isActive)
+        {
+            return;
+        }
+
+        ReleaseCellOwnership(dotIndex);
+
+        record = dots[dotIndex];
+        record.isActive = false;
+        record.colorGroupIndex = 0;
+        dots[dotIndex] = record;
+
+        inactiveReusableOrder.Enqueue(dotIndex);
+    }
+
     // 이전 셀 점유를 해제하는 함수이다.
     private void ReleaseCellOwnership(int dotIndex)
     {
@@ -687,6 +836,12 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
         record.hasCell = false;
         dots[dotIndex] = record;
+    }
+
+    // 렌더링 행렬에서 월드 위치를 꺼내는 함수이다.
+    private Vector3 GetPositionFromMatrix(Matrix4x4 matrix)
+    {
+        return new Vector3(matrix.m03, matrix.m13, matrix.m23);
     }
 
     // 월드 좌표를 셀 좌표로 바꾸는 함수이다.

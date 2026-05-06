@@ -152,6 +152,21 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("ItemSpawnPoint의 회전을 아이템에게 적용")]
         public bool AlignItemRotationToSpawnPoint = true;
 
+        [Header("Item Runtime State")]
+        [Tooltip("생성된 아이템의 Renderer만 끔. Collider, WorldItemPickup, ScanSurfaceInfo는 유지됨")]
+        public bool HideSpawnedItemRenderers = true;
+
+        [Tooltip("방 하나에 생성될 수 있는 최대 아이템 개수. 2면 한 방에 3개 이상 생성 금지")]
+        [Range(1, 20)]
+        public int MaxItemsPerRoom = 2;
+
+        [Header("Item Ground Snap")]
+        [Tooltip("바닥 Collider 없이 ItemSpawnPoint의 Y값을 바닥으로 보고 아이템 Bounds의 아래쪽을 맞춤")]
+        public bool SnapSpawnedItemsToSpawnPointGround = true;
+
+        [Tooltip("아이템을 바닥에 완전히 붙이지 않고 살짝 띄우는 값")]
+        public float ItemGroundOffset = 0.03f;
+
         [Header("Exit Door")]
         [Tooltip("탈출구가 시작방에서 이 거리보다 가까우면 생성 금지")]
         public float ExitMinDistanceFromStart = 25f;
@@ -228,25 +243,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("남은 출구 오브젝트로 판단할 이름 키워드. Underground Laboratory Generator 기본값은 보통 TempPortal 계열임")]
         public string[] ExtraExitObjectNameKeywords = { "TempPortal", "DoorPoint" };
 
-        [Header("Block Door Neighbor Check")]
-        [Tooltip("켜면 막힌 벽을 만들기 직전에 출구 앞/뒤에 다른 Cell 공간이 가까이 있는지 검사한다. 다른 Cell이 있으면 중간 벽으로 판단하고 InsteadDoor를 만들지 않는다.")]
-        public bool SkipBlockDoorWhenAnotherCellIsNearby = true;
-
-        [Tooltip("출구 앞/뒤로 얼마나 멀리까지 다른 Cell 공간을 검사할지 설정")]
-        public float BlockDoorNeighborCheckDistance = 2.6f;
-
-        [Tooltip("검사 간격. 작을수록 정확하지만 검사 횟수가 늘어난다")]
-        public float BlockDoorNeighborCheckStep = 0.35f;
-
-        [Tooltip("검사 점 주변 여유 반경. 출구와 Cell 경계가 살짝 어긋나도 감지하기 위한 값")]
-        public float BlockDoorNeighborCheckRadius = 0.45f;
-
-        [Tooltip("바닥이 아니라 사람 허리 정도 높이에서 검사하기 위한 Y 오프셋")]
-        public float BlockDoorNeighborCheckHeight = 0.65f;
-
-        [Tooltip("켜면 중간 벽으로 판단해서 생성을 건너뛴 위치에 노란 Gizmo를 표시한다")]
-        public bool DrawSkippedBlockDoorGizmos = false;
-
         [Header("Cleanup")]
         [Tooltip("생성 전에 이 오브젝트의 기존 자식들을 삭제")]
         public bool ClearPreviousGeneratedChildren = true;
@@ -290,9 +286,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
         // 탈출구 생성 여부를 저장한다.
         private bool hasExitDoorPosition;
-
-        // 중간 벽으로 판단해서 막지 않은 출구 위치를 Gizmo 표시용으로 저장한다.
-        private readonly List<Vector3> skippedBlockDoorGizmoPositions = new List<Vector3>();
 
         // 아직 막히지 않은 출구 정보를 저장한다.
         private class OpenExit
@@ -1538,11 +1531,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             List<SpawnPointRecord> usedPoints = new List<SpawnPointRecord>();
+            Dictionary<Cell, int> spawnedItemCountByRoom = new Dictionary<Cell, int>();
             int spawnedCount = 0;
 
             for (int i = 0; i < ItemSpawnCount; i++)
             {
-                SpawnPointRecord selectedPoint = SelectItemSpawnPoint(spawnPoints, usedPoints);
+                SpawnPointRecord selectedPoint = SelectItemSpawnPoint(spawnPoints, usedPoints, spawnedItemCountByRoom);
 
                 if (selectedPoint == null)
                 {
@@ -1555,9 +1549,13 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 Quaternion spawnRotation = AlignItemRotationToSpawnPoint ? selectedPoint.Point.rotation : Quaternion.identity;
                 Transform parent = ItemParent != null ? ItemParent : transform;
 
-                Instantiate(itemPrefab, spawnPosition, spawnRotation, parent);
+                GameObject createdItem = Instantiate(itemPrefab, spawnPosition, spawnRotation, parent);
+
+                SnapSpawnedItemToSpawnPointGround(createdItem, spawnPosition);
+                ApplyGeneratedItemVisualState(createdItem);
 
                 usedPoints.Add(selectedPoint);
+                IncreaseSpawnedItemCountForRoom(selectedPoint.OwnerCell, spawnedItemCountByRoom);
                 spawnedCount++;
             }
 
@@ -1871,15 +1869,15 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         }
 
         // 아이템 스폰 포인트 하나를 고른다.
-        private SpawnPointRecord SelectItemSpawnPoint(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints)
+        private SpawnPointRecord SelectItemSpawnPoint(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints, Dictionary<Cell, int> spawnedItemCountByRoom)
         {
             List<SpawnPointRecord> candidates = new List<SpawnPointRecord>();
 
-            AddItemSpawnCandidates(allPoints, usedPoints, candidates, true);
+            AddItemSpawnCandidates(allPoints, usedPoints, spawnedItemCountByRoom, candidates, true);
 
             if (candidates.Count <= 0)
             {
-                AddItemSpawnCandidates(allPoints, usedPoints, candidates, false);
+                AddItemSpawnCandidates(allPoints, usedPoints, spawnedItemCountByRoom, candidates, false);
             }
 
             if (candidates.Count <= 0)
@@ -1891,7 +1889,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         }
 
         // 아이템 후보 목록을 조건에 맞춰 추가한다.
-        private void AddItemSpawnCandidates(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints, List<SpawnPointRecord> candidates, bool useStrictRules)
+        private void AddItemSpawnCandidates(List<SpawnPointRecord> allPoints, List<SpawnPointRecord> usedPoints, Dictionary<Cell, int> spawnedItemCountByRoom, List<SpawnPointRecord> candidates, bool useStrictRules)
         {
             for (int i = 0; i < allPoints.Count; i++)
             {
@@ -1907,6 +1905,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                     continue;
                 }
 
+                // 한 방에 3개 이상 아이템이 생성되지 않게 방별 개수를 항상 검사한다.
+                if (!CanSpawnMoreItemsInRoom(point.OwnerCell, spawnedItemCountByRoom))
+                {
+                    continue;
+                }
+
                 if (useStrictRules && !AllowItemSpawnInPlayerRooms && playerSpawnedCells.Contains(point.OwnerCell))
                 {
                     continue;
@@ -1918,6 +1922,148 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 }
 
                 candidates.Add(point);
+            }
+        }
+
+        // 방 하나에 아이템을 더 생성할 수 있는지 확인한다.
+        private bool CanSpawnMoreItemsInRoom(Cell ownerCell, Dictionary<Cell, int> spawnedItemCountByRoom)
+        {
+            if (ownerCell == null)
+            {
+                return false;
+            }
+
+            int maxItems = Mathf.Max(1, MaxItemsPerRoom);
+            int currentCount = 0;
+
+            if (spawnedItemCountByRoom != null)
+            {
+                spawnedItemCountByRoom.TryGetValue(ownerCell, out currentCount);
+            }
+
+            return currentCount < maxItems;
+        }
+
+        // 방별 생성 아이템 수를 증가시킨다.
+        private void IncreaseSpawnedItemCountForRoom(Cell ownerCell, Dictionary<Cell, int> spawnedItemCountByRoom)
+        {
+            if (ownerCell == null || spawnedItemCountByRoom == null)
+            {
+                return;
+            }
+
+            int currentCount = 0;
+            spawnedItemCountByRoom.TryGetValue(ownerCell, out currentCount);
+            spawnedItemCountByRoom[ownerCell] = currentCount + 1;
+        }
+
+        // 바닥 Collider 없이 ItemSpawnPoint의 Y값을 바닥으로 보고 아이템을 붙인다.
+        private void SnapSpawnedItemToSpawnPointGround(GameObject itemObject, Vector3 spawnPointGroundPosition)
+        {
+            if (!SnapSpawnedItemsToSpawnPointGround || itemObject == null)
+            {
+                return;
+            }
+
+            Bounds itemBounds;
+
+            if (!TryGetCombinedItemBounds(itemObject, out itemBounds))
+            {
+                return;
+            }
+
+            float targetBottomY = spawnPointGroundPosition.y + Mathf.Max(0f, ItemGroundOffset);
+            float deltaY = targetBottomY - itemBounds.min.y;
+
+            if (Mathf.Abs(deltaY) <= 0.001f)
+            {
+                return;
+            }
+
+            itemObject.transform.position += Vector3.up * deltaY;
+        }
+
+        // 아이템의 전체 Bounds를 구한다. Collider를 우선 사용하고, 없으면 Renderer를 사용한다.
+        private bool TryGetCombinedItemBounds(GameObject itemObject, out Bounds combinedBounds)
+        {
+            combinedBounds = new Bounds(itemObject != null ? itemObject.transform.position : Vector3.zero, Vector3.zero);
+
+            if (itemObject == null)
+            {
+                return false;
+            }
+
+            bool hasBounds = false;
+            Collider[] colliders = itemObject.GetComponentsInChildren<Collider>(true);
+
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider currentCollider = colliders[i];
+
+                if (currentCollider == null || !currentCollider.enabled)
+                {
+                    continue;
+                }
+
+                if (!hasBounds)
+                {
+                    combinedBounds = currentCollider.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    combinedBounds.Encapsulate(currentCollider.bounds);
+                }
+            }
+
+            if (hasBounds)
+            {
+                return true;
+            }
+
+            Renderer[] renderers = itemObject.GetComponentsInChildren<Renderer>(true);
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer currentRenderer = renderers[i];
+
+                if (currentRenderer == null || !currentRenderer.enabled)
+                {
+                    continue;
+                }
+
+                if (!hasBounds)
+                {
+                    combinedBounds = currentRenderer.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    combinedBounds.Encapsulate(currentRenderer.bounds);
+                }
+            }
+
+            return hasBounds;
+        }
+
+        // 생성된 아이템의 Renderer만 끈다. Collider, WorldItemPickup, ScanSurfaceInfo는 건드리지 않는다.
+        private void ApplyGeneratedItemVisualState(GameObject itemObject)
+        {
+            if (!HideSpawnedItemRenderers || itemObject == null)
+            {
+                return;
+            }
+
+            Renderer[] renderers = itemObject.GetComponentsInChildren<Renderer>(true);
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] == null)
+                {
+                    continue;
+                }
+
+                renderers[i].enabled = false;
             }
         }
 
@@ -2163,19 +2309,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 blockedExits.Add(exitTransform);
             }
 
-            // 출구 앞/뒤에 다른 Cell 공간이 이미 있으면 방-방/방-복도 사이 중간 벽으로 판단한다.
-            // 이 경우 InsteadDoor를 만들지 않고 빨간 출구 표시만 제거한다.
-            if (ShouldSkipBlockDoorBecauseAnotherCellIsNearby(exitTransform))
-            {
-                if (DrawSkippedBlockDoorGizmos)
-                {
-                    skippedBlockDoorGizmoPositions.Add(exitTransform.position + Vector3.up * BlockDoorNeighborCheckHeight);
-                }
-
-                DestroyExitObject(exitTransform);
-                return;
-            }
-
             // activeInHierarchy를 검사하지 않는다.
             // 프리팹에서 DoorPoint가 비활성화되어 있어도 남은 출구라면 무조건 막아야 한다.
             if (InsteadDoor != null)
@@ -2188,155 +2321,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             DestroyExitObject(exitTransform);
-        }
-
-        // 출구 앞/뒤에 다른 Cell 공간이 가까이 있으면 막힌 벽 생성을 건너뛴다.
-        private bool ShouldSkipBlockDoorBecauseAnotherCellIsNearby(Transform exitTransform)
-        {
-            if (!SkipBlockDoorWhenAnotherCellIsNearby || exitTransform == null)
-            {
-                return false;
-            }
-
-            Cell ownerCell = FindOwnerCellOfExit(exitTransform);
-
-            Vector3 checkOrigin = exitTransform.position + Vector3.up * BlockDoorNeighborCheckHeight;
-            Vector3 forward = exitTransform.forward;
-            forward.y = 0f;
-
-            if (forward.sqrMagnitude < 0.0001f)
-            {
-                forward = exitTransform.TransformDirection(Vector3.forward);
-                forward.y = 0f;
-            }
-
-            if (forward.sqrMagnitude < 0.0001f)
-            {
-                return false;
-            }
-
-            forward.Normalize();
-
-            // 프리팹마다 출구의 forward 방향이 반대로 잡힌 경우가 있어서 양방향을 모두 검사한다.
-            if (IsAnotherCellSpaceNearDirection(checkOrigin, forward, ownerCell))
-            {
-                return true;
-            }
-
-            if (IsAnotherCellSpaceNearDirection(checkOrigin, -forward, ownerCell))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        // 특정 방향으로 여러 점을 찍어서 다른 Cell의 TriggerBox 안이나 근처에 들어가는지 검사한다.
-        private bool IsAnotherCellSpaceNearDirection(Vector3 checkOrigin, Vector3 direction, Cell ownerCell)
-        {
-            float maxDistance = Mathf.Max(0.1f, BlockDoorNeighborCheckDistance);
-            float step = Mathf.Max(0.05f, BlockDoorNeighborCheckStep);
-            float radius = Mathf.Max(0f, BlockDoorNeighborCheckRadius);
-
-            for (float distance = step; distance <= maxDistance; distance += step)
-            {
-                Vector3 checkPoint = checkOrigin + direction * distance;
-
-                if (IsPointNearAnyOtherCellTriggerBox(checkPoint, radius, ownerCell))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        // 검사 지점이 자기 자신이 아닌 다른 Cell의 TriggerBox 안이나 근처에 있는지 확인한다.
-        private bool IsPointNearAnyOtherCellTriggerBox(Vector3 worldPoint, float worldRadius, Cell ownerCell)
-        {
-            for (int i = 0; i < generatedCells.Count; i++)
-            {
-                Cell cell = generatedCells[i];
-
-                if (cell == null || cell == ownerCell)
-                {
-                    continue;
-                }
-
-                cell.CacheTriggerBox();
-
-                if (cell.TriggerBox == null)
-                {
-                    continue;
-                }
-
-                if (IsWorldPointNearBoxCollider(cell.TriggerBox, worldPoint, worldRadius))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        // BoxCollider의 회전/스케일을 고려해서 월드 점이 박스 안이나 근처에 있는지 검사한다.
-        private bool IsWorldPointNearBoxCollider(BoxCollider box, Vector3 worldPoint, float worldRadius)
-        {
-            if (box == null)
-            {
-                return false;
-            }
-
-            Vector3 localPoint = box.transform.InverseTransformPoint(worldPoint) - box.center;
-            Vector3 half = box.size * 0.5f;
-            Vector3 lossyScale = box.transform.lossyScale;
-
-            float radiusX = worldRadius / Mathf.Max(0.0001f, Mathf.Abs(lossyScale.x));
-            float radiusY = worldRadius / Mathf.Max(0.0001f, Mathf.Abs(lossyScale.y));
-            float radiusZ = worldRadius / Mathf.Max(0.0001f, Mathf.Abs(lossyScale.z));
-
-            if (Mathf.Abs(localPoint.x) > half.x + radiusX)
-            {
-                return false;
-            }
-
-            if (Mathf.Abs(localPoint.y) > half.y + radiusY)
-            {
-                return false;
-            }
-
-            if (Mathf.Abs(localPoint.z) > half.z + radiusZ)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        // 출구 Transform이 어떤 생성 Cell에 속해 있는지 찾는다.
-        private Cell FindOwnerCellOfExit(Transform exitTransform)
-        {
-            if (exitTransform == null)
-            {
-                return null;
-            }
-
-            for (int i = 0; i < generatedCells.Count; i++)
-            {
-                Cell cell = generatedCells[i];
-
-                if (cell == null)
-                {
-                    continue;
-                }
-
-                if (exitTransform == cell.transform || exitTransform.IsChildOf(cell.transform))
-                {
-                    return cell;
-                }
-            }
-
-            return null;
         }
 
         // Cell.Exits 배열에 빠져있는 TempPortal/DoorPoint 같은 남은 출구도 찾아서 막는다.
@@ -2594,31 +2578,20 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             exitDoorOwnerCell = null;
             exitDoorPosition = Vector3.zero;
             hasExitDoorPosition = false;
-            skippedBlockDoorGizmoPositions.Clear();
         }
 
-        // Scene View에서 80x80 같은 맵 제한 범위와 건너뛴 막힌 벽 위치를 보여준다.
+        // Scene View에서 80x80 같은 맵 제한 범위를 보여준다.
         private void OnDrawGizmosSelected()
         {
-            if (DrawMapBoundsGizmo && UseMapBounds)
-            {
-                Gizmos.color = Color.yellow;
-
-                Vector3 size = new Vector3(MapSize.x, 0.1f, MapSize.y);
-                Gizmos.DrawWireCube(MapCenter, size);
-            }
-
-            if (!DrawSkippedBlockDoorGizmos || skippedBlockDoorGizmoPositions == null)
+            if (!DrawMapBoundsGizmo || !UseMapBounds)
             {
                 return;
             }
 
             Gizmos.color = Color.yellow;
 
-            for (int i = 0; i < skippedBlockDoorGizmoPositions.Count; i++)
-            {
-                Gizmos.DrawSphere(skippedBlockDoorGizmoPositions[i], 0.25f);
-            }
+            Vector3 size = new Vector3(MapSize.x, 0.1f, MapSize.y);
+            Gizmos.DrawWireCube(MapCenter, size);
         }
     }
 }
