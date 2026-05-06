@@ -201,6 +201,40 @@ public class PlayerInventory : MonoBehaviour
         return true;
     }
 
+    // 현재 선택된 슬롯에서 아이템을 꺼낸다. 버리기처럼 타입 정보가 필요한 소비에 사용한다.
+    public bool TryRemoveSelectedItem(int amount, out ItemType removedItemType, out int removedAmount)
+    {
+        ValidateSlots();
+
+        removedItemType = ItemType.None;
+        removedAmount = 0;
+
+        if (amount <= 0)
+        {
+            return false;
+        }
+
+        ItemSlot slot = slots[selectedSlotIndex];
+
+        if (slot.itemType == ItemType.None || slot.amount <= 0)
+        {
+            return false;
+        }
+
+        removedItemType = slot.itemType;
+        removedAmount = Mathf.Min(amount, slot.amount);
+        slot.amount -= removedAmount;
+
+        if (slot.amount <= 0)
+        {
+            slot.itemType = ItemType.None;
+            slot.amount = 0;
+        }
+
+        RefreshSlotUi();
+        return true;
+    }
+
     // 아이템 이름을 UI 표시용 문자열로 바꾼다.
     public string GetItemDisplayName(ItemType itemType)
     {

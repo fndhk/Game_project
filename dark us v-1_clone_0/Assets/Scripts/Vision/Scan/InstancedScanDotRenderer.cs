@@ -463,6 +463,12 @@ public class InstancedScanDotRenderer : MonoBehaviour
         return count;
     }
 
+    // HUD에서 점 용량을 표시할 때 사용한다.
+    public int GetMaxActiveDotCount()
+    {
+        return maxActiveDots;
+    }
+
     // 가독성용 회백색 점 색 프리셋을 적용하는 함수이다.
     private void ApplyReadabilityColorPreset()
     {
