@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // 월드에 떨어져 있는 아이템이다.
-// PlayerObjectiveInteractor가 E키로 이 컴포넌트와 상호작용한다.
+// PlayerObjectiveInteractor가 아이템 줍기 키로 이 컴포넌트와 상호작용한다.
 public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
 {
     [Header("Item")]
@@ -32,8 +32,8 @@ public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
     // Bounds 기준 반경에 추가로 더할 여유값이다.
     public float scanDotRemovePadding = 0.18f;
 
-    // 켜면 Item 색상 그룹 점만 지운다. 꺼두면 작은 반경 안의 점을 전부 지운다.
-    public bool onlyRemoveItemColorDots = false;
+    // 켜면 Item 색상 그룹 점만 지운다. 주변 바닥/벽 점이 같이 사라지는 것을 막는다.
+    public bool onlyRemoveItemColorDots = true;
 
     // 점 렌더러 참조이다. 비워두면 씬에서 자동으로 찾는다.
     public InstancedScanDotRenderer[] scanDotRenderers;
@@ -44,7 +44,7 @@ public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
     // 상호작용 문구를 반환한다.
     public string GetPrompt(PlayerObjectiveInteractor interactor)
     {
-        return "[E] Take " + GetItemDisplayName() + " x" + Mathf.Max(1, amount);
+        return "[F] Take " + GetItemDisplayName() + " x" + Mathf.Max(1, amount);
     }
 
     // 아직 먹지 않았으면 상호작용 가능하다.

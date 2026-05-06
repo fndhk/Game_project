@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 2307871048586091165}
   - component: {fileID: -6440373317080244571}
   - component: {fileID: 6035897049699716359}
+  - component: {fileID: 7349962815435103381}
   m_Layer: 0
   m_Name: player
   m_TagString: Untagged
@@ -52,7 +53,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8091636358611988274}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -127,7 +128,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 2204065437
   InScenePlacedSourceGlobalObjectIdHash: 0
@@ -202,3 +203,29 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!114 &7349962815435103381
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8091636358611988274}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c73495deca3247fcb4142d0999c71b58, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerScanAvatar
+  buildOnEnable: 1
+  avatarRootName: ScanOnlyCharacterAvatar
+  scanLayer: 7
+  surfaceType: 14
+  hideRenderers: 1
+  hideAttachedBodyRenderers: 1
+  disableSelfScanWhenScannerIsHere: 1
+  standingHeight: 2.05
+  shoulderWidth: 0.62
+  hipWidth: 0.36
+  animationSpeed: 7.5
+  armSwingAngle: 28
+  legSwingAngle: 24
+  breathingAmount: 0.018

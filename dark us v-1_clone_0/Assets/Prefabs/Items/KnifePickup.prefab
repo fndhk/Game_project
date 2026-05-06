@@ -991,7 +991,7 @@ MonoBehaviour:
   scanDotRemoveRadius: 0.85
   useObjectBoundsForDotCleanup: 1
   scanDotRemovePadding: 0.18
-  onlyRemoveItemColorDots: 0
+  onlyRemoveItemColorDots: 1
   scanDotRenderers: []
 --- !u!114 &6285599294033245029
 MonoBehaviour:

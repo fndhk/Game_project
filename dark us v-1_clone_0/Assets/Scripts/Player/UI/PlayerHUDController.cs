@@ -1,497 +1,859 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-// 이 스크립트는 현재 확정된 HUD 최종안을 관리한다.
-// 체력 12칸, 스태미나 14칸, 중앙 스캔 쿨타임,
-// 그리고 1/2 슬롯 선택 표시 v의 페이드아웃을 담당한다.
+// 인게임 HUD를 런타임과 에디터에서 생성하고 갱신한다.
+// 기존 씬에 배치된 HUD 요소는 숨기고, 작은 LIDAR 스타일 HUD를 새로 만든다.
+[ExecuteAlways]
 public class PlayerHUDController : MonoBehaviour
 {
     [Header("플레이어 참조")]
-    // 값을 읽어올 플레이어 스탯이다.
     public PlayerStats targetStats;
-
-    // 중앙 쿨타임 표시를 위해 읽어올 스캐너이다.
     public LidarSpotScanner targetScanner;
+    public PlayerInventory targetInventory;
+    public InstancedScanDotRenderer targetDotRenderer;
 
-    [Header("체력 / 스태미나 블록")]
-    // 체력 블록들이다.
-    // 반드시 왼쪽부터 오른쪽 순서로 12개 넣어야 한다.
+    [Header("Legacy HUD References")]
     public Image[] vitalBlocks;
-
-    // 스태미나 블록들이다.
-    // 반드시 왼쪽부터 오른쪽 순서로 14개 넣어야 한다.
     public Image[] staminaBlocks;
-
-    [Header("인벤토리 슬롯 표시")]
-    // 선택 슬롯 위에 잠깐 나타날 v의 RectTransform이다.
     public RectTransform slotSelectMarkerRect;
-
-    // 선택 슬롯 위에 잠깐 나타날 v의 그래픽이다.
-    // TMP_Text 또는 Image를 넣으면 된다.
     public Graphic slotSelectMarkerGraphic;
-
-    // 1번 슬롯의 위치 기준 RectTransform이다.
     public RectTransform slot1Rect;
-
-    // 2번 슬롯의 위치 기준 RectTransform이다.
     public RectTransform slot2Rect;
-
-    // 슬롯 기준으로 v를 얼마나 위에 띄울지 정하는 값이다.
     public float markerOffsetY = 18f;
-
-    // 입력 후 v가 완전히 선명하게 유지될 시간이다.
     public float markerVisibleDuration = 1.1f;
-
-    // 유지 시간이 끝난 뒤 서서히 사라지는 시간이다.
     public float markerFadeDuration = 0.9f;
-
-    [Header("중앙 스캔 쿨타임")]
-    // 화면 중앙에 둘 쿨타임 표시 텍스트이다.
     public TMP_Text centerScanCooldownText;
-
-    // 스캔 준비 완료 상태에서의 알파값이다.
     public float cooldownReadyAlpha = 0.22f;
-
-    // 쿨타임 진행 중 상태에서의 알파값이다.
     public float cooldownActiveAlpha = 0.9f;
-
-    [Header("우상단 목표 텍스트")]
-    // 목표 텍스트이다.
     public TMP_Text objectiveText;
 
-    // 시작 시 넣어둘 기본 목표 문구이다.
+    [Header("Objective")]
     [TextArea]
-    public string defaultObjectiveText = "Find 4 Relics";
+    public string defaultObjectiveText = "Restore Computers 0/4";
 
-    // 현재 선택된 슬롯 번호이다.
-    // 0이면 1번 슬롯, 1이면 2번 슬롯이다.
-    private int currentSelectedSlotIndex = 0;
+    [Header("Runtime HUD")]
+    public bool buildRuntimeHud = true;
+    public int vitalSegmentCount = 12;
+    public int staminaSegmentCount = 14;
+    public int dotMeterSegmentCount = 28;
 
-    // 마지막으로 1 또는 2 입력을 받은 시간이다.
-    private float lastSlotInputTime = -999f;
+    private Canvas hudCanvas;
+    private RectTransform hudRoot;
+    private Image[] runtimeVitalBlocks;
+    private Image[] runtimeStaminaBlocks;
+    private Image[] dotMeterBlocks;
+    private TMP_Text dotCounterText;
+    private TMP_Text objectiveRuntimeText;
+    private TMP_Text scanCooldownText;
+    private RectTransform scanSweepRect;
+    private Image scanCooldownFill;
+    private RectTransform[] slotRects;
+    private Image[] slotFrames;
+    private Image[] slotIcons;
+    private TMP_Text[] slotCountTexts;
+    private TMP_Text[] slotKeyTexts;
+    private Image[] slotHighlights;
+    private RectTransform[] slotHighlightRects;
 
-    // 한 번이라도 슬롯 표시를 보여준 적이 있는지 저장한다.
-    private bool hasShownSlotMarkerOnce = false;
+    private Sprite whiteSprite;
+    private Sprite cameraIconSprite;
+    private Sprite knifeIconSprite;
+    private Sprite medkitIconSprite;
+    private Sprite emptyIconSprite;
 
-    // 마지막으로 표시했던 체력 칸 수이다.
-    private int lastVitalVisibleCount = -1;
+    private readonly Color panelColor = new Color(0.01f, 0.012f, 0.012f, 0.34f);
+    private readonly Color lineColor = new Color(0.78f, 0.80f, 0.76f, 0.64f);
+    private readonly Color dimLineColor = new Color(0.45f, 0.48f, 0.47f, 0.24f);
+    private readonly Color vitalColor = new Color(0.84f, 0.84f, 0.78f, 0.92f);
+    private readonly Color staminaColor = new Color(0.58f, 0.74f, 0.78f, 0.78f);
+    private readonly Color amberColor = new Color(1f, 0.74f, 0.18f, 0.92f);
+    private readonly Color cyanColor = new Color(0.54f, 0.88f, 1f, 0.82f);
+    private bool hasBuiltHud;
 
-    // 마지막으로 표시했던 스태미나 칸 수이다.
-    private int lastStaminaVisibleCount = -1;
-
-    // 시작 시 필요한 참조를 자동으로 보정한다.
     private void Awake()
     {
-        AutoFindReferences();
-        ApplyDefaultObjectiveText();
-        HideSlotMarkerImmediately();
-        RefreshAllHudImmediately();
+        EnsureHudReady();
     }
 
-    // 매 프레임 HUD 상태를 갱신한다.
+    private void OnEnable()
+    {
+        EnsureHudReady();
+    }
+
     private void Update()
     {
-        UpdateBars();
-        HandleSlotInput();
-        UpdateSlotMarkerFade();
-        UpdateCenterScanCooldown();
+        EnsureHudReady();
+        AutoFindReferences();
+        UpdateVitals();
+        UpdateInventory();
+        UpdateScanCooldown();
+        UpdateDotMemory();
         UpdateObjectiveText();
+        UpdateHudAnimation();
     }
 
-    // 비어 있는 참조를 자동으로 찾아 넣는 함수이다.
+    private void EnsureHudReady()
+    {
+        AutoFindReferences();
+        PrepareSprites();
+        HideLegacyHud();
+
+        if (buildRuntimeHud && (!hasBuiltHud || hudRoot == null))
+        {
+            BuildRuntimeHud();
+            hasBuiltHud = true;
+        }
+
+        RefreshAll();
+    }
+
     private void AutoFindReferences()
     {
-        // 스탯 참조가 비어 있으면 자신 또는 부모에서 찾는다.
         if (targetStats == null)
         {
             targetStats = GetComponent<PlayerStats>();
-
-            if (targetStats == null)
-            {
-                targetStats = GetComponentInParent<PlayerStats>();
-            }
         }
 
-        // 스캐너 참조가 비어 있으면 자신 또는 자식에서 찾는다.
+        if (targetInventory == null)
+        {
+            targetInventory = GetComponent<PlayerInventory>();
+        }
+
         if (targetScanner == null)
         {
-            targetScanner = GetComponent<LidarSpotScanner>();
+            targetScanner = GetComponentInChildren<LidarSpotScanner>(true);
+        }
 
-            if (targetScanner == null)
-            {
-                targetScanner = GetComponentInChildren<LidarSpotScanner>(true);
-            }
+        if (targetScanner == null)
+        {
+            targetScanner = GetComponentInParent<LidarSpotScanner>();
+        }
 
-            if (targetScanner == null)
-            {
-                targetScanner = GetComponentInParent<LidarSpotScanner>();
-            }
+        if (targetDotRenderer == null)
+        {
+            targetDotRenderer = GetComponentInChildren<InstancedScanDotRenderer>(true);
+        }
+
+        if (targetDotRenderer == null && targetScanner != null)
+        {
+            targetDotRenderer = targetScanner.GetComponent<InstancedScanDotRenderer>();
+        }
+
+        if (targetDotRenderer == null)
+        {
+            targetDotRenderer = FindObjectOfType<InstancedScanDotRenderer>();
         }
     }
 
-    // 시작 시 기본 목표 텍스트를 넣는 함수이다.
-    private void ApplyDefaultObjectiveText()
+    private void HideLegacyHud()
     {
-        // 목표 텍스트가 없으면 종료한다.
-        if (objectiveText == null)
-        {
-            return;
-        }
+        SetGraphicsEnabled(vitalBlocks, false);
+        SetGraphicsEnabled(staminaBlocks, false);
 
-        // 현재 텍스트가 비어 있을 때만 기본 문구를 넣는다.
-        if (string.IsNullOrWhiteSpace(objectiveText.text))
-        {
-            objectiveText.text = defaultObjectiveText;
-        }
-    }
-
-    // 시작 시 HUD를 현재 값에 맞춰 강제로 한 번 갱신한다.
-    private void RefreshAllHudImmediately()
-    {
-        UpdateBars(true);
-        UpdateCenterScanCooldown();
-        UpdateObjectiveText();
-    }
-
-    // 목표 텍스트를 현재 진행도에 맞게 갱신한다.
-    private void UpdateObjectiveText()
-    {
-        if (objectiveText == null)
-        {
-            return;
-        }
-
-        if (LabObjectiveManager.Instance == null)
-        {
-            return;
-        }
-
-        objectiveText.text = LabObjectiveManager.Instance.GetHudObjectiveText();
-    }
-
-    // 체력과 스태미나 블록을 갱신하는 함수이다.
-   private void UpdateBars(bool forceRefresh = false)
-{
-    // 스탯 참조가 없으면 종료한다.
-    if (targetStats == null)
-    {
-        return;
-    }
-
-    // 체력 비율을 현재 블록 개수에 맞는 칸 수로 바꾼다.
-    int vitalVisibleCount = GetVisibleBlockCount(
-        targetStats.GetHealthNormalized(),
-        vitalBlocks != null ? vitalBlocks.Length : 0
-    );
-
-    // 스태미나 비율을 현재 블록 개수에 맞는 칸 수로 바꾼다.
-    int staminaVisibleCount = GetStaminaVisibleBlockCount(
-        targetStats.GetStaminaNormalized(),
-        staminaBlocks != null ? staminaBlocks.Length : 0
-    );
-
-    // 체력 칸 수가 바뀌었을 때만 실제 표시를 갱신한다.
-    if (forceRefresh || vitalVisibleCount != lastVitalVisibleCount)
-    {
-        SetBlockVisibility(vitalBlocks, vitalVisibleCount);
-        lastVitalVisibleCount = vitalVisibleCount;
-    }
-
-    // 스태미나 칸 수가 바뀌었을 때만 실제 표시를 갱신한다.
-    if (forceRefresh || staminaVisibleCount != lastStaminaVisibleCount)
-    {
-        SetBlockVisibility(staminaBlocks, staminaVisibleCount);
-        lastStaminaVisibleCount = staminaVisibleCount;
-    }
-}
-
-    // 0~1 비율을 실제 보일 칸 수로 바꾸는 함수이다.
-    private int GetVisibleBlockCount(float normalizedValue, int totalBlockCount)
-    {
-        // 블록 수가 0 이하면 0을 반환한다.
-        if (totalBlockCount <= 0)
-        {
-            return 0;
-        }
-
-        // 비율을 0~1 사이로 고정한다.
-        float clampedValue = Mathf.Clamp01(normalizedValue);
-
-        // 비율이 0이면 0칸을 반환한다.
-        if (clampedValue <= 0f)
-        {
-            return 0;
-        }
-
-        // 비율이 1이면 전체 칸 수를 반환한다.
-        if (clampedValue >= 1f)
-        {
-            return totalBlockCount;
-        }
-
-        // 중간값은 올림 처리해서 마지막 한 칸이 너무 빨리 사라지지 않게 한다.
-        return Mathf.Clamp(Mathf.CeilToInt(clampedValue * totalBlockCount), 0, totalBlockCount);
-    }
-    
-    // 스태미나 블록은 너무 조금 찼을 때 첫 칸이 바로 켜지지 않게 계산한다.
-    private int GetStaminaVisibleBlockCount(float normalizedValue, int totalBlockCount)
-    {
-        // 블록 수가 0 이하면 0을 반환한다.
-        if (totalBlockCount <= 0)
-        {
-            return 0;
-        }
-
-        // 비율을 0~1 사이로 고정한다.
-        float clampedValue = Mathf.Clamp01(normalizedValue);
-
-        // 비율이 0이면 0칸이다.
-        if (clampedValue <= 0f)
-        {
-            return 0;
-        }
-
-        // 블록 1칸당 차지하는 비율이다.
-        float oneBlockRatio = 1f / totalBlockCount;
-
-        // 첫 칸의 절반 정도보다 적게 찼으면 아직 0칸으로 보이게 한다.
-        if (clampedValue < oneBlockRatio * 0.5f)
-        {
-            return 0;
-        }
-
-        // 스태미나는 올림 대신 반올림을 써서 너무 빨리 1칸이 켜지지 않게 한다.
-        return Mathf.Clamp(Mathf.RoundToInt(clampedValue * totalBlockCount), 0, totalBlockCount);
-    }
-    
-    // 실제 블록 오브젝트를 켜고 끄는 함수이다.
-    private void SetBlockVisibility(Image[] blocks, int visibleCount)
-    {
-        // 블록 배열이 비어 있으면 종료한다.
-        if (blocks == null)
-        {
-            return;
-        }
-
-        // 왼쪽부터 visibleCount개만 남기고 나머지는 끈다.
-        for (int i = 0; i < blocks.Length; i++)
-        {
-            // 비어 있는 원소는 건너뛴다.
-            if (blocks[i] == null)
-            {
-                continue;
-            }
-
-            bool shouldBeVisible = i < visibleCount;
-
-            // 상태가 다를 때만 실제 오브젝트를 켜고 끈다.
-            if (blocks[i].gameObject.activeSelf != shouldBeVisible)
-            {
-                blocks[i].gameObject.SetActive(shouldBeVisible);
-            }
-        }
-    }
-
-    // 1번과 2번 입력을 받아 선택 표시를 갱신하는 함수이다.
-    private void HandleSlotInput()
-    {
-        // 1번을 누르면 1번 슬롯을 선택한다.
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            currentSelectedSlotIndex = 0;
-            ShowSlotMarkerAtCurrentSlot();
-            return;
-        }
-
-        // 2번을 누르면 2번 슬롯을 선택한다.
-        if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            currentSelectedSlotIndex = 1;
-            ShowSlotMarkerAtCurrentSlot();
-            return;
-        }
-    }
-
-    // 현재 선택된 슬롯 위치에 v를 즉시 보여주는 함수이다.
-        // 현재 선택된 슬롯 위치에 v를 즉시 보여주는 함수이다.
-        // 현재 선택된 슬롯 위치에 v를 즉시 보여주는 함수이다.
-    private void ShowSlotMarkerAtCurrentSlot()
-    {
-        // 표시용 참조가 없으면 종료한다.
-        if (slotSelectMarkerRect == null || slotSelectMarkerGraphic == null)
-        {
-            return;
-        }
-
-        // 현재 선택된 슬롯에 맞는 목표 RectTransform을 가져온다.
-        RectTransform targetSlotRect = currentSelectedSlotIndex == 0 ? slot1Rect : slot2Rect;
-
-        // 목표가 없으면 종료한다.
-        if (targetSlotRect == null)
-        {
-            return;
-        }
-
-        // 마커 오브젝트를 켠다.
-        if (!slotSelectMarkerRect.gameObject.activeSelf)
-        {
-            slotSelectMarkerRect.gameObject.SetActive(true);
-        }
-
-        // 목표 위치와 똑같이 맞춘다.
-        slotSelectMarkerRect.anchoredPosition = targetSlotRect.anchoredPosition;
-
-        // 입력 직후에는 완전히 선명하게 보이게 만든다.
-        SetSlotMarkerAlpha(1f);
-
-        // 마지막 입력 시간을 기록한다.
-        lastSlotInputTime = Time.time;
-
-        // 한 번이라도 보여준 상태로 기록한다.
-        hasShownSlotMarkerOnce = true;
-    }
-
-    // 입력이 없을 때 v를 서서히 사라지게 만드는 함수이다.
-    private void UpdateSlotMarkerFade()
-    {
-        // 아직 한 번도 보여준 적이 없으면 종료한다.
-        if (!hasShownSlotMarkerOnce)
-        {
-            return;
-        }
-
-        // 필수 참조가 없으면 종료한다.
-        if (slotSelectMarkerRect == null || slotSelectMarkerGraphic == null)
-        {
-            return;
-        }
-
-        // 표시 오브젝트가 꺼져 있으면 더 처리할 필요가 없다.
-        if (!slotSelectMarkerRect.gameObject.activeSelf)
-        {
-            return;
-        }
-
-        // 마지막 입력 후 지난 시간을 계산한다.
-        float elapsedSinceLastInput = Time.time - lastSlotInputTime;
-
-        // 아직 유지 시간 안이면 완전히 보이게 둔다.
-        if (elapsedSinceLastInput <= markerVisibleDuration)
-        {
-            SetSlotMarkerAlpha(1f);
-            return;
-        }
-
-        // 유지 시간이 끝난 뒤부터 페이드 진행 시간을 계산한다.
-        float fadeElapsed = elapsedSinceLastInput - markerVisibleDuration;
-
-        // 페이드 시간이 0 이하면 즉시 숨긴다.
-        if (markerFadeDuration <= 0f)
-        {
-            HideSlotMarkerImmediately();
-            return;
-        }
-
-        // 1에서 0으로 줄어드는 알파를 계산한다.
-        float alpha = 1f - Mathf.Clamp01(fadeElapsed / markerFadeDuration);
-
-        // 알파를 반영한다.
-        SetSlotMarkerAlpha(alpha);
-
-        // 완전히 사라졌으면 오브젝트를 꺼둔다.
-        if (alpha <= 0f)
-        {
-            slotSelectMarkerRect.gameObject.SetActive(false);
-        }
-    }
-
-    // v의 알파를 바꾸는 함수이다.
-    private void SetSlotMarkerAlpha(float alpha)
-    {
-        // 그래픽이 없으면 종료한다.
-        if (slotSelectMarkerGraphic == null)
-        {
-            return;
-        }
-
-        // 현재 색을 가져온다.
-        Color color = slotSelectMarkerGraphic.color;
-
-        // 알파만 바꿔서 다시 넣는다.
-        color.a = Mathf.Clamp01(alpha);
-        slotSelectMarkerGraphic.color = color;
-    }
-
-    // v를 즉시 숨기는 함수이다.
-    private void HideSlotMarkerImmediately()
-    {
-        // 표시용 RectTransform이 있으면 오브젝트를 꺼둔다.
         if (slotSelectMarkerRect != null)
         {
             slotSelectMarkerRect.gameObject.SetActive(false);
         }
 
-        // 그래픽이 있으면 알파를 0으로 만든다.
-        if (slotSelectMarkerGraphic != null)
+        if (slot1Rect != null)
         {
-            SetSlotMarkerAlpha(0f);
+            slot1Rect.gameObject.SetActive(false);
+        }
+
+        if (slot2Rect != null)
+        {
+            slot2Rect.gameObject.SetActive(false);
+        }
+
+        if (centerScanCooldownText != null)
+        {
+            centerScanCooldownText.gameObject.SetActive(false);
+        }
+
+        if (objectiveText != null)
+        {
+            objectiveText.gameObject.SetActive(false);
         }
     }
 
-    // 중앙 스캔 쿨타임 아이콘을 갱신하는 함수이다.
-    private void UpdateCenterScanCooldown()
+    private void SetGraphicsEnabled(Image[] images, bool enabled)
     {
-        // 중앙 텍스트가 없으면 종료한다.
-        if (centerScanCooldownText == null)
+        if (images == null)
         {
             return;
         }
 
-        // 기본값은 준비 완료 상태로 둔다.
-        bool isReady = true;
-        float cooldownNormalized = 1f;
-
-        // 스캐너가 있으면 실제 쿨타임 값을 읽어온다.
-        if (targetScanner != null)
+        for (int i = 0; i < images.Length; i++)
         {
-            isReady = targetScanner.IsPulseReady;
-            cooldownNormalized = targetScanner.GetCooldownNormalized();
+            if (images[i] != null)
+            {
+                images[i].gameObject.SetActive(enabled);
+            }
         }
-
-        // 현재 상태에 맞는 심볼을 넣는다.
-        centerScanCooldownText.text = GetCooldownSymbol(isReady, cooldownNormalized);
-
-        // 준비 완료일 때는 희미하게, 진행 중일 때는 더 또렷하게 보이게 한다.
-        Color color = centerScanCooldownText.color;
-        color.a = isReady ? cooldownReadyAlpha : cooldownActiveAlpha;
-        centerScanCooldownText.color = color;
     }
 
-    // 현재 쿨타임 상태에 맞는 심볼을 반환하는 함수이다.
-        // 현재 쿨타임 상태에 맞는 심볼을 반환하는 함수이다.
-    private string GetCooldownSymbol(bool isReady, float cooldownNormalized)
+    private void BuildRuntimeHud()
     {
-        // 준비 완료면 가장 또렷한 문자로 표시한다.
-        if (isReady)
+        hudCanvas = GetComponentInChildren<Canvas>(true);
+
+        if (hudCanvas == null)
         {
-            return "O";
+            hudCanvas = FindObjectOfType<Canvas>();
         }
 
-        // 진행률을 0~1로 고정한다.
-        float clampedValue = Mathf.Clamp01(cooldownNormalized);
-
-        // 폰트 깨짐을 피하려고 ASCII 문자만 쓴다.
-        if (clampedValue < 0.34f)
+        if (hudCanvas == null)
         {
-            return ".";
+            GameObject canvasObject = new GameObject("Canvas_HUD");
+            hudCanvas = canvasObject.AddComponent<Canvas>();
+            hudCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasObject.AddComponent<GraphicRaycaster>();
         }
 
-        if (clampedValue < 0.67f)
+        HideExistingCanvasHudChildren();
+
+        Transform existing = hudCanvas.transform.Find("Runtime_LidarHud");
+
+        if (existing != null)
         {
-            return ":";
+            DestroyHudObject(existing.gameObject);
         }
 
-        return "o";
+        hudRoot = CreateRect("Runtime_LidarHud", hudCanvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        hudRoot.offsetMin = Vector2.zero;
+        hudRoot.offsetMax = Vector2.zero;
+
+        BuildVitalModule();
+        BuildInventoryModule();
+        BuildCenterScanModule();
+        BuildDotMemoryModule();
+        BuildObjectiveModule();
+    }
+
+    private void DestroyHudObject(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
+    }
+
+    private void HideExistingCanvasHudChildren()
+    {
+        if (hudCanvas == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < hudCanvas.transform.childCount; i++)
+        {
+            Transform child = hudCanvas.transform.GetChild(i);
+
+            if (child == null || child.name == "Runtime_LidarHud")
+            {
+                continue;
+            }
+
+            child.gameObject.SetActive(false);
+        }
+    }
+
+    private void BuildVitalModule()
+    {
+        RectTransform root = CreateRect("Vitals", hudRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(70f, 62f));
+        root.sizeDelta = new Vector2(255f, 74f);
+        AddPanel(root, new Color(0f, 0f, 0f, 0.12f));
+
+        CreateLabel("VITAL", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -2f), 18, lineColor, TextAlignmentOptions.Left);
+        CreateLabel("STAM", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(7f, -31f), 15, new Color(0.66f, 0.72f, 0.70f, 0.7f), TextAlignmentOptions.Left);
+
+        runtimeVitalBlocks = CreateSegmentRow("VitalBlocks", root, vitalSegmentCount, new Vector2(68f, -2f), new Vector2(11f, 22f), 6f);
+        runtimeStaminaBlocks = CreateSegmentRow("StaminaBlocks", root, staminaSegmentCount, new Vector2(68f, -35f), new Vector2(9f, 13f), 5f);
+    }
+
+    private void BuildInventoryModule()
+    {
+        RectTransform root = CreateRect("Inventory", hudRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 45f));
+        root.sizeDelta = new Vector2(128f, 58f);
+
+        slotRects = new RectTransform[2];
+        slotFrames = new Image[2];
+        slotIcons = new Image[2];
+        slotCountTexts = new TMP_Text[2];
+        slotKeyTexts = new TMP_Text[2];
+        slotHighlights = new Image[2];
+        slotHighlightRects = new RectTransform[2];
+
+        for (int i = 0; i < 2; i++)
+        {
+            RectTransform slot = CreateRect("Slot_" + (i + 1), root, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(25f + i * 57f, 0f));
+            slot.sizeDelta = new Vector2(42f, 42f);
+            slotRects[i] = slot;
+
+            slotFrames[i] = AddImage(slot, panelColor);
+            AddOutline(slot, dimLineColor, new Vector2(1f, -1f));
+
+            slotHighlightRects[i] = CreateRect("Highlight", slot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            slotHighlightRects[i].offsetMin = new Vector2(-3f, -3f);
+            slotHighlightRects[i].offsetMax = new Vector2(3f, 3f);
+            slotHighlights[i] = AddImage(slotHighlightRects[i], new Color(1f, 0.74f, 0.18f, 0.10f));
+            AddOutline(slotHighlightRects[i], amberColor, new Vector2(1.2f, -1.2f));
+
+            slotIcons[i] = AddImage(CreateRect("Icon", slot, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero), Color.white);
+            slotIcons[i].rectTransform.offsetMin = new Vector2(8f, 8f);
+            slotIcons[i].rectTransform.offsetMax = new Vector2(-8f, -8f);
+
+            slotCountTexts[i] = CreateLabel("x0", slot, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(4f, -2f), 13, lineColor, TextAlignmentOptions.Right);
+            slotKeyTexts[i] = CreateLabel("[" + (i + 1) + "]", slot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -4f), 13, amberColor, TextAlignmentOptions.Center);
+        }
+    }
+
+    private void BuildCenterScanModule()
+    {
+        RectTransform root = CreateRect("CenterScan", hudRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
+        root.sizeDelta = new Vector2(58f, 58f);
+
+        scanCooldownFill = AddImage(CreateRect("CooldownFill", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero), new Color(0.68f, 0.90f, 1f, 0.16f));
+        scanCooldownFill.sprite = CreateCircleSprite(96, 38f);
+        scanCooldownFill.type = Image.Type.Filled;
+        scanCooldownFill.fillMethod = Image.FillMethod.Radial360;
+        scanCooldownFill.fillOrigin = 2;
+        scanCooldownFill.fillClockwise = true;
+        scanCooldownFill.rectTransform.sizeDelta = new Vector2(34f, 34f);
+
+        Image inner = AddImage(CreateRect("CooldownInner", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero), new Color(0f, 0f, 0f, 0.48f));
+        inner.sprite = CreateCircleSprite(64, 24f);
+        inner.rectTransform.sizeDelta = new Vector2(23f, 23f);
+
+        CreateCrosshairLine(root, new Vector2(-10f, 0f), new Vector2(5f, 1f));
+        CreateCrosshairLine(root, new Vector2(10f, 0f), new Vector2(5f, 1f));
+        CreateCrosshairLine(root, new Vector2(0f, -10f), new Vector2(1f, 5f));
+        CreateCrosshairLine(root, new Vector2(0f, 10f), new Vector2(1f, 5f));
+
+        Image dot = AddImage(CreateRect("CenterDot", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero), new Color(0.78f, 0.80f, 0.76f, 0.58f));
+        dot.sprite = CreateCircleSprite(16, 7f);
+        dot.rectTransform.sizeDelta = new Vector2(3.2f, 3.2f);
+
+        scanSweepRect = CreateRect("SweepArc", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
+        Image sweep = AddImage(scanSweepRect, new Color(0.65f, 0.88f, 1f, 0.14f));
+        sweep.sprite = whiteSprite;
+        scanSweepRect.sizeDelta = new Vector2(1f, 18f);
+        scanSweepRect.anchoredPosition = new Vector2(0f, 9f);
+
+        scanCooldownText = CreateLabel("SCAN", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -2f), 10, new Color(0.72f, 0.83f, 0.86f, 0.58f), TextAlignmentOptions.Center);
+    }
+
+    private void BuildDotMemoryModule()
+    {
+        RectTransform root = CreateRect("DotMemory", hudRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(56f, -46f));
+        root.sizeDelta = new Vector2(385f, 52f);
+
+        CreateLabel("DOT MEMORY", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, 15, new Color(0.78f, 0.82f, 0.80f, 0.72f), TextAlignmentOptions.Left);
+        dotCounterText = CreateLabel("0 / 150k", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, 15, lineColor, TextAlignmentOptions.Right);
+        dotMeterBlocks = CreateSegmentRow("DotMeter", root, dotMeterSegmentCount, new Vector2(0f, -29f), new Vector2(8f, 10f), 4f);
+    }
+
+    private void BuildObjectiveModule()
+    {
+        objectiveRuntimeText = CreateLabel(defaultObjectiveText, hudRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -44f), 17, lineColor, TextAlignmentOptions.Right);
+        objectiveRuntimeText.rectTransform.sizeDelta = new Vector2(360f, 34f);
+    }
+
+    private void RefreshAll()
+    {
+        UpdateVitals();
+        UpdateInventory();
+        UpdateScanCooldown();
+        UpdateDotMemory();
+        UpdateObjectiveText();
+    }
+
+    private void UpdateVitals()
+    {
+        if (targetStats == null)
+        {
+            return;
+        }
+
+        SetSegmentFill(runtimeVitalBlocks, targetStats.GetHealthNormalized(), vitalColor, new Color(0.36f, 0.37f, 0.35f, 0.28f));
+        SetSegmentFill(runtimeStaminaBlocks, targetStats.GetStaminaNormalized(), staminaColor, new Color(0.28f, 0.36f, 0.38f, 0.22f));
+    }
+
+    private void UpdateInventory()
+    {
+        if (targetInventory == null || slotIcons == null)
+        {
+            return;
+        }
+
+        int selected = targetInventory.SelectedSlotIndex;
+
+        for (int i = 0; i < slotIcons.Length; i++)
+        {
+            PlayerInventory.ItemSlot slot = targetInventory.slots != null && i < targetInventory.slots.Length ? targetInventory.slots[i] : null;
+            ItemType itemType = slot != null && slot.amount > 0 ? slot.itemType : ItemType.None;
+            int amount = slot != null ? Mathf.Max(0, slot.amount) : 0;
+
+            slotIcons[i].sprite = GetIconSprite(itemType);
+            slotIcons[i].color = itemType == ItemType.None ? new Color(0.45f, 0.48f, 0.46f, 0.22f) : new Color(0.88f, 0.90f, 0.84f, 0.92f);
+            slotCountTexts[i].text = amount > 0 ? "x" + amount : "";
+            slotHighlights[i].gameObject.SetActive(i == selected);
+            slotFrames[i].color = i == selected ? new Color(0.02f, 0.018f, 0.01f, 0.46f) : panelColor;
+            slotKeyTexts[i].color = i == selected ? amberColor : new Color(0.76f, 0.75f, 0.66f, 0.52f);
+        }
+    }
+
+    private void UpdateScanCooldown()
+    {
+        if (scanCooldownText == null)
+        {
+            return;
+        }
+
+        bool ready = targetScanner == null || targetScanner.IsPulseReady;
+        float normalized = targetScanner != null ? targetScanner.GetCooldownNormalized() : 1f;
+        float fill = ready ? 1f : Mathf.Clamp01(normalized);
+
+        scanCooldownFill.fillAmount = fill;
+        scanCooldownFill.color = ready ? new Color(0.70f, 0.92f, 1f, 0.14f) : new Color(1f, 0.74f, 0.18f, 0.28f);
+        scanCooldownText.text = ready ? "SCAN RDY" : "SCAN " + Mathf.RoundToInt(fill * 100f) + "%";
+    }
+
+    private void UpdateDotMemory()
+    {
+        if (dotCounterText == null || targetDotRenderer == null)
+        {
+            return;
+        }
+
+        int active = targetDotRenderer.GetActiveDotCount();
+        int max = targetDotRenderer.GetMaxActiveDotCount();
+        float normalized = max > 0 ? active / (float)max : 0f;
+
+        SetSegmentFill(dotMeterBlocks, normalized, cyanColor, new Color(0.38f, 0.45f, 0.45f, 0.18f));
+        dotCounterText.text = FormatDotCount(active) + " / " + FormatDotCount(max);
+    }
+
+    private void UpdateObjectiveText()
+    {
+        if (objectiveRuntimeText == null)
+        {
+            return;
+        }
+
+        if (LabObjectiveManager.Instance != null)
+        {
+            objectiveRuntimeText.text = LabObjectiveManager.Instance.GetHudObjectiveText();
+        }
+        else if (string.IsNullOrWhiteSpace(objectiveRuntimeText.text))
+        {
+            objectiveRuntimeText.text = defaultObjectiveText;
+        }
+    }
+
+    private void UpdateHudAnimation()
+    {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        if (scanSweepRect != null)
+        {
+            scanSweepRect.localRotation = Quaternion.Euler(0f, 0f, -Time.unscaledTime * 90f);
+        }
+
+        if (slotHighlightRects != null && targetInventory != null)
+        {
+            int selected = Mathf.Clamp(targetInventory.SelectedSlotIndex, 0, slotHighlightRects.Length - 1);
+            float pulse = 1f + Mathf.Sin(Time.unscaledTime * 4.8f) * 0.045f;
+            slotHighlightRects[selected].localScale = Vector3.one * pulse;
+        }
+    }
+
+    private void SetSegmentFill(Image[] blocks, float normalized, Color activeColor, Color inactiveColor)
+    {
+        if (blocks == null)
+        {
+            return;
+        }
+
+        int filled = Mathf.RoundToInt(Mathf.Clamp01(normalized) * blocks.Length);
+
+        for (int i = 0; i < blocks.Length; i++)
+        {
+            if (blocks[i] == null)
+            {
+                continue;
+            }
+
+            bool active = i < filled;
+            blocks[i].color = active ? activeColor : inactiveColor;
+        }
+    }
+
+    private string FormatDotCount(int value)
+    {
+        if (value >= 1000)
+        {
+            float thousands = value / 1000f;
+            return thousands >= 100f ? Mathf.RoundToInt(thousands) + "k" : thousands.ToString("0.0") + "k";
+        }
+
+        return value.ToString();
+    }
+
+    private Image[] CreateSegmentRow(string name, Transform parent, int count, Vector2 start, Vector2 size, float gap)
+    {
+        Image[] result = new Image[Mathf.Max(0, count)];
+        RectTransform row = CreateRect(name, parent, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), start);
+
+        for (int i = 0; i < result.Length; i++)
+        {
+            RectTransform segment = CreateRect("Seg_" + i, row, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(i * (size.x + gap), 0f));
+            segment.sizeDelta = size;
+            result[i] = AddImage(segment, dimLineColor);
+        }
+
+        return result;
+    }
+
+    private void CreateCrosshairLine(Transform parent, Vector2 position, Vector2 size)
+    {
+        RectTransform line = CreateRect("CrosshairLine", parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), position);
+        line.sizeDelta = size;
+        AddImage(line, new Color(0.78f, 0.82f, 0.80f, 0.58f));
+    }
+
+    private TMP_Text CreateLabel(string text, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, int fontSize, Color color, TextAlignmentOptions alignment)
+    {
+        RectTransform rect = CreateRect("Text_" + text, parent, anchorMin, anchorMax, pivot, anchoredPosition);
+        rect.sizeDelta = new Vector2(220f, 28f);
+        TMP_Text label = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        label.text = text;
+        label.fontSize = fontSize;
+        label.enableAutoSizing = false;
+        label.alignment = alignment;
+        label.color = color;
+        label.raycastTarget = false;
+        return label;
+    }
+
+    private RectTransform CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition)
+    {
+        GameObject go = new GameObject(name);
+        go.layer = 5;
+        go.transform.SetParent(parent, false);
+        RectTransform rect = go.AddComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = anchoredPosition;
+        return rect;
+    }
+
+    private Image AddPanel(RectTransform rect, Color color)
+    {
+        Image image = AddImage(rect, color);
+        AddOutline(rect, new Color(0.72f, 0.76f, 0.72f, 0.08f), new Vector2(1f, -1f));
+        return image;
+    }
+
+    private Image AddImage(RectTransform rect, Color color)
+    {
+        Image image = rect.gameObject.AddComponent<Image>();
+        image.sprite = whiteSprite;
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private void AddOutline(RectTransform rect, Color color, Vector2 distance)
+    {
+        Outline outline = rect.gameObject.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = distance;
+    }
+
+    private Sprite GetIconSprite(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Camera:
+                return cameraIconSprite;
+
+            case ItemType.Knife:
+                return knifeIconSprite;
+
+            case ItemType.Medkit:
+                return medkitIconSprite;
+
+            default:
+                return emptyIconSprite;
+        }
+    }
+
+    private void PrepareSprites()
+    {
+        if (whiteSprite == null)
+        {
+            whiteSprite = CreateSolidSprite(2, 2, Color.white);
+        }
+
+        if (emptyIconSprite == null)
+        {
+            emptyIconSprite = CreateIconSprite(IconKind.Empty);
+            cameraIconSprite = CreateIconSprite(IconKind.Camera);
+            knifeIconSprite = CreateIconSprite(IconKind.Knife);
+            medkitIconSprite = CreateIconSprite(IconKind.Medkit);
+        }
+    }
+
+    private enum IconKind
+    {
+        Empty,
+        Camera,
+        Knife,
+        Medkit
+    }
+
+    private Sprite CreateIconSprite(IconKind kind)
+    {
+        const int size = 48;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color clear = new Color(0f, 0f, 0f, 0f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                texture.SetPixel(x, y, clear);
+            }
+        }
+
+        Color c = Color.white;
+
+        if (kind == IconKind.Camera)
+        {
+            FillRect(texture, 9, 17, 31, 19, c);
+            FillRect(texture, 14, 12, 13, 6, c);
+            FillCircle(texture, 25, 27, 7, clear);
+            FillCircle(texture, 25, 27, 4, c);
+        }
+        else if (kind == IconKind.Knife)
+        {
+            FillPolygon(
+                texture,
+                new Vector2[]
+                {
+                    new Vector2(6f, 8f),
+                    new Vector2(15f, 12f),
+                    new Vector2(31f, 28f),
+                    new Vector2(27f, 32f),
+                    new Vector2(11f, 19f)
+                },
+                c
+            );
+            FillPolygon(
+                texture,
+                new Vector2[]
+                {
+                    new Vector2(13f, 15f),
+                    new Vector2(28f, 29f),
+                    new Vector2(25f, 31f),
+                    new Vector2(11f, 19f)
+                },
+                new Color(0f, 0f, 0f, 0f)
+            );
+            FillPolygon(
+                texture,
+                new Vector2[]
+                {
+                    new Vector2(26f, 27f),
+                    new Vector2(31f, 22f),
+                    new Vector2(35f, 26f),
+                    new Vector2(30f, 31f)
+                },
+                c
+            );
+            DrawThickLine(texture, new Vector2(32f, 30f), new Vector2(43f, 41f), 5f, c);
+            DrawThickLine(texture, new Vector2(34f, 28f), new Vector2(45f, 39f), 2f, new Color(0f, 0f, 0f, 0f));
+        }
+        else if (kind == IconKind.Medkit)
+        {
+            FillRect(texture, 9, 15, 30, 24, c);
+            FillRect(texture, 18, 9, 12, 7, c);
+            FillRect(texture, 22, 20, 5, 14, clear);
+            FillRect(texture, 17, 25, 15, 5, clear);
+        }
+        else
+        {
+            FillRect(texture, 20, 22, 8, 4, new Color(1f, 1f, 1f, 0.35f));
+        }
+
+        texture.Apply();
+        texture.filterMode = FilterMode.Point;
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private Sprite CreateCircleSprite(int size, float radius)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01(radius + 1f - distance);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private Sprite CreateSolidSprite(int width, int height, Color color)
+    {
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private void FillRect(Texture2D texture, int x, int y, int width, int height, Color color)
+    {
+        for (int yy = y; yy < y + height; yy++)
+        {
+            for (int xx = x; xx < x + width; xx++)
+            {
+                if (xx >= 0 && yy >= 0 && xx < texture.width && yy < texture.height)
+                {
+                    texture.SetPixel(xx, yy, color);
+                }
+            }
+        }
+    }
+
+    private void FillCircle(Texture2D texture, int cx, int cy, int radius, Color color)
+    {
+        int sqrRadius = radius * radius;
+
+        for (int y = cy - radius; y <= cy + radius; y++)
+        {
+            for (int x = cx - radius; x <= cx + radius; x++)
+            {
+                int dx = x - cx;
+                int dy = y - cy;
+
+                if (dx * dx + dy * dy <= sqrRadius && x >= 0 && y >= 0 && x < texture.width && y < texture.height)
+                {
+                    texture.SetPixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    private void DrawThickLine(Texture2D texture, Vector2 from, Vector2 to, float thickness, Color color)
+    {
+        Vector2 direction = to - from;
+        float length = direction.magnitude;
+
+        if (length <= 0.001f)
+        {
+            return;
+        }
+
+        Vector2 normal = new Vector2(-direction.y, direction.x).normalized * (thickness * 0.5f);
+
+        FillPolygon(
+            texture,
+            new Vector2[]
+            {
+                from + normal,
+                to + normal,
+                to - normal,
+                from - normal
+            },
+            color
+        );
+    }
+
+    private void FillPolygon(Texture2D texture, Vector2[] points, Color color)
+    {
+        if (points == null || points.Length < 3)
+        {
+            return;
+        }
+
+        int minX = texture.width;
+        int minY = texture.height;
+        int maxX = 0;
+        int maxY = 0;
+
+        for (int i = 0; i < points.Length; i++)
+        {
+            minX = Mathf.Min(minX, Mathf.FloorToInt(points[i].x));
+            minY = Mathf.Min(minY, Mathf.FloorToInt(points[i].y));
+            maxX = Mathf.Max(maxX, Mathf.CeilToInt(points[i].x));
+            maxY = Mathf.Max(maxY, Mathf.CeilToInt(points[i].y));
+        }
+
+        minX = Mathf.Clamp(minX, 0, texture.width - 1);
+        minY = Mathf.Clamp(minY, 0, texture.height - 1);
+        maxX = Mathf.Clamp(maxX, 0, texture.width - 1);
+        maxY = Mathf.Clamp(maxY, 0, texture.height - 1);
+
+        for (int y = minY; y <= maxY; y++)
+        {
+            for (int x = minX; x <= maxX; x++)
+            {
+                if (IsPointInsidePolygon(new Vector2(x + 0.5f, y + 0.5f), points))
+                {
+                    texture.SetPixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    private bool IsPointInsidePolygon(Vector2 point, Vector2[] polygon)
+    {
+        bool inside = false;
+
+        for (int i = 0, j = polygon.Length - 1; i < polygon.Length; j = i++)
+        {
+            bool intersects = ((polygon[i].y > point.y) != (polygon[j].y > point.y)) &&
+                              (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y + 0.0001f) + polygon[i].x);
+
+            if (intersects)
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
     }
 }
