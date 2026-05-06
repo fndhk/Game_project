@@ -482,6 +482,7 @@ public class PlayerHUDController : MonoBehaviour
             float pulse = 1f + Mathf.Sin(Time.unscaledTime * 4.8f) * 0.045f;
             slotHighlightRects[selected].localScale = Vector3.one * pulse;
         }
+
     }
 
     private void SetSegmentFill(Image[] blocks, float normalized, Color activeColor, Color inactiveColor)
@@ -620,6 +621,7 @@ public class PlayerHUDController : MonoBehaviour
             knifeIconSprite = CreateIconSprite(IconKind.Knife);
             medkitIconSprite = CreateIconSprite(IconKind.Medkit);
         }
+
     }
 
     private enum IconKind
@@ -720,6 +722,28 @@ public class PlayerHUDController : MonoBehaviour
             {
                 float distance = Vector2.Distance(new Vector2(x, y), center);
                 float alpha = Mathf.Clamp01(radius + 1f - distance);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private Sprite CreateRingSprite(int size, float radius, float thickness)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float innerRadius = Mathf.Max(0f, radius - thickness);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float outerAlpha = Mathf.Clamp01(radius + 1f - distance);
+                float innerAlpha = Mathf.Clamp01(distance - innerRadius);
+                float alpha = Mathf.Min(outerAlpha, innerAlpha);
                 texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }
         }

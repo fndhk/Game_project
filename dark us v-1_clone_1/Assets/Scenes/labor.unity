@@ -1202,7 +1202,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 869e50b440605d342a75f030e78f5ce7, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.015
+  m_Volume: 0.08
   m_Pitch: 2
   Loop: 0
   Mute: 0
@@ -2769,7 +2769,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 869e50b440605d342a75f030e78f5ce7, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.015
+  m_Volume: 0.08
   m_Pitch: 2
   Loop: 0
   Mute: 0
@@ -5612,7 +5612,7 @@ AudioListener:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 458962924}
-  m_Enabled: 1
+  m_Enabled: 0
 --- !u!4 &458962928
 Transform:
   m_ObjectHideFlags: 0
