@@ -130,6 +130,12 @@ MonoBehaviour:
   amount: 1
   hideAfterPickup: 1
   destroyAfterPickup: 0
+  removeScanDotsAfterPickup: 1
+  scanDotRemoveRadius: 0.85
+  useObjectBoundsForDotCleanup: 1
+  scanDotRemovePadding: 0.18
+  onlyRemoveItemColorDots: 1
+  scanDotRenderers: []
 --- !u!114 &2383788514564702394
 MonoBehaviour:
   m_ObjectHideFlags: 0

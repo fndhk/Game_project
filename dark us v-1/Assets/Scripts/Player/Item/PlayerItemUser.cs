@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // 현재 선택된 인벤토리 아이템을 사용하는 스크립트이다.
-// 기본 사용 키는 F이다.
+// 기본 사용 입력은 마우스 좌클릭이다.
 // Camera는 강한 점 스캔, Knife는 근접 공격, Medkit은 자가 회복을 한다.
 public class PlayerItemUser : MonoBehaviour
 {
@@ -22,8 +22,27 @@ public class PlayerItemUser : MonoBehaviour
     public PlayerCombatTarget selfTarget;
 
     [Header("Input")]
-    // 아이템 사용 키이다.
-    public KeyCode useItemKey = KeyCode.F;
+    // 아이템 사용 마우스 버튼이다. 0이면 좌클릭이다.
+    public int useItemMouseButton = 0;
+
+    // 선택 아이템을 버리는 키이다.
+    public KeyCode dropItemKey = KeyCode.G;
+
+    // 아이템을 버릴 때 카메라 앞쪽으로 떨어뜨릴 거리이다.
+    public float dropForwardDistance = 1.15f;
+
+    // 아이템을 버릴 때 바닥 쪽으로 내릴 높이이다.
+    public float dropDownOffset = 0.65f;
+
+    [Header("Drop Prefabs")]
+    // 버릴 때 생성할 카메라 아이템 프리팹이다.
+    public GameObject cameraDropPrefab;
+
+    // 버릴 때 생성할 칼 아이템 프리팹이다.
+    public GameObject knifeDropPrefab;
+
+    // 버릴 때 생성할 구급상자 아이템 프리팹이다.
+    public GameObject medkitDropPrefab;
 
     [Header("Camera Item")]
     // 카메라 아이템 1회 사용 시 생성할 점 개수이다.
@@ -89,16 +108,35 @@ public class PlayerItemUser : MonoBehaviour
     // 구급상자 사용 사운드이다.
     public AudioSource medkitUseAudio;
 
+    [Header("Default Item Audio Clips")]
+    // 비워두면 Resources/Audio/Items/Item_CameraUse를 자동으로 불러온다.
+    public AudioClip cameraUseClip;
+
+    // 비워두면 Resources/Audio/Items/Item_KnifeUse를 자동으로 불러온다.
+    public AudioClip knifeUseClip;
+
+    // 비워두면 Resources/Audio/Items/Item_MedkitUse를 자동으로 불러온다.
+    public AudioClip medkitUseClip;
+
+    // 전용 AudioSource가 비어 있을 때 사용할 공용 아이템 사운드 소스이다.
+    private AudioSource itemAudioSource;
+
     private void Awake()
     {
         AutoFindReferences();
+        AutoFindAudio();
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(useItemKey))
+        if (Input.GetMouseButtonDown(useItemMouseButton))
         {
             UseSelectedItem();
+        }
+
+        if (Input.GetKeyDown(dropItemKey))
+        {
+            DropSelectedItem();
         }
     }
 
@@ -146,10 +184,209 @@ public class PlayerItemUser : MonoBehaviour
         }
     }
 
+    // 현재 선택된 아이템을 1개 바닥에 버린다.
+    public void DropSelectedItem()
+    {
+        AutoFindReferences();
+
+        if (inventory == null)
+        {
+            Debug.LogWarning("PlayerItemUser: PlayerInventory가 없음.");
+            return;
+        }
+
+        if (selfTarget != null && selfTarget.isDead)
+        {
+            return;
+        }
+
+        if (!inventory.TryRemoveSelectedItem(1, out ItemType droppedItemType, out int droppedAmount))
+        {
+            Debug.Log("No item selected.");
+            return;
+        }
+
+        SpawnDroppedItem(droppedItemType, droppedAmount);
+    }
+
+    // 버린 아이템을 다시 주울 수 있는 월드 아이템으로 만든다.
+    private void SpawnDroppedItem(ItemType itemType, int amount)
+    {
+        if (itemType == ItemType.None || amount <= 0)
+        {
+            return;
+        }
+
+        Vector3 origin = playerCamera != null ? playerCamera.transform.position : transform.position + Vector3.up;
+        Vector3 forward = playerCamera != null ? playerCamera.transform.forward : transform.forward;
+        Vector3 position = origin + forward.normalized * Mathf.Max(0.1f, dropForwardDistance) + Vector3.down * Mathf.Max(0f, dropDownOffset);
+
+        if (Physics.Raycast(position + Vector3.up, Vector3.down, out RaycastHit hit, 2.5f, scanMask, QueryTriggerInteraction.Ignore))
+        {
+            position = hit.point + Vector3.up * 0.12f;
+        }
+
+        GameObject dropPrefab = GetDropPrefab(itemType);
+        GameObject itemObject;
+
+        if (dropPrefab != null)
+        {
+            itemObject = Instantiate(dropPrefab, position, Quaternion.Euler(0f, transform.eulerAngles.y, 0f));
+            itemObject.name = GetDroppedItemObjectName(itemType);
+        }
+        else
+        {
+            itemObject = CreateFallbackDroppedItem(itemType, position);
+        }
+
+        itemObject.transform.position = position;
+        itemObject.transform.rotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
+        ConfigureDroppedPickup(itemObject, itemType, amount);
+        HideDroppedItemRenderers(itemObject);
+    }
+
+    // 드롭할 실제 아이템 프리팹을 반환한다.
+    private GameObject GetDropPrefab(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Camera:
+                return cameraDropPrefab;
+
+            case ItemType.Knife:
+                return knifeDropPrefab;
+
+            case ItemType.Medkit:
+                return medkitDropPrefab;
+
+            default:
+                return null;
+        }
+    }
+
+    // 프리팹 연결이 없을 때도 기능은 유지되게 최소 Collider만 만든다.
+    private GameObject CreateFallbackDroppedItem(ItemType itemType, Vector3 position)
+    {
+        GameObject itemObject = new GameObject(GetDroppedItemObjectName(itemType));
+        itemObject.transform.position = position;
+        itemObject.layer = gameObject.layer;
+
+        BoxCollider collider = itemObject.AddComponent<BoxCollider>();
+        collider.center = new Vector3(0f, 0.12f, 0f);
+        collider.size = GetDroppedItemColliderSize(itemType);
+
+        return itemObject;
+    }
+
+    // 드롭된 오브젝트가 다시 주울 수 있는 아이템 상태가 되도록 보정한다.
+    private void ConfigureDroppedPickup(GameObject itemObject, ItemType itemType, int amount)
+    {
+        if (itemObject == null)
+        {
+            return;
+        }
+
+        WorldItemPickup pickup = itemObject.GetComponent<WorldItemPickup>();
+
+        if (pickup == null)
+        {
+            pickup = itemObject.AddComponent<WorldItemPickup>();
+        }
+
+        pickup.itemType = itemType;
+        pickup.amount = Mathf.Max(1, amount);
+        pickup.hideAfterPickup = true;
+        pickup.destroyAfterPickup = false;
+        pickup.onlyRemoveItemColorDots = true;
+
+        ScanSurfaceInfo surfaceInfo = itemObject.GetComponent<ScanSurfaceInfo>();
+
+        if (surfaceInfo == null)
+        {
+            surfaceInfo = itemObject.AddComponent<ScanSurfaceInfo>();
+        }
+
+        surfaceInfo.surfaceType = ScanSurfaceType.Item;
+    }
+
+    // 화면에는 보이지 않게 Renderer만 끈다. Collider는 유지되어 스캔 점은 실제 형태로 찍힌다.
+    private void HideDroppedItemRenderers(GameObject itemObject)
+    {
+        if (itemObject == null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = itemObject.GetComponentsInChildren<Renderer>(true);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+            {
+                renderers[i].enabled = false;
+            }
+        }
+    }
+
+    private string GetDroppedItemObjectName(ItemType itemType)
+    {
+        return itemType + "Drop";
+    }
+
+    private Vector3 GetDroppedItemColliderSize(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Camera:
+                return new Vector3(0.48f, 0.24f, 0.34f);
+
+            case ItemType.Knife:
+                return new Vector3(0.18f, 0.18f, 0.7f);
+
+            case ItemType.Medkit:
+                return new Vector3(0.52f, 0.28f, 0.38f);
+
+            default:
+                return new Vector3(0.35f, 0.25f, 0.35f);
+        }
+    }
+
+    // 아이템 사용 효과음을 자동으로 준비한다.
+    private void AutoFindAudio()
+    {
+        if (itemAudioSource == null)
+        {
+            itemAudioSource = GetComponent<AudioSource>();
+        }
+
+        if (itemAudioSource == null)
+        {
+            itemAudioSource = gameObject.AddComponent<AudioSource>();
+            itemAudioSource.playOnAwake = false;
+            itemAudioSource.spatialBlend = 0f;
+        }
+
+        if (cameraUseClip == null)
+        {
+            cameraUseClip = Resources.Load<AudioClip>("Audio/Items/Item_CameraUse");
+        }
+
+        if (knifeUseClip == null)
+        {
+            knifeUseClip = Resources.Load<AudioClip>("Audio/Items/Item_KnifeUse");
+        }
+
+        if (medkitUseClip == null)
+        {
+            medkitUseClip = Resources.Load<AudioClip>("Audio/Items/Item_MedkitUse");
+        }
+    }
+
     // 현재 선택된 아이템을 사용한다.
     public void UseSelectedItem()
     {
         AutoFindReferences();
+        AutoFindAudio();
 
         if (inventory == null)
         {
@@ -216,7 +453,7 @@ public class PlayerItemUser : MonoBehaviour
             }
         }
 
-        PlayAudio(cameraUseAudio);
+        PlayAudio(cameraUseAudio, cameraUseClip);
 
         Debug.Log("Camera scan dots: " + createdCount);
 
@@ -271,7 +508,7 @@ public class PlayerItemUser : MonoBehaviour
 
         PlayerCombatTarget target = FindBestKnifeTarget();
 
-        PlayAudio(knifeUseAudio);
+        PlayAudio(knifeUseAudio, knifeUseClip);
 
         if (target == null)
         {
@@ -423,7 +660,7 @@ public class PlayerItemUser : MonoBehaviour
 
         playerStats.currentStamina = Mathf.Clamp(playerStats.currentStamina, 0f, playerStats.currentHealth);
 
-        PlayAudio(medkitUseAudio);
+        PlayAudio(medkitUseAudio, medkitUseClip);
 
         Debug.Log("Medkit used. Health: " + beforeHealth + " -> " + playerStats.currentHealth);
 
@@ -505,20 +742,28 @@ public class PlayerItemUser : MonoBehaviour
     }
 
     // 오디오가 있으면 한 번 재생한다.
-    private void PlayAudio(AudioSource source)
+    private void PlayAudio(AudioSource source, AudioClip fallbackClip)
     {
-        if (source == null)
+        AudioSource targetSource = source != null ? source : itemAudioSource;
+
+        if (targetSource == null)
         {
             return;
         }
 
-        if (source.clip != null)
+        if (source != null && source.clip != null)
         {
-            source.PlayOneShot(source.clip);
+            targetSource.PlayOneShot(source.clip);
             return;
         }
 
-        source.Play();
+        if (fallbackClip != null)
+        {
+            targetSource.PlayOneShot(fallbackClip);
+            return;
+        }
+
+        targetSource.Play();
     }
 
     // Scene View에서 칼 공격 범위를 확인하기 위한 기즈모이다.

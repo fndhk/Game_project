@@ -22,6 +22,16 @@ public class PlayerObjectiveInteractor : MonoBehaviour
     // 상호작용 키이다.
     public KeyCode interactKey = KeyCode.E;
 
+    // 바닥 아이템 줍기 키이다.
+    public KeyCode itemPickupKey = KeyCode.F;
+
+    [Header("Ground Item Pickup")]
+    // 서 있는 상태에서도 발 근처 바닥 아이템을 주울 수 있게 보조 탐색을 사용한다.
+    public bool allowNearbyGroundItemPickup = true;
+
+    // 바닥 아이템 보조 탐색 반경이다.
+    public float groundItemPickupRadius = 2.8f;
+
     // 현재 바라보고 있는 상호작용 대상이다.
     private IPlayerInteractable currentTarget;
 
@@ -75,16 +85,32 @@ public class PlayerObjectiveInteractor : MonoBehaviour
 
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
 
-        if (!Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactMask, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactMask, QueryTriggerInteraction.Ignore))
+        {
+            currentTarget = FindInteractable(hit.collider);
+
+            if (currentTarget != null && currentTarget.CanInteract(this))
+            {
+                // 길게 누르는 중에 다른 대상을 보게 되면 기존 상호작용을 취소한다.
+                if (isHoldingInteraction && previousTarget != currentTarget)
+                {
+                    CancelActiveHold();
+                }
+
+                return;
+            }
+        }
+
+        currentTarget = FindNearbyGroundItemPickup();
+
+        if (currentTarget == null)
         {
             CancelActiveHold();
             SetPrompt(string.Empty);
             return;
         }
 
-        currentTarget = FindInteractable(hit.collider);
-
-        if (currentTarget == null || !currentTarget.CanInteract(this))
+        if (!currentTarget.CanInteract(this))
         {
             CancelActiveHold();
             SetPrompt(string.Empty);
@@ -120,6 +146,76 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         return null;
     }
 
+    // 화면 중앙 레이캐스트가 바닥을 먼저 맞춰도, 같은 선상 뒤의 바닥 아이템은 찾는다.
+    private IPlayerInteractable FindNearbyGroundItemPickup()
+    {
+        if (!allowNearbyGroundItemPickup || playerCamera == null)
+        {
+            return null;
+        }
+
+        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+        RaycastHit[] hits = Physics.RaycastAll(ray, Mathf.Max(0.01f, groundItemPickupRadius), interactMask, QueryTriggerInteraction.Ignore);
+
+        if (hits == null || hits.Length <= 0)
+        {
+            return null;
+        }
+
+        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hitCollider = hits[i].collider;
+
+            if (hitCollider == null)
+            {
+                continue;
+            }
+
+            WorldItemPickup pickup = hitCollider.GetComponentInParent<WorldItemPickup>();
+
+            if (pickup != null)
+            {
+                return pickup.CanInteract(this) ? pickup : null;
+            }
+
+            if (IsFloorSurface(hits[i]))
+            {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    // 바닥 아이템 시야 보정에서 무시할 Floor 표면인지 확인한다.
+    private bool IsFloorSurface(RaycastHit hit)
+    {
+        if (hit.normal.y >= 0.55f)
+        {
+            return true;
+        }
+
+        Collider targetCollider = hit.collider;
+
+        if (targetCollider == null)
+        {
+            return false;
+        }
+
+        ScanSurfaceInfo surfaceInfo = targetCollider.GetComponent<ScanSurfaceInfo>();
+
+        if (surfaceInfo == null)
+        {
+            surfaceInfo = targetCollider.GetComponentInParent<ScanSurfaceInfo>();
+        }
+
+        return surfaceInfo != null && surfaceInfo.surfaceType == ScanSurfaceType.Floor;
+    }
+
     // E키 입력을 처리한다.
     private void HandleInteractInput()
     {
@@ -137,12 +233,25 @@ public class PlayerObjectiveInteractor : MonoBehaviour
             return;
         }
 
-        // 일반 상호작용은 기존처럼 E키를 한 번 누르면 실행한다.
-        if (Input.GetKeyDown(interactKey))
+        KeyCode key = GetInteractKeyForTarget(currentTarget);
+
+        // 일반 상호작용은 대상에 맞는 키를 한 번 누르면 실행한다.
+        if (Input.GetKeyDown(key))
         {
             currentTarget.Interact(this);
             UpdateCurrentTarget();
         }
+    }
+
+    // 아이템은 F, 그 외 상호작용은 E를 사용한다.
+    private KeyCode GetInteractKeyForTarget(IPlayerInteractable target)
+    {
+        if (target is WorldItemPickup)
+        {
+            return itemPickupKey;
+        }
+
+        return interactKey;
     }
 
     // 길게 누르기 상호작용 입력을 처리한다.

@@ -161,7 +161,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         public int MaxItemsPerRoom = 2;
 
         [Header("Item Ground Snap")]
-        [Tooltip("바닥 Collider 없이 ItemSpawnPoint의 Y값을 바닥으로 보고 아이템 Bounds의 아래쪽을 맞춤")]
+        [Tooltip("바닥 Collider 없이 방의 층 바닥 높이를 기준으로 아이템 Bounds의 아래쪽을 맞춤")]
         public bool SnapSpawnedItemsToSpawnPointGround = true;
 
         [Tooltip("아이템을 바닥에 완전히 붙이지 않고 살짝 띄우는 값")]
@@ -1551,7 +1551,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 GameObject createdItem = Instantiate(itemPrefab, spawnPosition, spawnRotation, parent);
 
-                SnapSpawnedItemToSpawnPointGround(createdItem, spawnPosition);
+                SnapSpawnedItemToSpawnPointGround(createdItem, selectedPoint.Point.position, selectedPoint.OwnerCell);
                 ApplyGeneratedItemVisualState(createdItem);
 
                 usedPoints.Add(selectedPoint);
@@ -1957,8 +1957,8 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             spawnedItemCountByRoom[ownerCell] = currentCount + 1;
         }
 
-        // 바닥 Collider 없이 ItemSpawnPoint의 Y값을 바닥으로 보고 아이템을 붙인다.
-        private void SnapSpawnedItemToSpawnPointGround(GameObject itemObject, Vector3 spawnPointGroundPosition)
+        // 바닥 Collider 없이 생성된 Cell의 층 높이를 바닥으로 보고 아이템을 붙인다.
+        private void SnapSpawnedItemToSpawnPointGround(GameObject itemObject, Vector3 spawnPointPosition, Cell ownerCell)
         {
             if (!SnapSpawnedItemsToSpawnPointGround || itemObject == null)
             {
@@ -1972,7 +1972,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return;
             }
 
-            float targetBottomY = spawnPointGroundPosition.y + Mathf.Max(0f, ItemGroundOffset);
+            float targetBottomY = ResolveSpawnedItemGroundY(spawnPointPosition, ownerCell) + Mathf.Max(0f, ItemGroundOffset);
             float deltaY = targetBottomY - itemBounds.min.y;
 
             if (Mathf.Abs(deltaY) <= 0.001f)
@@ -1981,6 +1981,41 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             itemObject.transform.position += Vector3.up * deltaY;
+        }
+
+        // ItemSpawnPoint가 선반/가구 높이에 있어도 실제로 보이는 지지대가 없으므로 Cell의 층 바닥 높이를 우선 사용한다.
+        private float ResolveSpawnedItemGroundY(Vector3 spawnPointPosition, Cell ownerCell)
+        {
+            if (ownerCell == null)
+            {
+                return spawnPointPosition.y;
+            }
+
+            Transform cellTransform = ownerCell.transform;
+
+            if (cellTransform == null)
+            {
+                return spawnPointPosition.y;
+            }
+
+            Vector3 localPoint = cellTransform.InverseTransformPoint(spawnPointPosition);
+            float localFloorY = GetLocalFloorYAtPoint(localPoint.y);
+            Vector3 worldFloorPoint = cellTransform.TransformPoint(new Vector3(localPoint.x, localFloorY, localPoint.z));
+
+            return worldFloorPoint.y + ItemSpawnPositionOffset.y;
+        }
+
+        // 현재 로컬 높이보다 위에 있는 장식용 스폰 높이는 무시하고, 아래쪽에 있는 가장 가까운 층 바닥을 고른다.
+        private float GetLocalFloorYAtPoint(float localY)
+        {
+            float safeFloorHeight = Mathf.Max(0.01f, FloorHeight);
+
+            if (localY < safeFloorHeight)
+            {
+                return 0f;
+            }
+
+            return Mathf.Floor(localY / safeFloorHeight) * safeFloorHeight;
         }
 
         // 아이템의 전체 Bounds를 구한다. Collider를 우선 사용하고, 없으면 Renderer를 사용한다.
