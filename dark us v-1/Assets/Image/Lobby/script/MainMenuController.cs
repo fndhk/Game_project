@@ -30,6 +30,7 @@ public class MainMenuController : MonoBehaviour
     private int selectedLanguageIndex;
     private Resolution[] availableResolutions;
     private TMP_FontAsset localizedFontAsset;
+    private Sprite settingSliderHandleSprite;
     private readonly int[] fpsLimits = { 30, 60, 120, 144, -1 };
 
     [Header("Scene Names")]
@@ -794,11 +795,15 @@ public class MainMenuController : MonoBehaviour
         slider.wholeNumbers = wholeNumbers;
         slider.targetGraphic = slider.GetComponent<Image>();
         slider.GetComponent<Image>().color = new Color(0.62f, 0.78f, 0.86f, 0.28f);
-        slider.GetComponent<RectTransform>().sizeDelta = new Vector2(260f, 28f);
+        slider.GetComponent<RectTransform>().sizeDelta = new Vector2(220f, 12f);
 
         Image fillImage = CreateSettingGraphic(slider.transform, "Fill", new Color(1f, 0.8f, 0.42f, 0.82f), new Vector2(0f, 0f), new Vector2(1f, 1f));
         Image handleImage = CreateSettingGraphic(slider.transform, "Handle", new Color(0.76f, 0.82f, 0.84f, 1f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
-        handleImage.rectTransform.sizeDelta = new Vector2(18f, 34f);
+        handleImage.sprite = GetSettingSliderHandleSprite();
+        handleImage.type = Image.Type.Simple;
+        handleImage.preserveAspect = true;
+        handleImage.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 20f);
+        handleImage.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 20f);
         slider.fillRect = fillImage.rectTransform;
         slider.handleRect = handleImage.rectTransform;
         slider.direction = Slider.Direction.LeftToRight;
@@ -855,6 +860,38 @@ public class MainMenuController : MonoBehaviour
         rectTransform.offsetMax = Vector2.zero;
 
         return image;
+    }
+
+    private Sprite GetSettingSliderHandleSprite()
+    {
+        if (settingSliderHandleSprite != null)
+        {
+            return settingSliderHandleSprite;
+        }
+
+        const int size = 64;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = "Setting Slider Round Handle";
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.46f;
+        float softEdge = 2f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01((radius - distance) / softEdge);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply();
+        settingSliderHandleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        return settingSliderHandleSprite;
     }
 
     private Transform CreateSettingsRow(Transform parent, string label)
@@ -956,18 +993,25 @@ public class MainMenuController : MonoBehaviour
 
         if (dynamicSettingLabels.Count > index)
         {
-            dynamicSettingLabels[index++].text = GetScreenModeLabel();
+            SetDynamicSettingLabel(index++, GetScreenModeLabel());
         }
 
         if (dynamicSettingLabels.Count > index)
         {
-            dynamicSettingLabels[index++].text = GetFpsLimitLabel();
+            SetDynamicSettingLabel(index++, GetFpsLimitLabel());
         }
 
         if (dynamicSettingLabels.Count > index)
         {
-            dynamicSettingLabels[index].text = GetLanguageLabel();
+            SetDynamicSettingLabel(index, GetLanguageLabel());
         }
+    }
+
+    private void SetDynamicSettingLabel(int index, string text)
+    {
+        TMP_Text label = dynamicSettingLabels[index];
+        ApplyFontForLanguage(label);
+        label.text = text;
     }
 
     private string GetScreenModeLabel()
@@ -1133,7 +1177,7 @@ public class MainMenuController : MonoBehaviour
 
     private void ApplyFontForLanguage(TMP_Text text)
     {
-        if (text == null || selectedLanguageIndex == 1)
+        if (text == null)
         {
             return;
         }
@@ -1185,6 +1229,7 @@ public class MainMenuController : MonoBehaviour
     private string GetLocalizedCharacterSet()
     {
         return "가나다라마바사아자차카타파하"
+            + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /&-.?"
             + "방만들기찾설정나가기닫적용초기화변경확인취소게임을종료할까요"
             + "그래픽및화면표시오디오조작키플레이접근성모드텍스처품질그림자시야각수직동기제한"
             + "모션블러카메라흔마스터볼륨배경음효과음음성이동상호작용눌러서말하기마우스감도반전패드진동자막크기언어색약튜토리얼전체창테두리없음한국어영어일본어"
