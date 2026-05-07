@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: -6440373317080244571}
   - component: {fileID: 6035897049699716359}
   - component: {fileID: 7349962815435103381}
+  - component: {fileID: 5511029837021104411}
   m_Layer: 0
   m_Name: player
   m_TagString: Untagged
@@ -229,3 +230,28 @@ MonoBehaviour:
   armSwingAngle: 28
   legSwingAngle: 24
   breathingAmount: 0.018
+--- !u!114 &5511029837021104411
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8091636358611988274}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bbf581c2fd642b7a51df43e6551c0a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerVoiceChat
+  pushToTalkKey: 118
+  voiceEnabled: 1
+  enableLocalMonitor: 0
+  microphoneDeviceName: 
+  sampleRate: 16000
+  microphoneBufferSeconds: 1
+  chunkSampleCount: 1024
+  silenceThreshold: 0.015
+  remoteVoiceVolume: 1
+  spatialBlend: 1
+  minDistance: 1.5
+  maxDistance: 18
+  showLocalMicHud: 1
