@@ -164,6 +164,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoomLobbySceneController
   mainMenuSceneName: LobbyScene 1
+  publicRoomListSceneName: PublicRoomListScene
   gameSceneName: labor
 --- !u!1 &200000
 GameObject:

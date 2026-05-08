@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -12,7 +14,7 @@ using UnityEditor;
 // 메인 메뉴 버튼 동작을 관리하는 스크립트이다.
 // 방 만들기, 방 찾기, 설정 버튼을 눌렀을 때의 기본 흐름을 담당한다.
 [ExecuteAlways]
-public class MainMenuController : MonoBehaviour
+public class MainMenuController : MonoBehaviourPunCallbacks
 {
     private struct LocalizedTextBinding
     {
@@ -34,16 +36,22 @@ public class MainMenuController : MonoBehaviour
     private TMP_FontAsset localizedFontAsset;
     private Sprite settingSliderHandleSprite;
     private TMP_InputField findRoomCodeInput;
+    private Transform publicRoomListContent;
+    private TMP_Text publicRoomEmptyText;
+    private TMP_Text publicRoomStatusText;
+    private readonly Dictionary<string, RoomInfo> publicRooms = new Dictionary<string, RoomInfo>();
     private readonly int[] fpsLimits = { 30, 60, 120, 144, -1 };
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
+    private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
+    private const string RoomTitlePrefsKey = "dark_us_room_title";
 
     [Header("Scene Names")]
     // 방 만들기를 눌렀을 때 이동할 씬 이름이다.
     public string createRoomSceneName = "CreateRoomLobbyScene";
 
     // 방 찾기를 눌렀을 때 이동할 씬 이름이다.
-    public string findRoomSceneName = "RoomListScene";
+    public string findRoomSceneName = "PublicRoomListScene";
 
     [Header("Panels")]
     // 방 만들기 버튼을 눌렀을 때 띄울 창이다.
@@ -162,14 +170,7 @@ public class MainMenuController : MonoBehaviour
     public void OnClickFindRoom()
     {
         PlayClickSound();
-
-        if (findRoomPanel == null)
-        {
-            Debug.LogWarning("Find room panel is not assigned.");
-            return;
-        }
-
-        ShowPanel(findRoomPanel);
+        LoadMenuScene(findRoomSceneName, "Public room list scene name is empty.");
     }
 
     public void OnClickJoinFriend()
@@ -203,7 +204,9 @@ public class MainMenuController : MonoBehaviour
     {
         PlayClickSound();
         PlayerPrefs.SetString(RoomCodePrefsKey, Random.Range(0, 10000).ToString("0000"));
+        PlayerPrefs.SetString(RoomTitlePrefsKey, "Private Room");
         PlayerPrefs.SetInt(RoomHostPrefsKey, 1);
+        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 0);
         PlayerPrefs.Save();
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
     }
@@ -220,9 +223,70 @@ public class MainMenuController : MonoBehaviour
         }
 
         PlayerPrefs.SetString(RoomCodePrefsKey, roomCode);
+        PlayerPrefs.SetString(RoomTitlePrefsKey, "Public Room");
         PlayerPrefs.SetInt(RoomHostPrefsKey, 0);
+        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 1);
         PlayerPrefs.Save();
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+    }
+
+    public void OnClickCreatePublicRoom()
+    {
+        PlayClickSound();
+        PlayerPrefs.SetString(RoomCodePrefsKey, Random.Range(0, 10000).ToString("0000"));
+        PlayerPrefs.SetString(RoomTitlePrefsKey, "Public Room");
+        PlayerPrefs.SetInt(RoomHostPrefsKey, 1);
+        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 1);
+        PlayerPrefs.Save();
+        LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+    }
+
+    public override void OnConnectedToMaster()
+    {
+        if (findRoomPanel != null && findRoomPanel.activeInHierarchy)
+        {
+            SetPublicRoomStatus("JOINING LOBBY");
+            PhotonNetwork.JoinLobby(TypedLobby.Default);
+        }
+    }
+
+    public override void OnJoinedLobby()
+    {
+        SetPublicRoomStatus("PUBLIC ROOMS");
+        RebuildPublicRoomList();
+    }
+
+    public override void OnLeftRoom()
+    {
+        if (findRoomPanel != null && findRoomPanel.activeInHierarchy)
+        {
+            StartPublicRoomListFlow();
+        }
+    }
+
+    public override void OnDisconnected(DisconnectCause cause)
+    {
+        if (findRoomPanel != null && findRoomPanel.activeInHierarchy)
+        {
+            SetPublicRoomStatus("DISCONNECTED");
+        }
+    }
+
+    public override void OnRoomListUpdate(List<RoomInfo> roomList)
+    {
+        foreach (RoomInfo room in roomList)
+        {
+            if (room.RemovedFromList || !room.IsOpen || !room.IsVisible || !IsValidRoomCode(room.Name))
+            {
+                publicRooms.Remove(room.Name);
+            }
+            else
+            {
+                publicRooms[room.Name] = room;
+            }
+        }
+
+        RebuildPublicRoomList();
     }
 
     public void OnClickClosePanel(GameObject panel)
@@ -561,16 +625,10 @@ public class MainMenuController : MonoBehaviour
         if (findRoomPanel == null)
         {
             Transform existingPanel = FindUiTransform("FindRoomPanel");
-            findRoomPanel = existingPanel != null ? existingPanel.gameObject : CreateMenuPanel(
-                "FindRoomPanel",
-                "Find Room",
-                "Enter the signal list and search for an active room.",
-                "Search",
-                OnClickFindRoomConfirm
-            );
+            findRoomPanel = existingPanel != null ? existingPanel.gameObject : CreatePublicRoomListPanel();
         }
 
-        PrepareExistingPanel(findRoomPanel, "Find Room", "Enter the signal list and search for an active room.", "Search", OnClickFindRoomConfirm);
+        PreparePublicRoomListPanel(findRoomPanel);
 
         if (settingsPanel == null)
         {
@@ -613,6 +671,136 @@ public class MainMenuController : MonoBehaviour
         return panelObject;
     }
 
+    private GameObject CreatePublicRoomListPanel()
+    {
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            Debug.LogWarning("Canvas is not found. Public room panel was not created.");
+            return null;
+        }
+
+        GameObject panelObject = new GameObject("FindRoomPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        panelObject.layer = canvas.gameObject.layer;
+        panelObject.transform.SetParent(canvas.transform, false);
+        PrepareOverlayRect(panelObject.GetComponent<RectTransform>());
+        BuildPublicRoomListPanelContents(panelObject);
+        panelObject.SetActive(false);
+        return panelObject;
+    }
+
+    private void PreparePublicRoomListPanel(GameObject panelObject)
+    {
+        if (panelObject == null)
+        {
+            return;
+        }
+
+        RectTransform rectTransform = panelObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            PrepareOverlayRect(rectTransform);
+        }
+
+        if (panelObject.GetComponent<Image>() == null)
+        {
+            panelObject.AddComponent<CanvasRenderer>();
+            panelObject.AddComponent<Image>();
+        }
+
+        if (panelObject.transform.Find("PublicRoomDialog") == null)
+        {
+            ClearChildren(panelObject.transform);
+            BuildPublicRoomListPanelContents(panelObject);
+        }
+    }
+
+    private void BuildPublicRoomListPanelContents(GameObject panelObject)
+    {
+        Image panelImage = panelObject.GetComponent<Image>();
+        panelImage.color = new Color(0f, 0f, 0f, 0.68f);
+
+        GameObject dialogObject = new GameObject("PublicRoomDialog", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+        dialogObject.layer = panelObject.layer;
+        dialogObject.transform.SetParent(panelObject.transform, false);
+
+        RectTransform dialogRect = dialogObject.GetComponent<RectTransform>();
+        dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+        dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+        dialogRect.anchoredPosition = new Vector2(0f, 0f);
+        dialogRect.sizeDelta = new Vector2(1120f, 720f);
+
+        Image dialogImage = dialogObject.GetComponent<Image>();
+        dialogImage.color = new Color(0.015f, 0.018f, 0.02f, 0.94f);
+
+        Outline dialogOutline = dialogObject.GetComponent<Outline>();
+        dialogOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.4f);
+        dialogOutline.effectDistance = new Vector2(2f, -2f);
+
+        TMP_Text titleText = CreateLabel(dialogObject.transform, "TitleText", "Public Game", 46f, FontStyles.Normal);
+        RegisterLocalizedText(titleText, "Public Game");
+        RectTransform titleRect = titleText.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.anchoredPosition = new Vector2(0f, -64f);
+        titleRect.sizeDelta = new Vector2(-96f, 68f);
+        titleText.color = new Color(1f, 0.8f, 0.42f, 1f);
+
+        publicRoomStatusText = CreateLabel(dialogObject.transform, "StatusText", "CONNECTING", 22f, FontStyles.UpperCase);
+        RectTransform statusRect = publicRoomStatusText.GetComponent<RectTransform>();
+        statusRect.anchorMin = new Vector2(0f, 1f);
+        statusRect.anchorMax = new Vector2(1f, 1f);
+        statusRect.anchoredPosition = new Vector2(0f, -116f);
+        statusRect.sizeDelta = new Vector2(-96f, 34f);
+        publicRoomStatusText.color = new Color(0.62f, 0.7f, 0.72f, 1f);
+
+        GameObject listObject = new GameObject("RoomList", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup));
+        listObject.layer = panelObject.layer;
+        listObject.transform.SetParent(dialogObject.transform, false);
+
+        RectTransform listRect = listObject.GetComponent<RectTransform>();
+        listRect.anchorMin = new Vector2(0f, 0f);
+        listRect.anchorMax = new Vector2(1f, 1f);
+        listRect.offsetMin = new Vector2(72f, 150f);
+        listRect.offsetMax = new Vector2(-72f, -170f);
+
+        Image listImage = listObject.GetComponent<Image>();
+        listImage.color = new Color(0.035f, 0.045f, 0.048f, 0.64f);
+
+        Outline listOutline = listObject.GetComponent<Outline>();
+        listOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.28f);
+        listOutline.effectDistance = new Vector2(2f, -2f);
+
+        VerticalLayoutGroup listLayout = listObject.GetComponent<VerticalLayoutGroup>();
+        listLayout.padding = new RectOffset(24, 24, 24, 24);
+        listLayout.spacing = 12f;
+        listLayout.childControlWidth = true;
+        listLayout.childControlHeight = false;
+        listLayout.childForceExpandWidth = true;
+        listLayout.childForceExpandHeight = false;
+
+        publicRoomListContent = listObject.transform;
+
+        publicRoomEmptyText = CreateLabel(listObject.transform, "EmptyText", "No public rooms found.", 28f, FontStyles.Normal);
+        RectTransform emptyRect = publicRoomEmptyText.GetComponent<RectTransform>();
+        emptyRect.sizeDelta = new Vector2(0f, 72f);
+        publicRoomEmptyText.color = new Color(0.62f, 0.7f, 0.72f, 1f);
+
+        Button createButton = CreateMenuButton(dialogObject.transform, "CreatePublicRoomButton", "Create Room", 260f, 64f, 26f);
+        RectTransform createRect = createButton.GetComponent<RectTransform>();
+        createRect.anchorMin = new Vector2(1f, 0f);
+        createRect.anchorMax = new Vector2(1f, 0f);
+        createRect.anchoredPosition = new Vector2(-212f, 72f);
+        createButton.onClick.AddListener(OnClickCreatePublicRoom);
+
+        Button closeButton = CreateMenuButton(dialogObject.transform, "CloseButton", "Close", 220f, 64f, 26f);
+        RectTransform closeRect = closeButton.GetComponent<RectTransform>();
+        closeRect.anchorMin = new Vector2(0f, 0f);
+        closeRect.anchorMax = new Vector2(0f, 0f);
+        closeRect.anchoredPosition = new Vector2(182f, 72f);
+        closeButton.onClick.AddListener(() => OnClickClosePanel(panelObject));
+    }
+
     private void PrepareExistingPanel(GameObject panelObject, string title, string body, string primaryLabel, UnityEngine.Events.UnityAction primaryAction)
     {
         if (panelObject == null || panelObject.transform.childCount > 0)
@@ -633,6 +821,135 @@ public class MainMenuController : MonoBehaviour
         }
 
         BuildPanelContents(panelObject, title, body, primaryLabel, primaryAction);
+    }
+
+    private void StartPublicRoomListFlow()
+    {
+        RebuildPublicRoomList();
+
+        if (PhotonNetwork.InRoom)
+        {
+            SetPublicRoomStatus("LEAVING ROOM");
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
+
+        if (PhotonNetwork.InLobby)
+        {
+            SetPublicRoomStatus("PUBLIC ROOMS");
+            return;
+        }
+
+        if (PhotonNetwork.IsConnectedAndReady)
+        {
+            SetPublicRoomStatus("JOINING LOBBY");
+            PhotonNetwork.JoinLobby(TypedLobby.Default);
+            return;
+        }
+
+        SetPublicRoomStatus("CONNECTING PHOTON");
+        PhotonNetwork.ConnectUsingSettings();
+    }
+
+    private void RebuildPublicRoomList()
+    {
+        if (publicRoomListContent == null)
+        {
+            return;
+        }
+
+        for (int i = publicRoomListContent.childCount - 1; i >= 0; i--)
+        {
+            Transform child = publicRoomListContent.GetChild(i);
+            if (publicRoomEmptyText != null && child == publicRoomEmptyText.transform)
+            {
+                continue;
+            }
+
+            DestroyUiObject(child.gameObject);
+        }
+
+        bool hasRoom = false;
+        foreach (RoomInfo room in publicRooms.Values)
+        {
+            if (!room.IsOpen || !room.IsVisible || !IsValidRoomCode(room.Name) || room.PlayerCount >= room.MaxPlayers)
+            {
+                continue;
+            }
+
+            hasRoom = true;
+            CreatePublicRoomRow(publicRoomListContent, room);
+        }
+
+        if (publicRoomEmptyText != null)
+        {
+            publicRoomEmptyText.gameObject.SetActive(!hasRoom);
+        }
+    }
+
+    private void CreatePublicRoomRow(Transform parent, RoomInfo room)
+    {
+        Button rowButton = CreateMenuButton(parent, "Room_" + room.Name, "ROOM " + room.Name + "        " + room.PlayerCount + " / " + room.MaxPlayers, 960f, 66f, 24f);
+        LayoutElement layout = rowButton.GetComponent<LayoutElement>();
+        layout.preferredWidth = 960f;
+        layout.preferredHeight = 66f;
+
+        TMP_Text label = rowButton.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.fontStyle = FontStyles.Normal;
+            label.alignment = TextAlignmentOptions.Left;
+            RectTransform labelRect = label.GetComponent<RectTransform>();
+            labelRect.offsetMin = new Vector2(32f, 0f);
+            labelRect.offsetMax = new Vector2(-32f, 0f);
+        }
+
+        string roomName = room.Name;
+        rowButton.onClick.AddListener(() => JoinPublicRoom(roomName));
+    }
+
+    private void JoinPublicRoom(string roomName)
+    {
+        PlayClickSound();
+        PlayerPrefs.SetString(RoomCodePrefsKey, roomName);
+        PlayerPrefs.SetString(RoomTitlePrefsKey, "Public Room");
+        PlayerPrefs.SetInt(RoomHostPrefsKey, 0);
+        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 1);
+        PlayerPrefs.Save();
+        LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+    }
+
+    private void SetPublicRoomStatus(string status)
+    {
+        if (publicRoomStatusText != null)
+        {
+            publicRoomStatusText.text = status;
+        }
+    }
+
+    private void ClearChildren(Transform parent)
+    {
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            DestroyUiObject(parent.GetChild(i).gameObject);
+        }
+    }
+
+    private void DestroyUiObject(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
     }
 
     private GameObject CreateSettingsPanel()

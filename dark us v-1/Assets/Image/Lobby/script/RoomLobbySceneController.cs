@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
@@ -10,15 +11,20 @@ using UnityEngine.UI;
 public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 {
     public string mainMenuSceneName = "LobbyScene 1";
+    public string publicRoomListSceneName = "PublicRoomListScene";
     public string gameSceneName = "labor";
 
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
+    private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
+    private const string RoomTitlePrefsKey = "dark_us_room_title";
+    private const string RoomTitlePropertyKey = "title";
     private const byte MaxPlayers = 12;
 
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
     private readonly List<TMP_Text> briefingValueTexts = new List<TMP_Text>();
     private TMP_Text networkStatusText;
+    private TMP_Text roomTitleText;
     private TMP_Text roomCodeText;
     private TMP_Text systemLogText;
     private Button startButton;
@@ -80,6 +86,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         pendingRoomCode = Random.Range(0, 10000).ToString("0000");
         PlayerPrefs.SetString(RoomCodePrefsKey, pendingRoomCode);
         PlayerPrefs.Save();
+        UpdateRoomTitleText();
         UpdateRoomCodeText();
         CreatePhotonRoom();
     }
@@ -93,6 +100,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         pendingRoomCode = PhotonNetwork.CurrentRoom.Name;
         PlayerPrefs.SetString(RoomCodePrefsKey, pendingRoomCode);
+        SaveJoinedRoomTitle();
         PlayerPrefs.Save();
         UpdateRoomCodeText();
         SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
@@ -116,7 +124,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnLeftRoom()
     {
-        LoadScene(mainMenuSceneName);
+        LoadScene(GetBackSceneName());
     }
 
     public override void OnDisconnected(DisconnectCause cause)
@@ -164,12 +172,20 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private void CreatePhotonRoom()
     {
+        bool isVisible = PlayerPrefs.GetInt(RoomVisiblePrefsKey, 0) == 1;
+        string roomTitle = PlayerPrefs.GetString(RoomTitlePrefsKey, isVisible ? "Public Room" : "Private Room");
+
         RoomOptions options = new RoomOptions
         {
             MaxPlayers = MaxPlayers,
             IsOpen = true,
-            IsVisible = false,
-            CleanupCacheOnLeave = true
+            IsVisible = isVisible,
+            CleanupCacheOnLeave = true,
+            CustomRoomProperties = new Hashtable
+            {
+                { RoomTitlePropertyKey, roomTitle }
+            },
+            CustomRoomPropertiesForLobby = new[] { RoomTitlePropertyKey }
         };
 
         SetNetworkStatus("CREATING ROOM " + pendingRoomCode);
@@ -239,6 +255,26 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         return roomCode;
     }
 
+    private void SaveJoinedRoomTitle()
+    {
+        if (PhotonNetwork.CurrentRoom == null || PhotonNetwork.CurrentRoom.CustomProperties == null)
+        {
+            return;
+        }
+
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(RoomTitlePropertyKey, out object value) &&
+            value is string title &&
+            !string.IsNullOrWhiteSpace(title))
+        {
+            PlayerPrefs.SetString(RoomTitlePrefsKey, title);
+        }
+    }
+
+    private string GetBackSceneName()
+    {
+        return PlayerPrefs.GetInt(RoomVisiblePrefsKey, 0) == 1 ? publicRoomListSceneName : mainMenuSceneName;
+    }
+
     private bool IsValidRoomCode(string roomCode)
     {
         if (roomCode.Length != 4)
@@ -262,6 +298,14 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         if (roomCodeText != null)
         {
             roomCodeText.text = "ROOM CODE " + pendingRoomCode;
+        }
+    }
+
+    private void UpdateRoomTitleText()
+    {
+        if (roomTitleText != null)
+        {
+            roomTitleText.text = PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY");
         }
     }
 
@@ -299,18 +343,26 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         titleRect.sizeDelta = new Vector2(520f, 90f);
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
+        roomTitleText = CreateText(canvas.transform, "RoomTitleText", PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"), 28f, FontStyles.Normal);
+        RectTransform roomTitleRect = roomTitleText.GetComponent<RectTransform>();
+        roomTitleRect.anchorMin = new Vector2(0f, 1f);
+        roomTitleRect.anchorMax = new Vector2(0f, 1f);
+        roomTitleRect.anchoredPosition = new Vector2(300f, -214f);
+        roomTitleRect.sizeDelta = new Vector2(520f, 44f);
+        roomTitleText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
+
         roomCodeText = CreateText(canvas.transform, "RoomCodeText", "ROOM CODE " + GetRoomCode(), 34f, FontStyles.UpperCase);
         RectTransform codeRect = roomCodeText.GetComponent<RectTransform>();
         codeRect.anchorMin = new Vector2(0f, 1f);
         codeRect.anchorMax = new Vector2(0f, 1f);
-        codeRect.anchoredPosition = new Vector2(300f, -230f);
+        codeRect.anchoredPosition = new Vector2(300f, -258f);
         codeRect.sizeDelta = new Vector2(520f, 56f);
 
         networkStatusText = CreateText(canvas.transform, "NetworkStatusText", "PHOTON READY", 24f, FontStyles.UpperCase);
         RectTransform statusRect = networkStatusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 1f);
         statusRect.anchorMax = new Vector2(0f, 1f);
-        statusRect.anchoredPosition = new Vector2(300f, -282f);
+        statusRect.anchoredPosition = new Vector2(300f, -310f);
         statusRect.sizeDelta = new Vector2(620f, 42f);
 
         GameObject panel = new GameObject("CrewPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup));
