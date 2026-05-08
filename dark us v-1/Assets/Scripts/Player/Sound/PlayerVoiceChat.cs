@@ -44,6 +44,8 @@ public class PlayerVoiceChat : NetworkBehaviour
 
     private void Awake()
     {
+        ApplySavedVoiceVolume();
+
         playbackSource = GetComponent<AudioSource>();
         if (playbackSource == null)
         {
@@ -74,13 +76,16 @@ public class PlayerVoiceChat : NetworkBehaviour
         StopMicrophone();
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
+        base.OnDestroy();
         StopMicrophone();
     }
 
     private void Update()
     {
+        ApplySavedVoiceVolume();
+
         if (!IsOwner)
         {
             return;
@@ -334,8 +339,27 @@ public class PlayerVoiceChat : NetworkBehaviour
 
         AudioClip clip = AudioClip.Create("VoiceChunk", sampleCount, 1, sampleRate, false);
         clip.SetData(samples, 0);
-        playbackSource.PlayOneShot(clip, remoteVoiceVolume);
+        playbackSource.PlayOneShot(clip, GetSavedVoiceVolume());
         Destroy(clip, Mathf.Max(0.5f, sampleCount / (float)sampleRate + 0.25f));
+    }
+
+    public static void ApplySavedVoiceVolumeToAll()
+    {
+        PlayerVoiceChat[] voiceChats = FindObjectsOfType<PlayerVoiceChat>(true);
+        for (int i = 0; i < voiceChats.Length; i++)
+        {
+            voiceChats[i].ApplySavedVoiceVolume();
+        }
+    }
+
+    private void ApplySavedVoiceVolume()
+    {
+        remoteVoiceVolume = GetSavedVoiceVolume();
+    }
+
+    private static float GetSavedVoiceVolume()
+    {
+        return Mathf.Clamp01(PlayerPrefs.GetFloat("setting_voice_volume", 1f));
     }
 
     private void OnGUI()

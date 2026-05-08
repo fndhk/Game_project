@@ -39,6 +39,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private void Start()
     {
+        PhotonConnectionDefaults.Apply();
         languageIndex = PlayerPrefs.GetInt("setting_language", 0);
         EnsureEventSystem();
         BuildRoomLobbyUi();
@@ -166,7 +167,15 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         if (PhotonNetwork.InRoom)
         {
-            PhotonNetwork.LeaveRoom();
+            pendingRoomCode = PhotonNetwork.CurrentRoom.Name;
+            pendingCreateRoom = PhotonNetwork.IsMasterClient;
+            SaveJoinedRoomTitle();
+            PlayerPrefs.SetString(RoomCodePrefsKey, pendingRoomCode);
+            PlayerPrefs.SetInt(RoomHostPrefsKey, PhotonNetwork.IsMasterClient ? 1 : 0);
+            PlayerPrefs.Save();
+            UpdateRoomCodeText();
+            SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
+            RefreshPlayerSlots();
             return;
         }
 
@@ -597,7 +606,48 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         systemLogText.alignment = TextAlignmentOptions.TopLeft;
         systemLogText.enableWordWrapping = true;
 
+        Transform voicePanel = CreateInfoPanel(parent, "VoiceSettingsPanel", new Vector2(1320f, -910f), new Vector2(620f, 150f));
+        TMP_Text voiceTitle = CreateText(voicePanel, "VoiceTitle", T("VOICE SETTINGS"), 28f, FontStyles.UpperCase);
+        ConfigurePanelTitle(voiceTitle);
+        CreateVoiceVolumeSlider(voicePanel);
+
         RefreshBriefingPanel();
+    }
+
+    private void CreateVoiceVolumeSlider(Transform parent)
+    {
+        TMP_Text label = CreateText(parent, "VoiceVolumeLabel", T("Voice Volume"), 22f, FontStyles.Normal);
+        RectTransform labelRect = label.GetComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0f, 1f);
+        labelRect.anchorMax = new Vector2(0f, 1f);
+        labelRect.anchoredPosition = new Vector2(148f, -92f);
+        labelRect.sizeDelta = new Vector2(210f, 34f);
+        label.alignment = TextAlignmentOptions.Left;
+        label.color = new Color(0.62f, 0.7f, 0.72f, 1f);
+
+        TMP_Text valueText = CreateText(parent, "VoiceVolumeValue", string.Empty, 22f, FontStyles.Normal);
+        RectTransform valueRect = valueText.GetComponent<RectTransform>();
+        valueRect.anchorMin = new Vector2(0f, 1f);
+        valueRect.anchorMax = new Vector2(0f, 1f);
+        valueRect.anchoredPosition = new Vector2(540f, -92f);
+        valueRect.sizeDelta = new Vector2(100f, 34f);
+        valueText.alignment = TextAlignmentOptions.Right;
+
+        Slider slider = CreateSlider(parent, 0f, 1f, PlayerPrefs.GetFloat("setting_voice_volume", 1f));
+        RectTransform sliderRect = slider.GetComponent<RectTransform>();
+        sliderRect.anchorMin = new Vector2(0f, 1f);
+        sliderRect.anchorMax = new Vector2(0f, 1f);
+        sliderRect.anchoredPosition = new Vector2(390f, -92f);
+        sliderRect.sizeDelta = new Vector2(250f, 28f);
+
+        slider.onValueChanged.AddListener(value =>
+        {
+            PlayerPrefs.SetFloat("setting_voice_volume", value);
+            PlayerPrefs.Save();
+            valueText.text = value.ToString("0.00");
+            PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
+        });
+        valueText.text = slider.value.ToString("0.00");
     }
 
     private Transform CreateInfoPanel(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size)
@@ -760,6 +810,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "WAITING FOR CREW": return "대원 대기 중";
             case "CONNECTING": return "연결 중";
             case "SYSTEM LOG": return "시스템 로그";
+            case "VOICE SETTINGS": return "음성 설정";
+            case "Voice Volume": return "마이크 볼륨";
             case "Room initialized": return "방 초기화됨";
             case "Voice channel standby": return "음성 채널 대기";
             case "Waiting for players": return "플레이어 대기 중";
@@ -808,6 +860,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "WAITING FOR CREW": return "クルー待機中";
             case "CONNECTING": return "接続中";
             case "SYSTEM LOG": return "システムログ";
+            case "VOICE SETTINGS": return "ボイス設定";
+            case "Voice Volume": return "マイク音量";
             case "Room initialized": return "ルーム初期化";
             case "Voice channel standby": return "ボイスチャンネル待機";
             case "Waiting for players": return "プレイヤー待機中";
@@ -873,5 +927,57 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         button.targetGraphic = image;
 
         return button;
+    }
+
+    private Slider CreateSlider(Transform parent, float min, float max, float value)
+    {
+        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider));
+        sliderObject.layer = parent.gameObject.layer;
+        sliderObject.transform.SetParent(parent, false);
+
+        Slider slider = sliderObject.GetComponent<Slider>();
+        slider.minValue = min;
+        slider.maxValue = max;
+        slider.value = Mathf.Clamp(value, min, max);
+
+        Image background = CreateSliderImage(sliderObject.transform, "Background", new Color(0.18f, 0.25f, 0.27f, 0.9f));
+        RectTransform backgroundRect = background.GetComponent<RectTransform>();
+        backgroundRect.anchorMin = new Vector2(0f, 0.5f);
+        backgroundRect.anchorMax = new Vector2(1f, 0.5f);
+        backgroundRect.sizeDelta = new Vector2(0f, 8f);
+
+        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
+        fillArea.layer = parent.gameObject.layer;
+        fillArea.transform.SetParent(sliderObject.transform, false);
+        RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
+        fillAreaRect.anchorMin = Vector2.zero;
+        fillAreaRect.anchorMax = Vector2.one;
+        fillAreaRect.offsetMin = Vector2.zero;
+        fillAreaRect.offsetMax = Vector2.zero;
+
+        Image fill = CreateSliderImage(fillArea.transform, "Fill", new Color(0.86f, 0.66f, 0.34f, 1f));
+        RectTransform fillRect = fill.GetComponent<RectTransform>();
+        fillRect.anchorMin = new Vector2(0f, 0.5f);
+        fillRect.anchorMax = new Vector2(1f, 0.5f);
+        fillRect.sizeDelta = new Vector2(0f, 8f);
+
+        Image handle = CreateSliderImage(sliderObject.transform, "Handle", new Color(0.78f, 0.86f, 0.88f, 1f));
+        RectTransform handleRect = handle.GetComponent<RectTransform>();
+        handleRect.sizeDelta = new Vector2(24f, 24f);
+
+        slider.fillRect = fillRect;
+        slider.handleRect = handleRect;
+        slider.targetGraphic = handle;
+        return slider;
+    }
+
+    private Image CreateSliderImage(Transform parent, string objectName, Color color)
+    {
+        GameObject imageObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        imageObject.layer = parent.gameObject.layer;
+        imageObject.transform.SetParent(parent, false);
+        Image image = imageObject.GetComponent<Image>();
+        image.color = color;
+        return image;
     }
 }

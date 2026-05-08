@@ -6,12 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/LobbyScene.unity
-    guid: 193127c24b23b6142ab3077b23d20add
-  - enabled: 1
-    path: Assets/Scenes/labor.unity
-    guid: 5bf52a0cb20260846b1289eec882a933
-  - enabled: 1
     path: Assets/Scenes/LobbyScene 1.unity
     guid: 035bf29d04da2da4d8d60cfbc76d1a6d
   - enabled: 1
@@ -20,4 +14,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/PublicRoomListScene.unity
     guid: 72dfbf0da6db47df8ddf9ef2603d9a71
+  - enabled: 1
+    path: Assets/Scenes/labor.unity
+    guid: 5bf52a0cb20260846b1289eec882a933
   m_configObjects: {}

@@ -76,6 +76,8 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     // 시작 시 설정 패널은 꺼둔다.
     private void Start()
     {
+        PhotonConnectionDefaults.Apply();
+
         if (!Application.isPlaying)
         {
             EnsureMainMenuLayout();
