@@ -289,6 +289,7 @@ MonoBehaviour:
   scanOrigin: {fileID: 49013741}
   scanCamera: {fileID: 330585545}
   scanMouseButton: 1
+<<<<<<< HEAD
   minDotSize: 0.009
   maxDotSize: 0.016
   surfaceOffset: 0.011
@@ -310,6 +311,29 @@ MonoBehaviour:
   edgeBoostMultiplier: 2.1
   edgeDepthThreshold: 0.55
   edgeNormalAngleThreshold: 17
+=======
+  minDotSize: 0.01
+  maxDotSize: 0.018
+  surfaceOffset: 0.015
+  planarJitterRadius: 0.025
+  dotLifetime: -1
+  clearDotsBeforeScan: 1
+  maxStoredDots: 0
+  pulseDuration: 0.28
+  maxRevealDistance: 8
+  samplesPerSecond: 4200
+  minSamplesPerFrame: 24
+  horizontalViewportMargin: 0.02
+  bottomViewportMargin: 0.06
+  topViewportMargin: 0.04
+  baseKeepChance: 0.22
+  floorDensityMultiplier: 1
+  wallDensityMultiplier: 0.42
+  farDistanceMultiplier: 0.55
+  edgeBoostMultiplier: 2.1
+  edgeDepthThreshold: 0.75
+  edgeNormalAngleThreshold: 22
+>>>>>>> fd5a8386e34ba8ac5628e70620d8b6f5c81df4c5
   debugCurrentRadius: 0
   revealSurfaceMask:
     serializedVersion: 2
@@ -2641,8 +2665,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Killer
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 0161d805a3764c089bef00bfe00793f5, type: 2}
-  m_sharedMaterial: {fileID: 2147374, guid: 0161d805a3764c089bef00bfe00793f5, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
