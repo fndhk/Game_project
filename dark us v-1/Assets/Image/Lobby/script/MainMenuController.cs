@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
@@ -13,8 +12,12 @@ using UnityEditor;
 
 // 메인 메뉴 버튼 동작을 관리하는 스크립트이다.
 // 방 만들기, 방 찾기, 설정 버튼을 눌렀을 때의 기본 흐름을 담당한다.
+<<<<<<< HEAD
 [ExecuteAlways]
 public class MainMenuController : MonoBehaviourPunCallbacks
+=======
+public class MainMenuController : MonoBehaviour
+>>>>>>> parent of cd8883a (0508)
 {
     private struct LocalizedTextBinding
     {
@@ -35,6 +38,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     private Resolution[] availableResolutions;
     private TMP_FontAsset localizedFontAsset;
     private Sprite settingSliderHandleSprite;
+<<<<<<< HEAD
     private TMP_InputField findRoomCodeInput;
     private Transform publicRoomListContent;
     private TMP_Text publicRoomEmptyText;
@@ -45,6 +49,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
     private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
     private const string RoomTitlePrefsKey = "dark_us_room_title";
+=======
+    private readonly int[] fpsLimits = { 30, 60, 120, 144, -1 };
+>>>>>>> parent of cd8883a (0508)
 
     [Header("Scene Names")]
     // 방 만들기를 눌렀을 때 이동할 씬 이름이다.
@@ -63,9 +70,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     // 설정 버튼을 눌렀을 때 켜고 끌 설정 패널이다.
     public GameObject settingsPanel;
 
-    // 친구 참가 버튼을 눌렀을 때 띄울 안내 패널이다.
-    public GameObject joinFriendPanel;
-
     // 게임 종료를 다시 확인하는 패널이다.
     public GameObject quitConfirmPanel;
 
@@ -76,16 +80,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     // 시작 시 설정 패널은 꺼둔다.
     private void Start()
     {
-        if (!Application.isPlaying)
-        {
-            EnsureMainMenuLayout();
-            return;
-        }
-
         PrepareSettingsState();
         EnsureMainMenuBindings();
         EnsureQuitUi();
-        EnsureMainMenuLayout();
         EnsureMenuPanels();
 
         if (createRoomPanel != null)
@@ -103,54 +100,13 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             settingsPanel.SetActive(false);
         }
 
-        if (joinFriendPanel != null)
-        {
-            joinFriendPanel.SetActive(false);
-        }
-
         if (quitConfirmPanel != null)
         {
             quitConfirmPanel.SetActive(false);
         }
 
         ApplyLanguage();
-        ClearSelectedUi();
     }
-
-#if UNITY_EDITOR
-    private void OnEnable()
-    {
-        if (Application.isPlaying)
-        {
-            return;
-        }
-
-        UnityEditor.EditorApplication.delayCall -= EnsureEditorMainMenuLayout;
-        UnityEditor.EditorApplication.delayCall += EnsureEditorMainMenuLayout;
-    }
-
-    private void OnValidate()
-    {
-        if (Application.isPlaying)
-        {
-            return;
-        }
-
-        UnityEditor.EditorApplication.delayCall -= EnsureEditorMainMenuLayout;
-        UnityEditor.EditorApplication.delayCall += EnsureEditorMainMenuLayout;
-    }
-
-    private void EnsureEditorMainMenuLayout()
-    {
-        if (this == null || Application.isPlaying)
-        {
-            return;
-        }
-
-        EnsureMainMenuLayout();
-        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
-    }
-#endif
 
     // 방 만들기 버튼에서 호출한다.
     public void OnClickCreateRoom()
@@ -173,19 +129,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         LoadMenuScene(findRoomSceneName, "Public room list scene name is empty.");
     }
 
-    public void OnClickJoinFriend()
-    {
-        PlayClickSound();
-
-        if (joinFriendPanel == null)
-        {
-            Debug.LogWarning("Join friend panel is not assigned.");
-            return;
-        }
-
-        ShowPanel(joinFriendPanel);
-    }
-
     // 설정 버튼에서 호출한다.
     public void OnClickSettings()
     {
@@ -203,17 +146,21 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     public void OnClickCreateRoomConfirm()
     {
         PlayClickSound();
+<<<<<<< HEAD
         PlayerPrefs.SetString(RoomCodePrefsKey, Random.Range(0, 10000).ToString("0000"));
         PlayerPrefs.SetString(RoomTitlePrefsKey, "Private Room");
         PlayerPrefs.SetInt(RoomHostPrefsKey, 1);
         PlayerPrefs.SetInt(RoomVisiblePrefsKey, 0);
         PlayerPrefs.Save();
+=======
+>>>>>>> parent of cd8883a (0508)
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
     }
 
     public void OnClickFindRoomConfirm()
     {
         PlayClickSound();
+<<<<<<< HEAD
 
         string roomCode = findRoomCodeInput != null ? findRoomCodeInput.text.Trim() : string.Empty;
         if (!IsValidRoomCode(roomCode))
@@ -228,6 +175,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         PlayerPrefs.SetInt(RoomVisiblePrefsKey, 1);
         PlayerPrefs.Save();
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+=======
+        LoadMenuScene(findRoomSceneName, "Find room scene name is empty.");
+>>>>>>> parent of cd8883a (0508)
     }
 
     public void OnClickCreatePublicRoom()
@@ -351,24 +301,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         SceneManager.LoadScene(sceneName);
     }
 
-    private bool IsValidRoomCode(string roomCode)
-    {
-        if (roomCode.Length != 4)
-        {
-            return false;
-        }
-
-        for (int i = 0; i < roomCode.Length; i++)
-        {
-            if (!char.IsDigit(roomCode[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     private void ShowPanel(GameObject panel)
     {
         if (createRoomPanel != null && createRoomPanel != panel)
@@ -384,11 +316,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         if (settingsPanel != null && settingsPanel != panel)
         {
             settingsPanel.SetActive(false);
-        }
-
-        if (joinFriendPanel != null && joinFriendPanel != panel)
-        {
-            joinFriendPanel.SetActive(false);
         }
 
         if (quitConfirmPanel != null && quitConfirmPanel != panel)
@@ -413,7 +340,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
         AddButtonListener("CreateRoomButton", OnClickCreateRoom);
         AddButtonListener("FindRoomButton", OnClickFindRoom);
-        AddButtonListener("JoinFriendButton", OnClickJoinFriend);
         AddButtonListener("SettingsButton", OnClickSettings);
     }
 
@@ -473,139 +399,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
     }
 
-    private void EnsureMainMenuLayout()
-    {
-        Transform buttonGroup = FindUiTransform("ButtonGroup");
-        if (buttonGroup == null)
-        {
-            Debug.LogWarning("ButtonGroup is not found. Main menu layout was not updated.");
-            return;
-        }
-
-        Button joinFriendButton = null;
-        Transform joinFriendTransform = buttonGroup.Find("JoinFriendButton");
-        if (joinFriendTransform == null)
-        {
-            joinFriendButton = CreateMenuButton(buttonGroup, "JoinFriendButton", "Join Friend");
-            joinFriendTransform = joinFriendButton.transform;
-        }
-        else
-        {
-            joinFriendButton = joinFriendTransform.GetComponent<Button>();
-        }
-
-        joinFriendTransform.SetSiblingIndex(2);
-        if (joinFriendButton != null)
-        {
-            joinFriendButton.onClick.RemoveListener(OnClickJoinFriend);
-            joinFriendButton.onClick.AddListener(OnClickJoinFriend);
-        }
-
-        SetMenuButtonLabel("CreateRoomButton", "Private Game");
-        SetMenuButtonLabel("FindRoomButton", "Public Game");
-        SetMenuButtonLabel("JoinFriendButton", "Join Friend");
-        SetMenuButtonLabel("SettingsButton", "Settings");
-        SetMenuButtonLabel("ExitButton", "Quit Game");
-        ConfigureMainMenuVisualStyle("CreateRoomButton");
-        ConfigureMainMenuVisualStyle("FindRoomButton");
-        ConfigureMainMenuVisualStyle("JoinFriendButton");
-        ConfigureMainMenuVisualStyle("SettingsButton");
-        ConfigureMainMenuVisualStyle("ExitButton");
-        ConfigureMenuButtonSelection("CreateRoomButton");
-        ConfigureMenuButtonSelection("FindRoomButton");
-        ConfigureMenuButtonSelection("JoinFriendButton");
-        ConfigureMenuButtonSelection("SettingsButton");
-        ConfigureMenuButtonSelection("ExitButton");
-
-        RectTransform groupRect = buttonGroup.GetComponent<RectTransform>();
-        if (groupRect != null)
-        {
-            groupRect.sizeDelta = new Vector2(groupRect.sizeDelta.x, 650f);
-        }
-    }
-
-    private void SetMenuButtonLabel(string buttonName, string label)
-    {
-        Transform buttonTransform = FindUiTransform(buttonName);
-        if (buttonTransform == null)
-        {
-            return;
-        }
-
-        TMP_Text text = buttonTransform.GetComponentInChildren<TMP_Text>(true);
-        if (text != null)
-        {
-            text.fontStyle = FontStyles.Normal;
-            text.text = label;
-        }
-    }
-
-    private void ConfigureMainMenuVisualStyle(string buttonName)
-    {
-        Transform buttonTransform = FindUiTransform(buttonName);
-        if (buttonTransform == null)
-        {
-            return;
-        }
-
-        Image image = buttonTransform.GetComponent<Image>();
-        if (image != null)
-        {
-            image.color = new Color(0.015f, 0.018f, 0.02f, 0f);
-        }
-
-        TMP_Text text = buttonTransform.GetComponentInChildren<TMP_Text>(true);
-        if (text != null)
-        {
-            text.fontStyle = FontStyles.Normal;
-            text.color = new Color(0.76f, 0.82f, 0.84f, 1f);
-        }
-
-        MenuButtonHoverEffect hover = buttonTransform.GetComponent<MenuButtonHoverEffect>();
-        if (hover != null)
-        {
-            hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0f);
-            hover.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.76f);
-            hover.pressedBackgroundColor = new Color(0.16f, 0.18f, 0.17f, 0.86f);
-            hover.normalTextColor = new Color(0.76f, 0.82f, 0.84f, 1f);
-            hover.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);
-        }
-    }
-
-    private void ConfigureMenuButtonSelection(string buttonName)
-    {
-        Transform buttonTransform = FindUiTransform(buttonName);
-        if (buttonTransform == null)
-        {
-            return;
-        }
-
-        Button button = buttonTransform.GetComponent<Button>();
-        if (button == null)
-        {
-            return;
-        }
-
-        Navigation navigation = button.navigation;
-        navigation.mode = Navigation.Mode.None;
-        button.navigation = navigation;
-
-        ColorBlock colors = button.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = Color.white;
-        colors.pressedColor = Color.white;
-        colors.selectedColor = colors.normalColor;
-        button.colors = colors;
-    }
-
-    private void ClearSelectedUi()
-    {
-        if (EventSystem.current != null)
-        {
-            EventSystem.current.SetSelectedGameObject(null);
-        }
-    }
-
     private void EnsureMenuPanels()
     {
         if (createRoomPanel == null)
@@ -637,20 +430,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
 
         PrepareExistingSettingsPanel(settingsPanel);
-
-        if (joinFriendPanel == null)
-        {
-            Transform existingPanel = FindUiTransform("JoinFriendPanel");
-            joinFriendPanel = existingPanel != null ? existingPanel.gameObject : CreateMenuPanel(
-                "JoinFriendPanel",
-                "Join Friend",
-                "Steam friend invites will be connected here later.",
-                "Close",
-                () => OnClickClosePanel(joinFriendPanel)
-            );
-        }
-
-        PrepareExistingPanel(joinFriendPanel, "Join Friend", "Steam friend invites will be connected here later.", "Close", () => OnClickClosePanel(joinFriendPanel));
     }
 
     private GameObject CreateMenuPanel(string objectName, string title, string body, string primaryLabel, UnityEngine.Events.UnityAction primaryAction)
@@ -1041,13 +820,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         bodyText.enableWordWrapping = true;
         bodyText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
-        if (title == "Find Room")
-        {
-            bodyRect.anchoredPosition = new Vector2(0f, 54f);
-            bodyRect.sizeDelta = new Vector2(-120f, 86f);
-            findRoomCodeInput = CreateRoomCodeInput(dialogObject.transform);
-        }
-
         Button primaryButton = CreateMenuButton(dialogObject.transform, primaryLabel + "Button", primaryLabel, 220f, 64f, 28f);
         RectTransform primaryRect = primaryButton.GetComponent<RectTransform>();
         primaryRect.anchorMin = new Vector2(0.5f, 0f);
@@ -1061,51 +833,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         closeRect.anchorMax = new Vector2(0.5f, 0f);
         closeRect.anchoredPosition = new Vector2(124f, 70f);
         closeButton.onClick.AddListener(() => OnClickClosePanel(panelObject));
-    }
-
-    private TMP_InputField CreateRoomCodeInput(Transform parent)
-    {
-        GameObject inputObject = new GameObject("RoomCodeInput", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(TMP_InputField), typeof(Outline));
-        inputObject.layer = parent.gameObject.layer;
-        inputObject.transform.SetParent(parent, false);
-
-        RectTransform inputRect = inputObject.GetComponent<RectTransform>();
-        inputRect.anchorMin = new Vector2(0.5f, 0.5f);
-        inputRect.anchorMax = new Vector2(0.5f, 0.5f);
-        inputRect.anchoredPosition = new Vector2(0f, -42f);
-        inputRect.sizeDelta = new Vector2(280f, 58f);
-
-        Image inputImage = inputObject.GetComponent<Image>();
-        inputImage.color = new Color(0.015f, 0.018f, 0.02f, 0.78f);
-
-        Outline outline = inputObject.GetComponent<Outline>();
-        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.36f);
-        outline.effectDistance = new Vector2(2f, -2f);
-
-        TMP_Text text = CreateLabel(inputObject.transform, "Text Area", string.Empty, 30f, FontStyles.UpperCase);
-        RectTransform textRect = text.GetComponent<RectTransform>();
-        textRect.offsetMin = new Vector2(20f, 6f);
-        textRect.offsetMax = new Vector2(-20f, -6f);
-        text.alignment = TextAlignmentOptions.Center;
-
-        TMP_Text placeholder = CreateLabel(inputObject.transform, "Placeholder", "0000", 30f, FontStyles.UpperCase);
-        RectTransform placeholderRect = placeholder.GetComponent<RectTransform>();
-        placeholderRect.offsetMin = new Vector2(20f, 6f);
-        placeholderRect.offsetMax = new Vector2(-20f, -6f);
-        placeholder.alignment = TextAlignmentOptions.Center;
-        placeholder.color = new Color(0.76f, 0.82f, 0.84f, 0.36f);
-
-        TMP_InputField inputField = inputObject.GetComponent<TMP_InputField>();
-        inputField.textComponent = text;
-        inputField.placeholder = placeholder;
-        inputField.textViewport = inputRect;
-        inputField.characterLimit = 4;
-        inputField.contentType = TMP_InputField.ContentType.IntegerNumber;
-        inputField.lineType = TMP_InputField.LineType.SingleLine;
-        inputField.caretColor = new Color(1f, 0.8f, 0.42f, 1f);
-        inputField.selectionColor = new Color(1f, 0.8f, 0.42f, 0.28f);
-
-        return inputField;
     }
 
     private void BuildSettingsPanelContents(GameObject panelObject)
@@ -1761,11 +1488,10 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private void ApplyLanguage()
     {
-        ApplyLanguageToSceneButton("CreateRoomButton", "Private Game");
-        ApplyLanguageToSceneButton("FindRoomButton", "Public Game");
-        ApplyLanguageToSceneButton("JoinFriendButton", "Join Friend");
-        ApplyLanguageToSceneButton("SettingsButton", "Settings");
-        ApplyLanguageToSceneButton("ExitButton", "Quit Game");
+        ApplyLanguageToSceneButton("CreateRoomButton", "Create Room");
+        ApplyLanguageToSceneButton("FindRoomButton", "Find Room");
+        ApplyLanguageToSceneButton("SettingsButton", "Setting");
+        ApplyLanguageToSceneButton("ExitButton", "Exit");
 
         for (int i = localizedTexts.Count - 1; i >= 0; i--)
         {
@@ -1795,7 +1521,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         if (text != null)
         {
             ApplyFontForLanguage(text);
-            text.fontStyle = FontStyles.Normal;
             text.text = Translate(key);
         }
     }
@@ -1856,11 +1581,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         return "가나다라마바사아자차카타파하"
             + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /&-.?"
             + "방만들기찾설정나가기닫적용초기화변경확인취소게임을종료할까요"
-            + "비공개친구참가"
             + "그래픽및화면표시오디오조작키플레이접근성모드텍스처품질그림자시야각수직동기제한"
             + "모션블러카메라흔마스터볼륨배경음효과음음성이동상호작용눌러서말하기마우스감도반전패드진동자막크기언어색약튜토리얼전체창테두리없음한국어영어일본어"
             + "ルーム作成検索設定終了閉じる適用リセット変更確認キャンセルゲームを終了しますか"
-            + "公開フレンド参加"
             + "プライベート作戦待信号リスト参加探グラフィック表示画面オーディオ操作キーゲームプレイアクセシビリティ"
             + "モードテクスチャ品質影視野角垂直同期制限ブラー揺れ音量移動インタラクトプッシュトゥトーク"
             + "マウス感度反転パッド振動字幕サイズ背景言語色覚サポートチュートリアルフルスクリーンウィンドウボーダーレス無韓国語英日本";
@@ -1890,15 +1613,10 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         {
             case "Create Room": return "방 만들기";
             case "Find Room": return "방 찾기";
-            case "Private Game": return "비공개 게임";
-            case "Public Game": return "공개 게임";
-            case "Join Friend": return "친구 참가";
-            case "Steam friend invites will be connected here later.": return "Steam 친구 초대는 여기에 나중에 연결됩니다.";
             case "Setting": return "설정";
             case "Settings": return "설정";
             case "SETTINGS": return "설정";
             case "Exit": return "나가기";
-            case "Quit Game": return "게임 종료";
             case "Close": return "닫기";
             case "Apply": return "적용";
             case "Reset": return "초기화";
@@ -1960,15 +1678,10 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         {
             case "Create Room": return "ルーム作成";
             case "Find Room": return "ルーム検索";
-            case "Private Game": return "プライベートゲーム";
-            case "Public Game": return "公開ゲーム";
-            case "Join Friend": return "フレンド参加";
-            case "Steam friend invites will be connected here later.": return "Steamフレンド招待は後でここに接続されます。";
             case "Setting": return "設定";
             case "Settings": return "設定";
             case "SETTINGS": return "設定";
             case "Exit": return "終了";
-            case "Quit Game": return "ゲーム終了";
             case "Close": return "閉じる";
             case "Apply": return "適用";
             case "Reset": return "リセット";
