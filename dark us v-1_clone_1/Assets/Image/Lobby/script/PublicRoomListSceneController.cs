@@ -24,9 +24,11 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
     private TMP_Text statusText;
     private GameObject createRoomDialog;
     private TMP_InputField roomTitleInput;
+    private int languageIndex;
 
     private void Start()
     {
+        languageIndex = PlayerPrefs.GetInt("setting_language", 0);
         EnsureEventSystem();
         BuildUi();
         ConnectToPhotonLobby();
@@ -241,10 +243,20 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
             value is string title &&
             !string.IsNullOrWhiteSpace(title))
         {
-            return title;
+            return TranslateRoomTitle(title);
         }
 
-        return "Public Room";
+        return T("Public Room");
+    }
+
+    private string TranslateRoomTitle(string title)
+    {
+        if (title == "Public Room" || title == "Private Room")
+        {
+            return T(title);
+        }
+
+        return title;
     }
 
     private void BuildUi()
@@ -252,7 +264,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         Canvas canvas = CreateCanvas();
         CreateBackground(canvas.transform);
 
-        TMP_Text title = CreateText(canvas.transform, "TitleText", "PUBLIC GAME", 64f, FontStyles.Normal);
+        TMP_Text title = CreateText(canvas.transform, "TitleText", T("PUBLIC GAME"), 64f, FontStyles.Normal);
         RectTransform titleRect = title.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(1f, 1f);
@@ -260,7 +272,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         titleRect.sizeDelta = new Vector2(-160f, 90f);
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        statusText = CreateText(canvas.transform, "StatusText", "CONNECTING", 24f, FontStyles.UpperCase);
+        statusText = CreateText(canvas.transform, "StatusText", T("CONNECTING"), 24f, FontStyles.UpperCase);
         RectTransform statusRect = statusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 1f);
         statusRect.anchorMax = new Vector2(1f, 1f);
@@ -294,19 +306,19 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         layout.childForceExpandHeight = false;
         roomListContent = listPanel.transform;
 
-        emptyText = CreateText(roomListContent, "EmptyText", "No public rooms found.", 30f, FontStyles.Normal);
+        emptyText = CreateText(roomListContent, "EmptyText", T("No public rooms found."), 30f, FontStyles.Normal);
         RectTransform emptyRect = emptyText.GetComponent<RectTransform>();
         emptyRect.sizeDelta = new Vector2(0f, 80f);
         emptyText.color = new Color(0.62f, 0.7f, 0.72f, 1f);
 
-        Button backButton = CreateButton(canvas.transform, "BackButton", "Back", 240f, 66f, 28f);
+        Button backButton = CreateButton(canvas.transform, "BackButton", T("Back"), 240f, 66f, 28f);
         RectTransform backRect = backButton.GetComponent<RectTransform>();
         backRect.anchorMin = new Vector2(0f, 0f);
         backRect.anchorMax = new Vector2(0f, 0f);
         backRect.anchoredPosition = new Vector2(180f, 82f);
         backButton.onClick.AddListener(OnClickBack);
 
-        Button createButton = CreateButton(canvas.transform, "CreateRoomButton", "Create Room", 280f, 66f, 28f);
+        Button createButton = CreateButton(canvas.transform, "CreateRoomButton", T("Create Room"), 280f, 66f, 28f);
         RectTransform createRect = createButton.GetComponent<RectTransform>();
         createRect.anchorMin = new Vector2(1f, 0f);
         createRect.anchorMax = new Vector2(1f, 0f);
@@ -349,7 +361,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.4f);
         outline.effectDistance = new Vector2(2f, -2f);
 
-        TMP_Text title = CreateText(dialog.transform, "TitleText", "Create Room", 42f, FontStyles.Normal);
+        TMP_Text title = CreateText(dialog.transform, "TitleText", T("Create Room"), 42f, FontStyles.Normal);
         RectTransform titleRect = title.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(1f, 1f);
@@ -357,7 +369,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         titleRect.sizeDelta = new Vector2(-80f, 62f);
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        TMP_Text label = CreateText(dialog.transform, "RoomTitleLabel", "Room Title", 24f, FontStyles.Normal);
+        TMP_Text label = CreateText(dialog.transform, "RoomTitleLabel", T("Room Title"), 24f, FontStyles.Normal);
         RectTransform labelRect = label.GetComponent<RectTransform>();
         labelRect.anchorMin = new Vector2(0.5f, 0.5f);
         labelRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -365,16 +377,16 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         labelRect.sizeDelta = new Vector2(420f, 40f);
         label.color = new Color(0.62f, 0.7f, 0.72f, 1f);
 
-        roomTitleInput = CreateTextInput(dialog.transform, "RoomTitleInput", "Public Room");
+        roomTitleInput = CreateTextInput(dialog.transform, "RoomTitleInput", T("Public Room"));
 
-        Button confirmButton = CreateButton(dialog.transform, "ConfirmCreateRoomButton", "Create", 220f, 62f, 26f);
+        Button confirmButton = CreateButton(dialog.transform, "ConfirmCreateRoomButton", T("Create"), 220f, 62f, 26f);
         RectTransform confirmRect = confirmButton.GetComponent<RectTransform>();
         confirmRect.anchorMin = new Vector2(0.5f, 0f);
         confirmRect.anchorMax = new Vector2(0.5f, 0f);
         confirmRect.anchoredPosition = new Vector2(-124f, 72f);
         confirmButton.onClick.AddListener(OnClickConfirmCreateRoom);
 
-        Button cancelButton = CreateButton(dialog.transform, "CancelCreateRoomButton", "Cancel", 220f, 62f, 26f);
+        Button cancelButton = CreateButton(dialog.transform, "CancelCreateRoomButton", T("Cancel"), 220f, 62f, 26f);
         RectTransform cancelRect = cancelButton.GetComponent<RectTransform>();
         cancelRect.anchorMin = new Vector2(0.5f, 0f);
         cancelRect.anchorMax = new Vector2(0.5f, 0f);
@@ -472,6 +484,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         label.alignment = TextAlignmentOptions.Center;
         label.color = new Color(0.76f, 0.82f, 0.84f, 1f);
         label.raycastTarget = false;
+        LocalizedTmpFontProvider.Apply(label);
 
         RectTransform rect = textObject.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(520f, 42f);
@@ -544,10 +557,69 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
     {
         if (statusText != null)
         {
-            statusText.text = status;
+            statusText.text = T(status);
         }
 
         Debug.Log(status);
+    }
+
+    private string T(string key)
+    {
+        switch (languageIndex)
+        {
+            case 1:
+                return key;
+            case 2:
+                return TranslateJapanese(key);
+            default:
+                return TranslateKorean(key);
+        }
+    }
+
+    private string TranslateKorean(string key)
+    {
+        switch (key)
+        {
+            case "PUBLIC GAME": return "공개 게임";
+            case "PUBLIC ROOMS": return "공개 방 목록";
+            case "CONNECTING": return "연결 중";
+            case "JOINING LOBBY": return "로비 참가 중";
+            case "DISCONNECTED": return "연결 끊김";
+            case "LEAVING ROOM": return "방 나가는 중";
+            case "CONNECTING PHOTON": return "포톤 연결 중";
+            case "No public rooms found.": return "공개 방이 없습니다.";
+            case "Back": return "뒤로";
+            case "Create Room": return "방 만들기";
+            case "Room Title": return "방 제목";
+            case "Public Room": return "공개 방";
+            case "Private Room": return "비공개 방";
+            case "Create": return "생성";
+            case "Cancel": return "취소";
+            default: return key;
+        }
+    }
+
+    private string TranslateJapanese(string key)
+    {
+        switch (key)
+        {
+            case "PUBLIC GAME": return "公開ゲーム";
+            case "PUBLIC ROOMS": return "公開ルーム一覧";
+            case "CONNECTING": return "接続中";
+            case "JOINING LOBBY": return "ロビー参加中";
+            case "DISCONNECTED": return "切断";
+            case "LEAVING ROOM": return "ルーム退出中";
+            case "CONNECTING PHOTON": return "Photon接続中";
+            case "No public rooms found.": return "公開ルームがありません。";
+            case "Back": return "戻る";
+            case "Create Room": return "ルーム作成";
+            case "Room Title": return "ルーム名";
+            case "Public Room": return "公開ルーム";
+            case "Private Room": return "プライベートルーム";
+            case "Create": return "作成";
+            case "Cancel": return "キャンセル";
+            default: return key;
+        }
     }
 
     private void LoadScene(string sceneName)

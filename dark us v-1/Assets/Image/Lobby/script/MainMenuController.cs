@@ -1802,16 +1802,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private void ApplyFontForLanguage(TMP_Text text)
     {
-        if (text == null)
-        {
-            return;
-        }
-
-        TMP_FontAsset fontAsset = GetLocalizedFontAsset();
-        if (fontAsset != null)
-        {
-            text.font = fontAsset;
-        }
+        LocalizedTmpFontProvider.Apply(text);
     }
 
     private TMP_FontAsset GetLocalizedFontAsset()

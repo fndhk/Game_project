@@ -13,6 +13,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     public string mainMenuSceneName = "LobbyScene 1";
     public string publicRoomListSceneName = "PublicRoomListScene";
     public string gameSceneName = "labor";
+    public Sprite lobbyBackgroundSprite;
 
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
@@ -20,6 +21,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private const string RoomTitlePrefsKey = "dark_us_room_title";
     private const string RoomTitlePropertyKey = "title";
     private const string MapSeedPropertyKey = "mapSeed";
+    private const string ReadyPropertyKey = "ready";
     private const byte MaxPlayers = 12;
 
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
@@ -28,13 +30,16 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private TMP_Text roomTitleText;
     private TMP_Text roomCodeText;
     private TMP_Text systemLogText;
+    private Button readyButton;
     private Button startButton;
     private string pendingRoomCode;
     private bool pendingCreateRoom;
     private int createRetryCount;
+    private int languageIndex;
 
     private void Start()
     {
+        languageIndex = PlayerPrefs.GetInt("setting_language", 0);
         EnsureEventSystem();
         BuildRoomLobbyUi();
         StartPhotonRoomFlow();
@@ -45,6 +50,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         if (!PhotonNetwork.IsMasterClient)
         {
             SetNetworkStatus("HOST ONLY");
+            return;
+        }
+
+        if (!AreAllPlayersReady())
+        {
+            SetNetworkStatus("WAITING READY");
             return;
         }
 
@@ -105,6 +116,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PlayerPrefs.SetString(RoomCodePrefsKey, pendingRoomCode);
         SaveJoinedRoomTitle();
         PlayerPrefs.Save();
+        SetLocalReady(false);
         UpdateRoomCodeText();
         SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
         RefreshPlayerSlots();
@@ -123,6 +135,14 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     public override void OnMasterClientSwitched(Player newMasterClient)
     {
         RefreshPlayerSlots();
+    }
+
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        if (changedProps != null && changedProps.ContainsKey(ReadyPropertyKey))
+        {
+            RefreshPlayerSlots();
+        }
     }
 
     public override void OnLeftRoom()
@@ -200,21 +220,22 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         for (int i = 0; i < slotTexts.Count; i++)
         {
-            string label = "EMPTY   WAITING";
+            string label = T("EMPTY").PadRight(12) + T("WAITING");
             if (PhotonNetwork.InRoom && i < PhotonNetwork.PlayerList.Length)
             {
                 Player player = PhotonNetwork.PlayerList[i];
-                string role = player.IsMasterClient ? "HOST" : "PLAYER";
-                string name = player.IsLocal ? "YOU" : role;
-                label = name.PadRight(8) + "READY";
+                string role = player.IsMasterClient ? T("HOST") : T("PLAYER");
+                string name = player.IsLocal ? T("YOU") : role;
+                string readyLabel = IsPlayerReady(player) ? T("READY") : T("WAITING");
+                label = name.PadRight(12) + readyLabel;
             }
             else if (!PhotonNetwork.InRoom && i == 0 && pendingCreateRoom)
             {
-                label = "HOST    READY";
+                label = T("HOST").PadRight(12) + T("READY");
             }
             else if (!PhotonNetwork.InRoom && i == 1 && !pendingCreateRoom)
             {
-                label = "YOU     READY";
+                label = T("YOU").PadRight(12) + T("READY");
             }
 
             slotTexts[i].text = label;
@@ -223,10 +244,75 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         if (startButton != null)
         {
             startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient || pendingCreateRoom);
-            startButton.interactable = PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient;
+            startButton.interactable = PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient && AreAllPlayersReady();
+        }
+
+        if (readyButton != null)
+        {
+            readyButton.interactable = PhotonNetwork.InRoom;
+            TMP_Text readyLabel = readyButton.GetComponentInChildren<TMP_Text>(true);
+            if (readyLabel != null)
+            {
+                readyLabel.text = IsPlayerReady(PhotonNetwork.LocalPlayer) ? T("Cancel Ready") : T("Ready");
+            }
         }
 
         RefreshBriefingPanel();
+    }
+
+    public void OnClickReady()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return;
+        }
+
+        SetLocalReady(!IsPlayerReady(PhotonNetwork.LocalPlayer));
+    }
+
+    private void SetLocalReady(bool isReady)
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return;
+        }
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        {
+            { ReadyPropertyKey, isReady }
+        });
+
+        RefreshPlayerSlots();
+    }
+
+    private bool IsPlayerReady(Player player)
+    {
+        if (player == null || player.CustomProperties == null)
+        {
+            return false;
+        }
+
+        return player.CustomProperties.TryGetValue(ReadyPropertyKey, out object value) &&
+               value is bool isReady &&
+               isReady;
+    }
+
+    private bool AreAllPlayersReady()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.PlayerList.Length <= 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
+        {
+            if (!IsPlayerReady(PhotonNetwork.PlayerList[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void RefreshBriefingPanel()
@@ -238,10 +324,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         int playerCount = PhotonNetwork.InRoom ? PhotonNetwork.CurrentRoom.PlayerCount : 1;
         briefingValueTexts[0].text = "R-03";
-        briefingValueTexts[1].text = "INVESTIGATE SIGNAL";
-        briefingValueTexts[2].text = "UNKNOWN";
+        briefingValueTexts[1].text = T("INVESTIGATE SIGNAL");
+        briefingValueTexts[2].text = T("UNKNOWN");
         briefingValueTexts[3].text = playerCount + " / " + MaxPlayers;
-        briefingValueTexts[4].text = PhotonNetwork.InRoom ? "WAITING FOR CREW" : "CONNECTING";
+        briefingValueTexts[4].text = PhotonNetwork.InRoom ? T("WAITING FOR CREW") : T("CONNECTING");
     }
 
     private string GetRoomCode()
@@ -320,7 +406,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         if (roomCodeText != null)
         {
-            roomCodeText.text = PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY");
+            roomCodeText.text = TranslateRoomTitle(PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"));
         }
     }
 
@@ -358,7 +444,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         Canvas canvas = CreateCanvas();
         CreateBackground(canvas.transform);
 
-        TMP_Text title = CreateText(canvas.transform, "TitleText", "ROOM LOBBY", 64f, FontStyles.UpperCase);
+        TMP_Text title = CreateText(canvas.transform, "TitleText", T("ROOM LOBBY"), 64f, FontStyles.UpperCase);
         RectTransform titleRect = title.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(0f, 1f);
@@ -374,14 +460,14 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         roomTitleRect.sizeDelta = new Vector2(520f, 44f);
         roomTitleText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
-        roomCodeText = CreateText(canvas.transform, "RoomCodeText", PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"), 34f, FontStyles.Normal);
+        roomCodeText = CreateText(canvas.transform, "RoomCodeText", TranslateRoomTitle(PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY")), 34f, FontStyles.Normal);
         RectTransform codeRect = roomCodeText.GetComponent<RectTransform>();
         codeRect.anchorMin = new Vector2(0f, 1f);
         codeRect.anchorMax = new Vector2(0f, 1f);
         codeRect.anchoredPosition = new Vector2(300f, -230f);
         codeRect.sizeDelta = new Vector2(520f, 56f);
 
-        networkStatusText = CreateText(canvas.transform, "NetworkStatusText", "PHOTON READY", 24f, FontStyles.UpperCase);
+        networkStatusText = CreateText(canvas.transform, "NetworkStatusText", T("PHOTON READY"), 24f, FontStyles.UpperCase);
         RectTransform statusRect = networkStatusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 1f);
         statusRect.anchorMax = new Vector2(0f, 1f);
@@ -415,19 +501,26 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         slotTexts.Clear();
         for (int i = 0; i < 4; i++)
         {
-            slotTexts.Add(CreateText(panel.transform, "Slot" + i, "EMPTY   WAITING", 30f, FontStyles.UpperCase));
+            slotTexts.Add(CreateText(panel.transform, "Slot" + i, T("EMPTY").PadRight(12) + T("WAITING"), 30f, FontStyles.UpperCase));
         }
 
         BuildRightInfoPanels(canvas.transform);
 
-        startButton = CreateButton(canvas.transform, "StartGameButton", "Start Game", 260f, 70f, 30f);
+        readyButton = CreateButton(canvas.transform, "ReadyButton", T("Ready"), 260f, 70f, 30f);
+        RectTransform readyRect = readyButton.GetComponent<RectTransform>();
+        readyRect.anchorMin = new Vector2(0f, 0f);
+        readyRect.anchorMax = new Vector2(0f, 0f);
+        readyRect.anchoredPosition = new Vector2(300f, 248f);
+        readyButton.onClick.AddListener(OnClickReady);
+
+        startButton = CreateButton(canvas.transform, "StartGameButton", T("Start Game"), 260f, 70f, 30f);
         RectTransform startRect = startButton.GetComponent<RectTransform>();
         startRect.anchorMin = new Vector2(0f, 0f);
         startRect.anchorMax = new Vector2(0f, 0f);
         startRect.anchoredPosition = new Vector2(300f, 160f);
         startButton.onClick.AddListener(OnClickStartGame);
 
-        Button backButton = CreateButton(canvas.transform, "BackButton", "Back", 260f, 70f, 30f);
+        Button backButton = CreateButton(canvas.transform, "BackButton", T("Back"), 260f, 70f, 30f);
         RectTransform backRect = backButton.GetComponent<RectTransform>();
         backRect.anchorMin = new Vector2(0f, 0f);
         backRect.anchorMax = new Vector2(0f, 0f);
@@ -451,7 +544,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private void CreateBackground(Transform parent)
     {
-        GameObject background = new GameObject("Background", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        GameObject background = new GameObject("BackgroundImage", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         background.transform.SetParent(parent, false);
 
         RectTransform rect = background.GetComponent<RectTransform>();
@@ -461,27 +554,41 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rect.offsetMax = Vector2.zero;
 
         Image image = background.GetComponent<Image>();
-        image.color = new Color(0.005f, 0.007f, 0.008f, 1f);
+        image.sprite = lobbyBackgroundSprite;
+        image.color = lobbyBackgroundSprite != null ? new Color(0.42f, 0.48f, 0.5f, 0.42f) : new Color(0.005f, 0.007f, 0.008f, 1f);
+        image.preserveAspect = false;
+
+        GameObject overlay = new GameObject("BackgroundDarkOverlay", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        overlay.transform.SetParent(parent, false);
+
+        RectTransform overlayRect = overlay.GetComponent<RectTransform>();
+        overlayRect.anchorMin = Vector2.zero;
+        overlayRect.anchorMax = Vector2.one;
+        overlayRect.offsetMin = Vector2.zero;
+        overlayRect.offsetMax = Vector2.zero;
+
+        Image overlayImage = overlay.GetComponent<Image>();
+        overlayImage.color = new Color(0f, 0f, 0f, 0.58f);
     }
 
     private void BuildRightInfoPanels(Transform parent)
     {
         Transform briefingPanel = CreateInfoPanel(parent, "MissionBriefingPanel", new Vector2(1320f, -250f), new Vector2(620f, 320f));
-        TMP_Text briefingTitle = CreateText(briefingPanel, "BriefingTitle", "MISSION BRIEFING", 34f, FontStyles.UpperCase);
+        TMP_Text briefingTitle = CreateText(briefingPanel, "BriefingTitle", T("MISSION BRIEFING"), 34f, FontStyles.UpperCase);
         ConfigurePanelTitle(briefingTitle);
 
         briefingValueTexts.Clear();
         CreateBriefingRow(briefingPanel, "FACILITY", "R-03");
-        CreateBriefingRow(briefingPanel, "OBJECTIVE", "INVESTIGATE SIGNAL");
-        CreateBriefingRow(briefingPanel, "THREAT LEVEL", "UNKNOWN");
+        CreateBriefingRow(briefingPanel, "OBJECTIVE", T("INVESTIGATE SIGNAL"));
+        CreateBriefingRow(briefingPanel, "THREAT LEVEL", T("UNKNOWN"));
         CreateBriefingRow(briefingPanel, "TEAM SIZE", "1 / " + MaxPlayers);
-        CreateBriefingRow(briefingPanel, "STATUS", "CONNECTING");
+        CreateBriefingRow(briefingPanel, "STATUS", T("CONNECTING"));
 
         Transform logPanel = CreateInfoPanel(parent, "SystemLogPanel", new Vector2(1320f, -630f), new Vector2(620f, 320f));
-        TMP_Text logTitle = CreateText(logPanel, "LogTitle", "SYSTEM LOG", 34f, FontStyles.UpperCase);
+        TMP_Text logTitle = CreateText(logPanel, "LogTitle", T("SYSTEM LOG"), 34f, FontStyles.UpperCase);
         ConfigurePanelTitle(logTitle);
 
-        systemLogText = CreateText(logPanel, "SystemLogText", "> Room initialized\n> Voice channel standby\n> Waiting for players", 24f, FontStyles.Normal);
+        systemLogText = CreateText(logPanel, "SystemLogText", "> " + T("Room initialized") + "\n> " + T("Voice channel standby") + "\n> " + T("Waiting for players"), 24f, FontStyles.Normal);
         RectTransform logRect = systemLogText.GetComponent<RectTransform>();
         logRect.anchorMin = new Vector2(0f, 1f);
         logRect.anchorMax = new Vector2(1f, 1f);
@@ -531,7 +638,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         int index = briefingValueTexts.Count;
         float y = -105f - index * 40f;
 
-        TMP_Text labelText = CreateText(parent, label + "Label", label, 22f, FontStyles.UpperCase);
+        TMP_Text labelText = CreateText(parent, label + "Label", T(label), 22f, FontStyles.UpperCase);
         RectTransform labelRect = labelText.GetComponent<RectTransform>();
         labelRect.anchorMin = new Vector2(0f, 1f);
         labelRect.anchorMax = new Vector2(0f, 1f);
@@ -556,17 +663,156 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         if (networkStatusText != null)
         {
-            networkStatusText.text = status;
+            networkStatusText.text = T(status);
         }
 
         if (systemLogText != null)
         {
-            systemLogText.text = "> " + status + "\n> Voice channel standby\n> Waiting for players";
+            systemLogText.text = "> " + T(status) + "\n> " + T("Voice channel standby") + "\n> " + T("Waiting for players");
         }
 
         RefreshBriefingPanel();
 
         Debug.Log(status);
+    }
+
+    private string T(string key)
+    {
+        if (key.StartsWith("JOINING ROOM "))
+        {
+            return T("JOINING ROOM") + " " + key.Substring("JOINING ROOM ".Length);
+        }
+
+        if (key.StartsWith("CREATING ROOM "))
+        {
+            return T("CREATING ROOM") + " " + key.Substring("CREATING ROOM ".Length);
+        }
+
+        if (key.StartsWith("CREATE FAILED: "))
+        {
+            return T("CREATE FAILED") + ": " + key.Substring("CREATE FAILED: ".Length);
+        }
+
+        if (key.StartsWith("DISCONNECTED: "))
+        {
+            return T("DISCONNECTED") + ": " + key.Substring("DISCONNECTED: ".Length);
+        }
+
+        switch (languageIndex)
+        {
+            case 1:
+                return key;
+            case 2:
+                return TranslateJapanese(key);
+            default:
+                return TranslateKorean(key);
+        }
+    }
+
+    private string TranslateRoomTitle(string title)
+    {
+        if (title == "Private Room" || title == "Public Room" || title == "ROOM LOBBY")
+        {
+            return T(title);
+        }
+
+        return title;
+    }
+
+    private string TranslateKorean(string key)
+    {
+        switch (key)
+        {
+            case "ROOM LOBBY": return "방 로비";
+            case "Private Room": return "비공개 방";
+            case "Public Room": return "공개 방";
+            case "PHOTON READY": return "포톤 준비됨";
+            case "HOST ONLY": return "호스트만 가능";
+            case "WAITING READY": return "준비 대기 중";
+            case "PHOTON CONNECTED": return "포톤 연결됨";
+            case "ROOM CREATED": return "방 생성됨";
+            case "CREATE FAILED": return "방 생성 실패";
+            case "ROOM NOT FOUND": return "방을 찾을 수 없음";
+            case "HOST READY": return "호스트 준비됨";
+            case "CONNECTED": return "연결됨";
+            case "CONNECTING PHOTON": return "포톤 연결 중";
+            case "JOINING ROOM": return "방 참가 중";
+            case "CREATING ROOM": return "방 생성 중";
+            case "DISCONNECTED": return "연결 끊김";
+            case "YOU": return "나";
+            case "HOST": return "호스트";
+            case "PLAYER": return "플레이어";
+            case "READY": return "준비";
+            case "WAITING": return "대기";
+            case "EMPTY": return "비어 있음";
+            case "Ready": return "준비";
+            case "Cancel Ready": return "준비 취소";
+            case "Start Game": return "게임 시작";
+            case "Back": return "뒤로";
+            case "MISSION BRIEFING": return "임무 브리핑";
+            case "FACILITY": return "시설";
+            case "OBJECTIVE": return "목표";
+            case "THREAT LEVEL": return "위험도";
+            case "TEAM SIZE": return "팀 인원";
+            case "STATUS": return "상태";
+            case "INVESTIGATE SIGNAL": return "신호 조사";
+            case "UNKNOWN": return "알 수 없음";
+            case "WAITING FOR CREW": return "대원 대기 중";
+            case "CONNECTING": return "연결 중";
+            case "SYSTEM LOG": return "시스템 로그";
+            case "Room initialized": return "방 초기화됨";
+            case "Voice channel standby": return "음성 채널 대기";
+            case "Waiting for players": return "플레이어 대기 중";
+            default: return key;
+        }
+    }
+
+    private string TranslateJapanese(string key)
+    {
+        switch (key)
+        {
+            case "ROOM LOBBY": return "ルームロビー";
+            case "Private Room": return "プライベートルーム";
+            case "Public Room": return "公開ルーム";
+            case "PHOTON READY": return "Photon準備完了";
+            case "HOST ONLY": return "ホストのみ";
+            case "WAITING READY": return "準備待ち";
+            case "PHOTON CONNECTED": return "Photon接続済み";
+            case "ROOM CREATED": return "ルーム作成済み";
+            case "ROOM NOT FOUND": return "ルームなし";
+            case "HOST READY": return "ホスト準備完了";
+            case "CONNECTED": return "接続済み";
+            case "CONNECTING PHOTON": return "Photon接続中";
+            case "JOINING ROOM": return "ルーム参加中";
+            case "CREATING ROOM": return "ルーム作成中";
+            case "CREATE FAILED": return "作成失敗";
+            case "DISCONNECTED": return "切断";
+            case "YOU": return "自分";
+            case "HOST": return "ホスト";
+            case "PLAYER": return "プレイヤー";
+            case "READY": return "準備完了";
+            case "WAITING": return "待機中";
+            case "EMPTY": return "空き";
+            case "Ready": return "準備";
+            case "Cancel Ready": return "準備取消";
+            case "Start Game": return "ゲーム開始";
+            case "Back": return "戻る";
+            case "MISSION BRIEFING": return "任務ブリーフィング";
+            case "FACILITY": return "施設";
+            case "OBJECTIVE": return "目標";
+            case "THREAT LEVEL": return "脅威度";
+            case "TEAM SIZE": return "チーム人数";
+            case "STATUS": return "状態";
+            case "INVESTIGATE SIGNAL": return "信号を調査";
+            case "UNKNOWN": return "不明";
+            case "WAITING FOR CREW": return "クルー待機中";
+            case "CONNECTING": return "接続中";
+            case "SYSTEM LOG": return "システムログ";
+            case "Room initialized": return "ルーム初期化";
+            case "Voice channel standby": return "ボイスチャンネル待機";
+            case "Waiting for players": return "プレイヤー待機中";
+            default: return key;
+        }
     }
 
     private TMP_Text CreateText(Transform parent, string objectName, string text, float fontSize, FontStyles fontStyle)
@@ -582,6 +828,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         label.alignment = TextAlignmentOptions.Center;
         label.color = new Color(0.76f, 0.82f, 0.84f, 1f);
         label.raycastTarget = false;
+        LocalizedTmpFontProvider.Apply(label);
 
         RectTransform rect = textObject.GetComponent<RectTransform>();
         rect.sizeDelta = new Vector2(420f, 42f);
