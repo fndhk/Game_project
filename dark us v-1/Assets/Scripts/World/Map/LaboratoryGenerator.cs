@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using Photon.Pun;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -11,9 +10,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
     {
         [Header("Basic")]
         public bool GenerateOnStart = true;
-
-        [Tooltip("PUN 방에서 시작하면 호스트가 저장한 seed로 모든 클라이언트가 같은 맵을 생성")]
-        public bool UsePhotonRoomSeed = true;
 
         [Tooltip("메인 맵에 생성할 방/복도 개수. 시작방은 별도 생성")]
         [Range(3, 200)]
@@ -321,13 +317,8 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
         }
 
-        private bool hasPhotonMapSeed;
-        private int photonMapSeed;
-
         private void Start()
         {
-            ApplyPhotonRoomSeed();
-
             if (GenerateOnStart)
             {
                 StartCoroutine(StartGeneration());
@@ -475,7 +466,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             BlockRemainingExits();
             ApplyRuntimeVisualState();
             SpawnPlayersAfterGeneratedMap();
-            ApplyPhotonStageSeed(2000003, "item");
             SpawnItemsAfterGeneratedMap();
 
             return true;
@@ -1460,11 +1450,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return;
             }
 
-            if (TrySpawnLocalPhotonPlayer())
-            {
-                return;
-            }
-
             int desiredSpawnCount = GetDesiredPlayerSpawnCount();
 
             if (desiredSpawnCount <= 0)
@@ -1514,87 +1499,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             Debug.Log("[LaboratoryGenerator] Player spawn finished. Count: " + spawnedCount);
-        }
-
-        private bool TrySpawnLocalPhotonPlayer()
-        {
-            if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
-            {
-                return false;
-            }
-
-            List<Transform> existingPlayers = CollectExistingPlayers();
-            Transform localPlayerTransform = null;
-
-            if (existingPlayers != null && existingPlayers.Count > 0)
-            {
-                localPlayerTransform = existingPlayers[0];
-            }
-
-            if (localPlayerTransform == null)
-            {
-                return false;
-            }
-
-            List<SpawnPointRecord> spawnPoints = CollectSpawnPoints(PlayerSpawnPointPrefix, IncludeInactivePlayerSpawnPoints, PlayerSpawnOnlyInRooms);
-
-            if (spawnPoints.Count <= 0)
-            {
-                Debug.LogWarning("[LaboratoryGenerator] PlayerSpawnPoint를 찾지 못함.");
-                return true;
-            }
-
-            int localPlayerIndex = GetPhotonLocalPlayerIndex();
-            int playerCount = Mathf.Max(1, PhotonNetwork.PlayerList.Length);
-            List<SpawnPointRecord> usedPoints = new List<SpawnPointRecord>();
-            HashSet<Cell> usedRooms = new HashSet<Cell>();
-            SpawnPointRecord selectedPoint = null;
-
-            for (int i = 0; i < playerCount; i++)
-            {
-                SpawnPointRecord point = SelectPlayerSpawnPoint(spawnPoints, usedPoints, usedRooms);
-                if (point == null)
-                {
-                    break;
-                }
-
-                usedPoints.Add(point);
-                usedRooms.Add(point.OwnerCell);
-
-                if (i == localPlayerIndex)
-                {
-                    selectedPoint = point;
-                }
-            }
-
-            if (selectedPoint == null)
-            {
-                selectedPoint = SelectPlayerSpawnPoint(spawnPoints, usedPoints, usedRooms);
-            }
-
-            if (selectedPoint != null)
-            {
-                MovePlayerToSpawnPoint(localPlayerTransform, selectedPoint.Point);
-                playerSpawnedCells.Add(selectedPoint.OwnerCell);
-                playerSpawnedPositions.Add(localPlayerTransform.position);
-            }
-
-            Debug.Log("[LaboratoryGenerator] Photon local player spawn index: " + localPlayerIndex);
-            return true;
-        }
-
-        private int GetPhotonLocalPlayerIndex()
-        {
-            Photon.Realtime.Player[] players = PhotonNetwork.PlayerList;
-            for (int i = 0; i < players.Length; i++)
-            {
-                if (players[i] != null && players[i].ActorNumber == PhotonNetwork.LocalPlayer.ActorNumber)
-                {
-                    return i;
-                }
-            }
-
-            return 0;
         }
 
         // 맵 생성 후 아이템을 ItemSpawnPoint 중 랜덤 위치에 생성한다.
@@ -2077,49 +1981,6 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             itemObject.transform.position += Vector3.up * deltaY;
-        }
-
-        private void ApplyPhotonRoomSeed()
-        {
-            hasPhotonMapSeed = false;
-
-            if (!UsePhotonRoomSeed || !PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
-            {
-                return;
-            }
-
-            if (PhotonNetwork.CurrentRoom.CustomProperties == null ||
-                !PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("mapSeed", out object value))
-            {
-                return;
-            }
-
-            int seed;
-            if (value is int intSeed)
-            {
-                seed = intSeed;
-            }
-            else if (!int.TryParse(value.ToString(), out seed))
-            {
-                return;
-            }
-
-            Random.InitState(seed);
-            photonMapSeed = seed;
-            hasPhotonMapSeed = true;
-            Debug.Log("[LaboratoryGenerator] Photon map seed applied: " + seed);
-        }
-
-        private void ApplyPhotonStageSeed(int salt, string stageName)
-        {
-            if (!hasPhotonMapSeed)
-            {
-                return;
-            }
-
-            int stageSeed = unchecked(photonMapSeed + salt);
-            Random.InitState(stageSeed);
-            Debug.Log("[LaboratoryGenerator] Photon " + stageName + " seed applied: " + stageSeed);
         }
 
         // ItemSpawnPoint가 선반/가구 높이에 있어도 실제로 보이는 지지대가 없으므로 Cell의 층 바닥 높이를 우선 사용한다.
