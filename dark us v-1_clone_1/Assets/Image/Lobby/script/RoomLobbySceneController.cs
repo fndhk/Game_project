@@ -1,19 +1,23 @@
+<<<<<<< HEAD
 using System.Collections.Generic;
 using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
+=======
+>>>>>>> parent of cd8883a (0508)
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class RoomLobbySceneController : MonoBehaviourPunCallbacks
+public class RoomLobbySceneController : MonoBehaviour
 {
     public string mainMenuSceneName = "LobbyScene 1";
     public string publicRoomListSceneName = "PublicRoomListScene";
     public string gameSceneName = "labor";
 
+<<<<<<< HEAD
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
     private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
@@ -32,15 +36,19 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private bool pendingCreateRoom;
     private int createRetryCount;
 
+=======
+>>>>>>> parent of cd8883a (0508)
     private void Start()
     {
         EnsureEventSystem();
         BuildRoomLobbyUi();
-        StartPhotonRoomFlow();
     }
 
     public void OnClickStartGame()
     {
+<<<<<<< HEAD
+        LoadScene(gameSceneName);
+=======
         if (!PhotonNetwork.IsMasterClient)
         {
             SetNetworkStatus("HOST ONLY");
@@ -50,19 +58,15 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
         PhotonNetwork.LoadLevel(gameSceneName);
+>>>>>>> parent of 44c39c3 (0508)
     }
 
     public void OnClickBack()
     {
-        if (PhotonNetwork.InRoom)
-        {
-            PhotonNetwork.LeaveRoom();
-            return;
-        }
-
         LoadScene(mainMenuSceneName);
     }
 
+<<<<<<< HEAD
     public override void OnConnectedToMaster()
     {
         SetNetworkStatus("PHOTON CONNECTED");
@@ -309,6 +313,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
     }
 
+=======
+>>>>>>> parent of cd8883a (0508)
     private void LoadScene(string sceneName)
     {
         if (string.IsNullOrWhiteSpace(sceneName))
@@ -343,6 +349,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         titleRect.sizeDelta = new Vector2(520f, 90f);
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 44c39c3 (0508)
         roomTitleText = CreateText(canvas.transform, "RoomTitleText", PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"), 28f, FontStyles.Normal);
         RectTransform roomTitleRect = roomTitleText.GetComponent<RectTransform>();
         roomTitleRect.anchorMin = new Vector2(0f, 1f);
@@ -353,11 +363,16 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         roomCodeText = CreateText(canvas.transform, "RoomCodeText", "ROOM CODE " + GetRoomCode(), 34f, FontStyles.UpperCase);
         RectTransform codeRect = roomCodeText.GetComponent<RectTransform>();
+=======
+        TMP_Text code = CreateText(canvas.transform, "RoomCodeText", "ROOM CODE 0000", 34f, FontStyles.UpperCase);
+        RectTransform codeRect = code.GetComponent<RectTransform>();
+>>>>>>> parent of cd8883a (0508)
         codeRect.anchorMin = new Vector2(0f, 1f);
         codeRect.anchorMax = new Vector2(0f, 1f);
         codeRect.anchoredPosition = new Vector2(300f, -258f);
         codeRect.sizeDelta = new Vector2(520f, 56f);
 
+<<<<<<< HEAD
         networkStatusText = CreateText(canvas.transform, "NetworkStatusText", "PHOTON READY", 24f, FontStyles.UpperCase);
         RectTransform statusRect = networkStatusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 1f);
@@ -365,6 +380,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         statusRect.anchoredPosition = new Vector2(300f, -310f);
         statusRect.sizeDelta = new Vector2(620f, 42f);
 
+=======
+>>>>>>> parent of cd8883a (0508)
         GameObject panel = new GameObject("CrewPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup));
         panel.layer = canvas.gameObject.layer;
         panel.transform.SetParent(canvas.transform, false);
@@ -389,15 +406,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         layout.childControlWidth = true;
         layout.childControlHeight = false;
 
-        slotTexts.Clear();
-        for (int i = 0; i < 4; i++)
-        {
-            slotTexts.Add(CreateText(panel.transform, "Slot" + i, "EMPTY   WAITING", 30f, FontStyles.UpperCase));
-        }
+        CreateText(panel.transform, "SlotHost", "HOST    READY", 30f, FontStyles.UpperCase);
+        CreateText(panel.transform, "SlotEmpty1", "EMPTY   WAITING", 30f, FontStyles.UpperCase);
+        CreateText(panel.transform, "SlotEmpty2", "EMPTY   WAITING", 30f, FontStyles.UpperCase);
+        CreateText(panel.transform, "SlotEmpty3", "EMPTY   WAITING", 30f, FontStyles.UpperCase);
 
-        BuildRightInfoPanels(canvas.transform);
-
-        startButton = CreateButton(canvas.transform, "StartGameButton", "Start Game", 260f, 70f, 30f);
+        Button startButton = CreateButton(canvas.transform, "StartGameButton", "Start Game", 260f, 70f, 30f);
         RectTransform startRect = startButton.GetComponent<RectTransform>();
         startRect.anchorMin = new Vector2(0f, 0f);
         startRect.anchorMax = new Vector2(0f, 0f);
@@ -439,111 +453,6 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         Image image = background.GetComponent<Image>();
         image.color = new Color(0.005f, 0.007f, 0.008f, 1f);
-    }
-
-    private void BuildRightInfoPanels(Transform parent)
-    {
-        Transform briefingPanel = CreateInfoPanel(parent, "MissionBriefingPanel", new Vector2(1320f, -250f), new Vector2(620f, 320f));
-        TMP_Text briefingTitle = CreateText(briefingPanel, "BriefingTitle", "MISSION BRIEFING", 34f, FontStyles.UpperCase);
-        ConfigurePanelTitle(briefingTitle);
-
-        briefingValueTexts.Clear();
-        CreateBriefingRow(briefingPanel, "FACILITY", "R-03");
-        CreateBriefingRow(briefingPanel, "OBJECTIVE", "INVESTIGATE SIGNAL");
-        CreateBriefingRow(briefingPanel, "THREAT LEVEL", "UNKNOWN");
-        CreateBriefingRow(briefingPanel, "TEAM SIZE", "1 / " + MaxPlayers);
-        CreateBriefingRow(briefingPanel, "STATUS", "CONNECTING");
-
-        Transform logPanel = CreateInfoPanel(parent, "SystemLogPanel", new Vector2(1320f, -630f), new Vector2(620f, 320f));
-        TMP_Text logTitle = CreateText(logPanel, "LogTitle", "SYSTEM LOG", 34f, FontStyles.UpperCase);
-        ConfigurePanelTitle(logTitle);
-
-        systemLogText = CreateText(logPanel, "SystemLogText", "> Room initialized\n> Voice channel standby\n> Waiting for players", 24f, FontStyles.Normal);
-        RectTransform logRect = systemLogText.GetComponent<RectTransform>();
-        logRect.anchorMin = new Vector2(0f, 1f);
-        logRect.anchorMax = new Vector2(1f, 1f);
-        logRect.anchoredPosition = new Vector2(0f, -160f);
-        logRect.sizeDelta = new Vector2(-64f, 170f);
-        systemLogText.alignment = TextAlignmentOptions.TopLeft;
-        systemLogText.enableWordWrapping = true;
-
-        RefreshBriefingPanel();
-    }
-
-    private Transform CreateInfoPanel(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size)
-    {
-        GameObject panel = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
-        panel.layer = parent.gameObject.layer;
-        panel.transform.SetParent(parent, false);
-
-        RectTransform rect = panel.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.anchoredPosition = anchoredPosition;
-        rect.sizeDelta = size;
-
-        Image image = panel.GetComponent<Image>();
-        image.color = new Color(0.015f, 0.018f, 0.02f, 0.58f);
-
-        Outline outline = panel.GetComponent<Outline>();
-        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.32f);
-        outline.effectDistance = new Vector2(2f, -2f);
-
-        return panel.transform;
-    }
-
-    private void ConfigurePanelTitle(TMP_Text title)
-    {
-        RectTransform rect = title.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -42f);
-        rect.sizeDelta = new Vector2(-64f, 54f);
-        title.alignment = TextAlignmentOptions.Left;
-        title.color = new Color(1f, 0.8f, 0.42f, 1f);
-    }
-
-    private void CreateBriefingRow(Transform parent, string label, string value)
-    {
-        int index = briefingValueTexts.Count;
-        float y = -105f - index * 40f;
-
-        TMP_Text labelText = CreateText(parent, label + "Label", label, 22f, FontStyles.UpperCase);
-        RectTransform labelRect = labelText.GetComponent<RectTransform>();
-        labelRect.anchorMin = new Vector2(0f, 1f);
-        labelRect.anchorMax = new Vector2(0f, 1f);
-        labelRect.anchoredPosition = new Vector2(148f, y);
-        labelRect.sizeDelta = new Vector2(210f, 34f);
-        labelText.alignment = TextAlignmentOptions.Left;
-        labelText.color = new Color(0.62f, 0.7f, 0.72f, 1f);
-
-        TMP_Text valueText = CreateText(parent, label + "Value", value, 22f, FontStyles.UpperCase);
-        RectTransform valueRect = valueText.GetComponent<RectTransform>();
-        valueRect.anchorMin = new Vector2(0f, 1f);
-        valueRect.anchorMax = new Vector2(0f, 1f);
-        valueRect.anchoredPosition = new Vector2(412f, y);
-        valueRect.sizeDelta = new Vector2(300f, 34f);
-        valueText.alignment = TextAlignmentOptions.Left;
-        valueText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
-
-        briefingValueTexts.Add(valueText);
-    }
-
-    private void SetNetworkStatus(string status)
-    {
-        if (networkStatusText != null)
-        {
-            networkStatusText.text = status;
-        }
-
-        if (systemLogText != null)
-        {
-            systemLogText.text = "> " + status + "\n> Voice channel standby\n> Waiting for players";
-        }
-
-        RefreshBriefingPanel();
-
-        Debug.Log(status);
     }
 
     private TMP_Text CreateText(Transform parent, string objectName, string text, float fontSize, FontStyles fontStyle)
