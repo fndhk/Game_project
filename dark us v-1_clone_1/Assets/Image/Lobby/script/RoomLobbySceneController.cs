@@ -19,6 +19,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
     private const string RoomTitlePrefsKey = "dark_us_room_title";
     private const string RoomTitlePropertyKey = "title";
+    private const string MapSeedPropertyKey = "mapSeed";
     private const byte MaxPlayers = 12;
 
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
@@ -49,6 +50,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
+        EnsureMapSeedProperty();
         PhotonNetwork.LoadLevel(gameSceneName);
     }
 
@@ -71,6 +73,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnCreatedRoom()
     {
+        EnsureMapSeedProperty();
         SetNetworkStatus("ROOM CREATED");
     }
 
@@ -183,9 +186,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             CleanupCacheOnLeave = true,
             CustomRoomProperties = new Hashtable
             {
-                { RoomTitlePropertyKey, roomTitle }
+                { RoomTitlePropertyKey, roomTitle },
+                { MapSeedPropertyKey, Random.Range(1, int.MaxValue) }
             },
-            CustomRoomPropertiesForLobby = new[] { RoomTitlePropertyKey }
+            CustomRoomPropertiesForLobby = new[] { RoomTitlePropertyKey, MapSeedPropertyKey }
         };
 
         SetNetworkStatus("CREATING ROOM " + pendingRoomCode);
@@ -270,6 +274,25 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
     }
 
+    private void EnsureMapSeedProperty()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || !PhotonNetwork.IsMasterClient)
+        {
+            return;
+        }
+
+        if (PhotonNetwork.CurrentRoom.CustomProperties != null &&
+            PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(MapSeedPropertyKey))
+        {
+            return;
+        }
+
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { MapSeedPropertyKey, Random.Range(1, int.MaxValue) }
+        });
+    }
+
     private string GetBackSceneName()
     {
         return PlayerPrefs.GetInt(RoomVisiblePrefsKey, 0) == 1 ? publicRoomListSceneName : mainMenuSceneName;
@@ -297,7 +320,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         if (roomCodeText != null)
         {
-            roomCodeText.text = "ROOM CODE " + pendingRoomCode;
+            roomCodeText.text = PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY");
         }
     }
 
@@ -305,7 +328,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         if (roomTitleText != null)
         {
-            roomTitleText.text = PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY");
+            roomTitleText.text = string.Empty;
         }
     }
 
@@ -343,7 +366,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         titleRect.sizeDelta = new Vector2(520f, 90f);
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        roomTitleText = CreateText(canvas.transform, "RoomTitleText", PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"), 28f, FontStyles.Normal);
+        roomTitleText = CreateText(canvas.transform, "RoomTitleText", string.Empty, 28f, FontStyles.Normal);
         RectTransform roomTitleRect = roomTitleText.GetComponent<RectTransform>();
         roomTitleRect.anchorMin = new Vector2(0f, 1f);
         roomTitleRect.anchorMax = new Vector2(0f, 1f);
@@ -351,18 +374,18 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         roomTitleRect.sizeDelta = new Vector2(520f, 44f);
         roomTitleText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
-        roomCodeText = CreateText(canvas.transform, "RoomCodeText", "ROOM CODE " + GetRoomCode(), 34f, FontStyles.UpperCase);
+        roomCodeText = CreateText(canvas.transform, "RoomCodeText", PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"), 34f, FontStyles.Normal);
         RectTransform codeRect = roomCodeText.GetComponent<RectTransform>();
         codeRect.anchorMin = new Vector2(0f, 1f);
         codeRect.anchorMax = new Vector2(0f, 1f);
-        codeRect.anchoredPosition = new Vector2(300f, -258f);
+        codeRect.anchoredPosition = new Vector2(300f, -230f);
         codeRect.sizeDelta = new Vector2(520f, 56f);
 
         networkStatusText = CreateText(canvas.transform, "NetworkStatusText", "PHOTON READY", 24f, FontStyles.UpperCase);
         RectTransform statusRect = networkStatusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 1f);
         statusRect.anchorMax = new Vector2(0f, 1f);
-        statusRect.anchoredPosition = new Vector2(300f, -310f);
+        statusRect.anchoredPosition = new Vector2(300f, -282f);
         statusRect.sizeDelta = new Vector2(620f, 42f);
 
         GameObject panel = new GameObject("CrewPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup));

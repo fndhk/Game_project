@@ -180,6 +180,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         }
 
         bool hasRoom = false;
+        int roomIndex = 1;
         foreach (RoomInfo room in publicRooms.Values)
         {
             if (!room.IsOpen || !room.IsVisible || !IsValidRoomCode(room.Name) || room.PlayerCount >= room.MaxPlayers)
@@ -188,7 +189,8 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
             }
 
             hasRoom = true;
-            CreateRoomRow(room);
+            CreateRoomRow(room, roomIndex);
+            roomIndex++;
         }
 
         if (emptyText != null)
@@ -197,23 +199,38 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         }
     }
 
-    private void CreateRoomRow(RoomInfo room)
+    private void CreateRoomRow(RoomInfo room, int index)
     {
         string roomTitle = GetRoomTitle(room);
-        Button button = CreateButton(roomListContent, "Room_" + room.Name, roomTitle + "        ROOM " + room.Name + "        " + room.PlayerCount + " / " + room.MaxPlayers, 980f, 70f, 26f);
+        Button button = CreateButton(roomListContent, "Room_" + room.Name, string.Empty, 980f, 70f, 26f);
         LayoutElement layout = button.GetComponent<LayoutElement>();
         layout.preferredWidth = 980f;
         layout.preferredHeight = 70f;
 
         TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
-        label.alignment = TextAlignmentOptions.Left;
-        label.fontStyle = FontStyles.Normal;
-        RectTransform labelRect = label.GetComponent<RectTransform>();
-        labelRect.offsetMin = new Vector2(34f, 0f);
-        labelRect.offsetMax = new Vector2(-34f, 0f);
+        if (label != null)
+        {
+            label.text = string.Empty;
+        }
+
+        CreateRoomRowText(button.transform, "IndexText", index.ToString(), 34f, 90f, TextAlignmentOptions.MidlineLeft);
+        CreateRoomRowText(button.transform, "TitleText", roomTitle, 150f, 620f, TextAlignmentOptions.MidlineLeft);
+        CreateRoomRowText(button.transform, "PlayerCountText", room.PlayerCount + " / " + room.MaxPlayers, 790f, 156f, TextAlignmentOptions.MidlineRight);
 
         string roomName = room.Name;
         button.onClick.AddListener(() => JoinPublicRoom(roomName));
+    }
+
+    private void CreateRoomRowText(Transform parent, string objectName, string value, float x, float width, TextAlignmentOptions alignment)
+    {
+        TMP_Text text = CreateText(parent, objectName, value, 26f, FontStyles.Normal);
+        RectTransform rect = text.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = new Vector2(x, 0f);
+        rect.sizeDelta = new Vector2(width, 0f);
+        text.alignment = alignment;
     }
 
     private string GetRoomTitle(RoomInfo room)
