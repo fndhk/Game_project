@@ -18,6 +18,7 @@ public class InGamePauseMenu : MonoBehaviour
     private Canvas canvas;
     private GameObject root;
     private GameObject settingsRoot;
+    private GameObject settingsActionRoot;
     private GameObject confirmDialog;
     private TMP_Text titleText;
     private TMP_Text bodyText;
@@ -26,7 +27,9 @@ public class InGamePauseMenu : MonoBehaviour
     private CursorLockMode previousLockState;
     private bool previousCursorVisible;
     private bool isOpen;
+    private string currentPanelKey;
     private System.Action pendingConfirmAction;
+    private Sprite roundSliderHandleSprite;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateForLoadedScene()
@@ -164,70 +167,74 @@ public class InGamePauseMenu : MonoBehaviour
     private void ShowHomePanel()
     {
         SetSettingsVisible(false);
-        titleText.text = "PAUSED";
+        currentPanelKey = "PAUSED";
+        titleText.text = T("PAUSED");
         roomCodeText.text = GetRoomCodeLine();
         SetBody(
-            "SESSION\n" +
+            T("SESSION") + "\n" +
             GetRoomCodeLine() + "\n\n" +
-            "STATUS\n" +
+            T("STATUS") + "\n" +
             GetNetworkStatusLine() + "\n\n" +
-            "ESC closes this menu."
+            T("ESC closes this menu.")
         );
     }
 
     private void ShowSettingsPanel()
     {
         SetSettingsVisible(true);
-        titleText.text = "SETTINGS";
-        roomCodeText.text = "IN-GAME SETTINGS";
+        currentPanelKey = "SETTINGS";
+        titleText.text = T("SETTINGS");
+        roomCodeText.text = T("IN-GAME SETTINGS");
     }
 
     private void ShowControlsPanel()
     {
         SetSettingsVisible(false);
-        titleText.text = "CONTROLS";
+        currentPanelKey = "CONTROLS";
+        titleText.text = T("CONTROLS");
         SetBody(
-            "WASD        MOVE\n" +
-            "MOUSE       LOOK\n" +
-            "SHIFT       SPRINT\n" +
-            "CTRL        CROUCH\n" +
-            "E           INTERACT\n" +
-            "F           PICK UP\n" +
-            "1 / 2       SELECT ITEM\n" +
-            "LMB         USE ITEM\n" +
-            "G           DROP ITEM\n" +
-            "V           VOICE\n" +
-            "ESC         PAUSE"
+            T("WASD        MOVE") + "\n" +
+            T("MOUSE       LOOK") + "\n" +
+            T("SHIFT       SPRINT") + "\n" +
+            T("CTRL        CROUCH") + "\n" +
+            T("E           INTERACT") + "\n" +
+            T("F           PICK UP") + "\n" +
+            T("1 / 2       SELECT ITEM") + "\n" +
+            T("LMB         USE ITEM") + "\n" +
+            T("G           DROP ITEM") + "\n" +
+            T("V           VOICE") + "\n" +
+            T("ESC         PAUSE")
         );
     }
 
     private void ShowPlayersPanel()
     {
         SetSettingsVisible(false);
-        titleText.text = "PLAYERS";
+        currentPanelKey = "PLAYERS";
+        titleText.text = T("PLAYERS");
         RefreshPlayersPanel();
     }
 
     private void RefreshPlayersPanel()
     {
-        if (titleText == null || titleText.text != "PLAYERS")
+        if (titleText == null || currentPanelKey != "PLAYERS")
         {
             return;
         }
 
         if (!PhotonNetwork.InRoom)
         {
-            SetBody("Not connected to a Photon room.");
+            SetBody(T("Not connected to a Photon room."));
             return;
         }
 
-        string body = "CREW\n";
+        string body = T("CREW") + "\n";
         Player[] players = PhotonNetwork.PlayerList;
         for (int i = 0; i < players.Length; i++)
         {
             Player player = players[i];
-            string role = player.IsMasterClient ? "HOST" : "PLAYER";
-            string local = player.IsLocal ? "YOU" : "REMOTE";
+            string role = player.IsMasterClient ? T("HOST") : T("PLAYER");
+            string local = player.IsLocal ? T("YOU") : T("REMOTE");
             body += "> " + local + "    " + role + "    ID " + player.ActorNumber + "\n";
         }
 
@@ -297,17 +304,17 @@ public class InGamePauseMenu : MonoBehaviour
     {
         if (PhotonNetwork.InRoom)
         {
-            return "ROOM CODE " + PhotonNetwork.CurrentRoom.Name;
+            return T("ROOM CODE") + " " + PhotonNetwork.CurrentRoom.Name;
         }
 
-        return "ROOM CODE ----";
+        return T("ROOM CODE") + " ----";
     }
 
     private string GetNetworkStatusLine()
     {
         if (PhotonNetwork.InRoom)
         {
-            return "CONNECTED  " + PhotonNetwork.CurrentRoom.PlayerCount + " / " + PhotonNetwork.CurrentRoom.MaxPlayers;
+            return T("CONNECTED") + "  " + PhotonNetwork.CurrentRoom.PlayerCount + " / " + PhotonNetwork.CurrentRoom.MaxPlayers;
         }
 
         return PhotonNetwork.NetworkClientState.ToString().ToUpperInvariant();
@@ -328,6 +335,11 @@ public class InGamePauseMenu : MonoBehaviour
             settingsRoot.SetActive(visible);
         }
 
+        if (settingsActionRoot != null)
+        {
+            settingsActionRoot.SetActive(visible);
+        }
+
         if (bodyText != null)
         {
             bodyText.gameObject.SetActive(!visible);
@@ -341,8 +353,8 @@ public class InGamePauseMenu : MonoBehaviour
         TMP_Text[] texts = confirmDialog.GetComponentsInChildren<TMP_Text>(true);
         if (texts.Length >= 2)
         {
-            texts[0].text = title;
-            texts[1].text = message;
+            texts[0].text = T(title);
+            texts[1].text = T(message);
         }
     }
 
@@ -391,22 +403,22 @@ public class InGamePauseMenu : MonoBehaviour
         menuLayout.childForceExpandWidth = true;
         menuLayout.childForceExpandHeight = false;
 
-        TMP_Text logo = CreateText(leftPanel.transform, "MenuTitle", "dark Us", 46f, FontStyles.Normal);
+        TMP_Text logo = CreateText(leftPanel.transform, "MenuTitle", T("dark Us"), 46f, FontStyles.Normal);
         logo.color = new Color(0.76f, 0.82f, 0.84f, 1f);
         SetLayoutSize(logo.gameObject, 0f, 60f);
 
-        CreateButton(leftPanel.transform, "ResumeButton", "Resume", SetOpenFalse);
-        CreateButton(leftPanel.transform, "SettingsButton", "Settings", ShowSettingsPanel);
-        CreateButton(leftPanel.transform, "ControlsButton", "Controls", ShowControlsPanel);
-        CreateButton(leftPanel.transform, "PlayersButton", "Players", ShowPlayersPanel);
+        CreateButton(leftPanel.transform, "ResumeButton", T("Resume"), SetOpenFalse);
+        CreateButton(leftPanel.transform, "SettingsButton", T("Settings"), ShowSettingsPanel);
+        CreateButton(leftPanel.transform, "ControlsButton", T("Controls"), ShowControlsPanel);
+        CreateButton(leftPanel.transform, "PlayersButton", T("Players"), ShowPlayersPanel);
         CreateSpacer(leftPanel.transform, 18f);
-        CreateButton(leftPanel.transform, "ReturnLobbyButton", "Return to Lobby", ConfirmReturnToLobby);
-        CreateButton(leftPanel.transform, "MainMenuButton", "Quit to Main Menu", ConfirmQuitToMainMenu);
-        CreateButton(leftPanel.transform, "QuitGameButton", "Quit Game", ConfirmQuitGame);
+        CreateButton(leftPanel.transform, "ReturnLobbyButton", T("Return to Lobby"), ConfirmReturnToLobby);
+        CreateButton(leftPanel.transform, "MainMenuButton", T("Quit to Main Menu"), ConfirmQuitToMainMenu);
+        CreateButton(leftPanel.transform, "QuitGameButton", T("Quit Game"), ConfirmQuitGame);
 
         GameObject infoPanel = CreatePanel(root.transform, "InfoPanel", new Vector2(-120f, 0f), new Vector2(940f, 780f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
 
-        titleText = CreateText(infoPanel.transform, "TitleText", "PAUSED", 62f, FontStyles.Normal);
+        titleText = CreateText(infoPanel.transform, "TitleText", T("PAUSED"), 62f, FontStyles.Normal);
         RectTransform titleRect = titleText.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(1f, 1f);
@@ -414,7 +426,7 @@ public class InGamePauseMenu : MonoBehaviour
         titleRect.sizeDelta = new Vector2(-100f, 80f);
         titleText.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        roomCodeText = CreateText(infoPanel.transform, "RoomCodeText", "ROOM CODE ----", 28f, FontStyles.Normal);
+        roomCodeText = CreateText(infoPanel.transform, "RoomCodeText", T("ROOM CODE") + " ----", 28f, FontStyles.Normal);
         RectTransform roomRect = roomCodeText.GetComponent<RectTransform>();
         roomRect.anchorMin = new Vector2(0f, 1f);
         roomRect.anchorMax = new Vector2(1f, 1f);
@@ -558,11 +570,11 @@ public class InGamePauseMenu : MonoBehaviour
         RectTransform rect = content.GetComponent<RectTransform>();
         rect.anchorMin = new Vector2(0f, 0f);
         rect.anchorMax = new Vector2(1f, 1f);
-        rect.offsetMin = new Vector2(70f, 90f);
-        rect.offsetMax = new Vector2(-70f, -190f);
+        rect.offsetMin = new Vector2(48f, 154f);
+        rect.offsetMax = new Vector2(-48f, -190f);
 
         VerticalLayoutGroup layout = content.GetComponent<VerticalLayoutGroup>();
-        layout.spacing = 10f;
+        layout.spacing = 8f;
         layout.childControlWidth = true;
         layout.childControlHeight = false;
         layout.childForceExpandWidth = true;
@@ -572,10 +584,23 @@ public class InGamePauseMenu : MonoBehaviour
         CreateSettingsSliderRow(content.transform, "Voice Volume", "setting_voice_volume", 0f, 1f, PlayerPrefs.GetFloat("setting_voice_volume", 1f), false);
         CreateSettingsSliderRow(content.transform, "Mouse Sens X", "setting_mouse_x", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_x", 1f), false);
         CreateSettingsSliderRow(content.transform, "Mouse Sens Y", "setting_mouse_y", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_y", 1f), false);
-        CreateSettingsSliderRow(content.transform, "Field of View", "setting_fov", 60f, 100f, PlayerPrefs.GetFloat("setting_fov", 75f), true);
-        GameObject buttonRow = new GameObject("SettingsButtonRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
-        buttonRow.transform.SetParent(content.transform, false);
-        SetLayoutSize(buttonRow, 0f, 46f);
+
+        if (settingsActionRoot != null)
+        {
+            Destroy(settingsActionRoot);
+        }
+
+        GameObject buttonRow = new GameObject("SettingsButtonRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        buttonRow.transform.SetParent(parent, false);
+        settingsActionRoot = buttonRow;
+
+        RectTransform buttonRowRect = buttonRow.GetComponent<RectTransform>();
+        buttonRowRect.anchorMin = new Vector2(0f, 0f);
+        buttonRowRect.anchorMax = new Vector2(1f, 0f);
+        buttonRowRect.pivot = new Vector2(0.5f, 0f);
+        buttonRowRect.anchoredPosition = new Vector2(0f, 54f);
+        buttonRowRect.sizeDelta = new Vector2(-140f, 56f);
+
         HorizontalLayoutGroup buttonLayout = buttonRow.GetComponent<HorizontalLayoutGroup>();
         buttonLayout.spacing = 16f;
         buttonLayout.childControlWidth = true;
@@ -583,11 +608,12 @@ public class InGamePauseMenu : MonoBehaviour
         buttonLayout.childForceExpandWidth = true;
         buttonLayout.childForceExpandHeight = true;
 
-        CreateButton(buttonRow.transform, "ApplySettingsButton", "Apply", ApplyInGameSettings);
-        CreateButton(buttonRow.transform, "ResetSettingsButton", "Reset", ResetInGameSettings);
-        CreateButton(buttonRow.transform, "BackSettingsButton", "Back", ShowHomePanel);
+        CreateButton(buttonRow.transform, "ApplySettingsButton", T("Apply"), ApplyInGameSettings);
+        CreateButton(buttonRow.transform, "ResetSettingsButton", T("Reset"), ResetInGameSettings);
+        CreateButton(buttonRow.transform, "BackSettingsButton", T("Back"), ShowHomePanel);
 
         content.SetActive(false);
+        buttonRow.SetActive(false);
         return content;
     }
 
@@ -597,20 +623,13 @@ public class InGamePauseMenu : MonoBehaviour
 
         TMP_Text valueText = CreateText(row.transform, "ValueText", string.Empty, 22f, FontStyles.Normal);
         RectTransform valueRect = valueText.GetComponent<RectTransform>();
-        valueRect.anchorMin = new Vector2(1f, 0f);
-        valueRect.anchorMax = new Vector2(1f, 1f);
-        valueRect.pivot = new Vector2(1f, 0.5f);
-        valueRect.anchoredPosition = new Vector2(-8f, 0f);
-        valueRect.sizeDelta = new Vector2(96f, 0f);
-        valueText.alignment = TextAlignmentOptions.MidlineRight;
+        valueRect.sizeDelta = new Vector2(210f, 36f);
+        valueText.alignment = TextAlignmentOptions.Center;
 
         Slider slider = CreateSlider(row.transform, min, max, PlayerPrefs.GetFloat(prefsKey, defaultValue), wholeNumbers);
         RectTransform sliderRect = slider.GetComponent<RectTransform>();
-        sliderRect.anchorMin = new Vector2(0f, 0.5f);
-        sliderRect.anchorMax = new Vector2(1f, 0.5f);
-        sliderRect.pivot = new Vector2(0.5f, 0.5f);
-        sliderRect.anchoredPosition = new Vector2(110f, 0f);
-        sliderRect.sizeDelta = new Vector2(-420f, 28f);
+        sliderRect.sizeDelta = new Vector2(220f, 12f);
+        slider.transform.SetSiblingIndex(1);
 
         UnityEngine.Events.UnityAction<float> refresh = value =>
         {
@@ -648,17 +667,21 @@ public class InGamePauseMenu : MonoBehaviour
 
     private GameObject CreateSettingsRow(Transform parent, string label)
     {
-        GameObject row = new GameObject(label + "Row", typeof(RectTransform), typeof(LayoutElement));
+        GameObject row = new GameObject(label + "Row", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
         row.transform.SetParent(parent, false);
-        SetLayoutSize(row, 0f, 46f);
+        SetLayoutSize(row, 0f, 54f);
 
-        TMP_Text labelText = CreateText(row.transform, "LabelText", label, 22f, FontStyles.Normal);
+        HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+        layout.spacing = 14f;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        TMP_Text labelText = CreateText(row.transform, "LabelText", T(label), 22f, FontStyles.Normal);
         RectTransform labelRect = labelText.GetComponent<RectTransform>();
-        labelRect.anchorMin = new Vector2(0f, 0f);
-        labelRect.anchorMax = new Vector2(0f, 1f);
-        labelRect.pivot = new Vector2(0f, 0.5f);
-        labelRect.anchoredPosition = Vector2.zero;
-        labelRect.sizeDelta = new Vector2(260f, 0f);
+        labelRect.sizeDelta = new Vector2(360f, 40f);
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
 
         return row;
@@ -666,37 +689,31 @@ public class InGamePauseMenu : MonoBehaviour
 
     private Slider CreateSlider(Transform parent, float min, float max, float value, bool wholeNumbers)
     {
-        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider));
+        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider), typeof(Image));
         sliderObject.transform.SetParent(parent, false);
         Slider slider = sliderObject.GetComponent<Slider>();
         slider.minValue = min;
         slider.maxValue = max;
         slider.value = Mathf.Clamp(value, min, max);
         slider.wholeNumbers = wholeNumbers;
+        slider.targetGraphic = slider.GetComponent<Image>();
+        slider.GetComponent<Image>().color = new Color(0.62f, 0.78f, 0.86f, 0.28f);
 
-        Image background = CreateSliderImage(sliderObject.transform, "Background", new Color(0.18f, 0.25f, 0.27f, 0.9f));
-        RectTransform backgroundRect = background.GetComponent<RectTransform>();
-        backgroundRect.anchorMin = new Vector2(0f, 0.5f);
-        backgroundRect.anchorMax = new Vector2(1f, 0.5f);
-        backgroundRect.sizeDelta = new Vector2(0f, 8f);
-
-        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
-        fillArea.transform.SetParent(sliderObject.transform, false);
-        RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
-        fillAreaRect.anchorMin = new Vector2(0f, 0f);
-        fillAreaRect.anchorMax = new Vector2(1f, 1f);
-        fillAreaRect.offsetMin = Vector2.zero;
-        fillAreaRect.offsetMax = Vector2.zero;
-
-        Image fill = CreateSliderImage(fillArea.transform, "Fill", new Color(0.86f, 0.66f, 0.34f, 1f));
-        RectTransform fillRect = fill.GetComponent<RectTransform>();
-        fillRect.anchorMin = new Vector2(0f, 0.5f);
-        fillRect.anchorMax = new Vector2(1f, 0.5f);
-        fillRect.sizeDelta = new Vector2(0f, 8f);
+        Image fill = CreateSliderImage(sliderObject.transform, "Fill", new Color(1f, 0.8f, 0.42f, 0.82f));
+        RectTransform fillRect = fill.rectTransform;
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
 
         Image handle = CreateSliderImage(sliderObject.transform, "Handle", new Color(0.78f, 0.86f, 0.88f, 1f));
-        RectTransform handleRect = handle.GetComponent<RectTransform>();
-        handleRect.sizeDelta = new Vector2(24f, 24f);
+        RectTransform handleRect = handle.rectTransform;
+        handleRect.anchorMin = new Vector2(0f, 0.5f);
+        handleRect.anchorMax = new Vector2(0f, 0.5f);
+        handle.sprite = GetRoundSliderHandleSprite();
+        handle.type = Image.Type.Simple;
+        handle.preserveAspect = true;
+        handleRect.sizeDelta = new Vector2(20f, 20f);
 
         slider.fillRect = fillRect;
         slider.handleRect = handleRect;
@@ -713,12 +730,44 @@ public class InGamePauseMenu : MonoBehaviour
         return image;
     }
 
+    private Sprite GetRoundSliderHandleSprite()
+    {
+        if (roundSliderHandleSprite != null)
+        {
+            return roundSliderHandleSprite;
+        }
+
+        const int size = 64;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = "In Game Slider Round Handle";
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.43f;
+        float softEdge = 2f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01((radius - distance) / softEdge);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply();
+        roundSliderHandleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        return roundSliderHandleSprite;
+    }
+
     private void RefreshToggleLabel(Button button, string prefsKey, bool defaultValue)
     {
         TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
         if (label != null)
         {
-            label.text = PlayerPrefs.GetInt(prefsKey, defaultValue ? 1 : 0) == 1 ? "ON" : "OFF";
+            label.text = PlayerPrefs.GetInt(prefsKey, defaultValue ? 1 : 0) == 1 ? T("ON") : T("OFF");
         }
     }
 
@@ -726,13 +775,6 @@ public class InGamePauseMenu : MonoBehaviour
     {
         AudioListener.volume = PlayerPrefs.GetFloat("setting_master_volume", 1f);
         PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
-
-        float fov = PlayerPrefs.GetFloat("setting_fov", 75f);
-        Camera[] cameras = FindObjectsOfType<Camera>();
-        for (int i = 0; i < cameras.Length; i++)
-        {
-            cameras[i].fieldOfView = fov;
-        }
 
         float mouseX = PlayerPrefs.GetFloat("setting_mouse_x", 1f);
         float mouseY = PlayerPrefs.GetFloat("setting_mouse_y", 1f);
@@ -752,13 +794,18 @@ public class InGamePauseMenu : MonoBehaviour
         PlayerPrefs.SetFloat("setting_voice_volume", 1f);
         PlayerPrefs.SetFloat("setting_mouse_x", 1f);
         PlayerPrefs.SetFloat("setting_mouse_y", 1f);
-        PlayerPrefs.SetFloat("setting_fov", 75f);
         PlayerPrefs.SetInt("setting_subtitle", 1);
         ApplyInGameSettings();
 
         if (settingsRoot != null)
         {
             Destroy(settingsRoot);
+            if (settingsActionRoot != null)
+            {
+                Destroy(settingsActionRoot);
+                settingsActionRoot = null;
+            }
+
             settingsRoot = CreateSettingsContent(bodyText.transform.parent);
             ShowSettingsPanel();
         }
@@ -768,7 +815,7 @@ public class InGamePauseMenu : MonoBehaviour
     {
         GameObject dialog = CreatePanel(parent, "ConfirmDialog", Vector2.zero, new Vector2(620f, 300f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
-        TMP_Text confirmTitle = CreateText(dialog.transform, "ConfirmTitle", "CONFIRM", 38f, FontStyles.Normal);
+        TMP_Text confirmTitle = CreateText(dialog.transform, "ConfirmTitle", T("CONFIRM"), 38f, FontStyles.Normal);
         RectTransform titleRect = confirmTitle.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(1f, 1f);
@@ -783,14 +830,14 @@ public class InGamePauseMenu : MonoBehaviour
         messageRect.anchoredPosition = new Vector2(0f, 20f);
         messageRect.sizeDelta = new Vector2(-80f, 70f);
 
-        Button confirm = CreateButton(dialog.transform, "ConfirmButton", "Confirm", ConfirmDialogAction);
+        Button confirm = CreateButton(dialog.transform, "ConfirmButton", T("Confirm"), ConfirmDialogAction);
         RectTransform confirmRect = confirm.GetComponent<RectTransform>();
         confirmRect.anchorMin = new Vector2(0.5f, 0f);
         confirmRect.anchorMax = new Vector2(0.5f, 0f);
         confirmRect.anchoredPosition = new Vector2(-130f, 54f);
         confirmRect.sizeDelta = new Vector2(210f, 56f);
 
-        Button cancel = CreateButton(dialog.transform, "CancelButton", "Cancel", CloseConfirmDialog);
+        Button cancel = CreateButton(dialog.transform, "CancelButton", T("Cancel"), CloseConfirmDialog);
         RectTransform cancelRect = cancel.GetComponent<RectTransform>();
         cancelRect.anchorMin = new Vector2(0.5f, 0f);
         cancelRect.anchorMax = new Vector2(0.5f, 0f);
@@ -810,5 +857,10 @@ public class InGamePauseMenu : MonoBehaviour
 
         GameObject eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         DontDestroyOnLoad(eventSystem);
+    }
+
+    private string T(string key)
+    {
+        return InGameLocalization.Text(key);
     }
 }

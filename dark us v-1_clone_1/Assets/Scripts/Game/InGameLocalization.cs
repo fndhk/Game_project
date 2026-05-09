@@ -1,0 +1,224 @@
+using UnityEngine;
+
+public static class InGameLocalization
+{
+    public static int LanguageIndex => PlayerPrefs.GetInt("setting_language", 0);
+
+    public static string Text(string key)
+    {
+        switch (LanguageIndex)
+        {
+            case 1:
+                return key;
+            case 2:
+                return Japanese(key);
+            default:
+                return Korean(key);
+        }
+    }
+
+    public static string RoleName(PlayerRole role)
+    {
+        return role == PlayerRole.Killer ? Text("Imposter") : Text("Citizen");
+    }
+
+    public static string ItemName(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Camera:
+                return Text("Camera");
+            case ItemType.Knife:
+                return Text("Knife");
+            case ItemType.Medkit:
+                return Text("Medkit");
+            default:
+                return Text("Item");
+        }
+    }
+
+    private static string Korean(string key)
+    {
+        switch (key)
+        {
+            case "Role": return "직업";
+            case "Citizen": return "시민";
+            case "Imposter": return "임포스터";
+            case "VITAL": return "체력";
+            case "STAM": return "스태미나";
+            case "DOT MEMORY": return "스캔 메모리";
+            case "SCAN": return "스캔";
+            case "SCAN RDY": return "스캔 준비";
+            case "Restore Computers": return "컴퓨터 복구";
+            case "Exit Unlocked": return "탈출구 잠금 해제";
+            case "Find Access Cores": return "액세스 코어 찾기";
+            case "Install Access Cores": return "액세스 코어 삽입";
+            case "Reach The Exit": return "탈출구로 이동";
+            case "Use Terminal": return "터미널 사용";
+            case "Exit Power Restored": return "탈출 전원 복구됨";
+            case "Need Access Core": return "액세스 코어 필요";
+            case "Insert Access Core": return "액세스 코어 삽입";
+            case "Take Access Core": return "액세스 코어 획득";
+            case "Take": return "획득";
+            case "Camera": return "카메라";
+            case "Knife": return "칼";
+            case "Medkit": return "구급상자";
+            case "Item": return "아이템";
+            case "Inventory is full.": return "인벤토리가 가득 찼습니다.";
+            case "Escape Computer Restored": return "탈출 컴퓨터 복구 완료";
+            case "Wrong Computer Restored": return "잘못된 컴퓨터 복구 완료";
+            case "Restoring Computer": return "컴퓨터 복구 중";
+            case "Restore Computer": return "컴퓨터 복구";
+            case "Exit Locked": return "탈출구 잠김";
+            case "Escape Route Open": return "탈출 경로 열림";
+            case "Open Exit": return "탈출구 열기";
+            case "PAUSED": return "일시정지";
+            case "SETTINGS": return "설정";
+            case "CONTROLS": return "조작";
+            case "PLAYERS": return "플레이어";
+            case "SESSION": return "세션";
+            case "STATUS": return "상태";
+            case "ROOM CODE": return "방 코드";
+            case "CONNECTED": return "연결됨";
+            case "ESC closes this menu.": return "ESC로 메뉴를 닫습니다.";
+            case "IN-GAME SETTINGS": return "인게임 설정";
+            case "WASD        MOVE": return "WASD        이동";
+            case "MOUSE       LOOK": return "마우스      시점";
+            case "SHIFT       SPRINT": return "SHIFT       달리기";
+            case "CTRL        CROUCH": return "CTRL        앉기";
+            case "E           INTERACT": return "E           상호작용";
+            case "F           PICK UP": return "F           줍기";
+            case "1 / 2       SELECT ITEM": return "1 / 2       아이템 선택";
+            case "LMB         USE ITEM": return "좌클릭      아이템 사용";
+            case "G           DROP ITEM": return "G           아이템 버리기";
+            case "V           VOICE": return "V           음성";
+            case "ESC         PAUSE": return "ESC         일시정지";
+            case "Not connected to a Photon room.": return "Photon 방에 연결되어 있지 않습니다.";
+            case "CREW": return "대원";
+            case "HOST": return "호스트";
+            case "PLAYER": return "플레이어";
+            case "YOU": return "나";
+            case "REMOTE": return "원격";
+            case "RETURN TO LOBBY": return "방 로비로 돌아가기";
+            case "Return everyone to the room lobby?": return "모두 방 로비로 돌아갈까요?";
+            case "QUIT TO MAIN MENU": return "메인 메뉴로 나가기";
+            case "Leave the current room and return to main menu?": return "현재 방을 나가고 메인 메뉴로 돌아갈까요?";
+            case "QUIT GAME": return "게임 종료";
+            case "Close the game?": return "게임을 종료할까요?";
+            case "dark Us": return "dark Us";
+            case "Resume": return "계속";
+            case "Settings": return "설정";
+            case "Controls": return "조작";
+            case "Players": return "플레이어";
+            case "Return to Lobby": return "방 로비로";
+            case "Quit to Main Menu": return "메인 메뉴로";
+            case "Quit Game": return "게임 종료";
+            case "Master Volume": return "전체 볼륨";
+            case "Voice Volume": return "마이크 볼륨";
+            case "Mouse Sens X": return "마우스 감도 X";
+            case "Mouse Sens Y": return "마우스 감도 Y";
+            case "Field of View": return "시야각";
+            case "Apply": return "적용";
+            case "Reset": return "초기화";
+            case "Back": return "뒤로";
+            case "ON": return "켜짐";
+            case "OFF": return "꺼짐";
+            case "CONFIRM": return "확인";
+            case "Confirm": return "확인";
+            case "Cancel": return "취소";
+            default: return key;
+        }
+    }
+
+    private static string Japanese(string key)
+    {
+        switch (key)
+        {
+            case "Role": return "役職";
+            case "Citizen": return "市民";
+            case "Imposter": return "インポスター";
+            case "VITAL": return "体力";
+            case "STAM": return "スタミナ";
+            case "DOT MEMORY": return "スキャンメモリ";
+            case "SCAN": return "スキャン";
+            case "SCAN RDY": return "スキャン準備";
+            case "Restore Computers": return "コンピューター修復";
+            case "Exit Unlocked": return "出口ロック解除";
+            case "Find Access Cores": return "アクセスコア探索";
+            case "Install Access Cores": return "アクセスコア挿入";
+            case "Reach The Exit": return "出口へ向かう";
+            case "Use Terminal": return "端末を使う";
+            case "Exit Power Restored": return "出口電源復旧";
+            case "Need Access Core": return "アクセスコアが必要";
+            case "Insert Access Core": return "アクセスコア挿入";
+            case "Take Access Core": return "アクセスコア取得";
+            case "Take": return "取得";
+            case "Camera": return "カメラ";
+            case "Knife": return "ナイフ";
+            case "Medkit": return "救急キット";
+            case "Item": return "アイテム";
+            case "Inventory is full.": return "インベントリが満杯です。";
+            case "Escape Computer Restored": return "脱出コンピューター修復完了";
+            case "Wrong Computer Restored": return "違うコンピューター修復完了";
+            case "Restoring Computer": return "コンピューター修復中";
+            case "Restore Computer": return "コンピューター修復";
+            case "Exit Locked": return "出口ロック中";
+            case "Escape Route Open": return "脱出経路開放";
+            case "Open Exit": return "出口を開く";
+            case "PAUSED": return "一時停止";
+            case "SETTINGS": return "設定";
+            case "CONTROLS": return "操作";
+            case "PLAYERS": return "プレイヤー";
+            case "SESSION": return "セッション";
+            case "STATUS": return "状態";
+            case "ROOM CODE": return "ルームコード";
+            case "CONNECTED": return "接続済み";
+            case "ESC closes this menu.": return "ESCでメニューを閉じます。";
+            case "IN-GAME SETTINGS": return "ゲーム内設定";
+            case "WASD        MOVE": return "WASD        移動";
+            case "MOUSE       LOOK": return "マウス      視点";
+            case "SHIFT       SPRINT": return "SHIFT       ダッシュ";
+            case "CTRL        CROUCH": return "CTRL        しゃがむ";
+            case "E           INTERACT": return "E           インタラクト";
+            case "F           PICK UP": return "F           拾う";
+            case "1 / 2       SELECT ITEM": return "1 / 2       アイテム選択";
+            case "LMB         USE ITEM": return "左クリック  アイテム使用";
+            case "G           DROP ITEM": return "G           アイテムを落とす";
+            case "V           VOICE": return "V           ボイス";
+            case "ESC         PAUSE": return "ESC         一時停止";
+            case "Not connected to a Photon room.": return "Photonルームに接続されていません。";
+            case "CREW": return "クルー";
+            case "HOST": return "ホスト";
+            case "PLAYER": return "プレイヤー";
+            case "YOU": return "自分";
+            case "REMOTE": return "リモート";
+            case "RETURN TO LOBBY": return "ルームロビーへ戻る";
+            case "Return everyone to the room lobby?": return "全員をルームロビーへ戻しますか？";
+            case "QUIT TO MAIN MENU": return "メインメニューへ戻る";
+            case "Leave the current room and return to main menu?": return "現在のルームを退出してメインメニューへ戻りますか？";
+            case "QUIT GAME": return "ゲーム終了";
+            case "Close the game?": return "ゲームを終了しますか？";
+            case "Resume": return "再開";
+            case "Settings": return "設定";
+            case "Controls": return "操作";
+            case "Players": return "プレイヤー";
+            case "Return to Lobby": return "ルームロビーへ";
+            case "Quit to Main Menu": return "メインメニューへ";
+            case "Quit Game": return "ゲーム終了";
+            case "Master Volume": return "全体音量";
+            case "Voice Volume": return "マイク音量";
+            case "Mouse Sens X": return "マウス感度 X";
+            case "Mouse Sens Y": return "マウス感度 Y";
+            case "Field of View": return "視野角";
+            case "Apply": return "適用";
+            case "Reset": return "リセット";
+            case "Back": return "戻る";
+            case "ON": return "オン";
+            case "OFF": return "オフ";
+            case "CONFIRM": return "確認";
+            case "Confirm": return "確認";
+            case "Cancel": return "キャンセル";
+            default: return key;
+        }
+    }
+}

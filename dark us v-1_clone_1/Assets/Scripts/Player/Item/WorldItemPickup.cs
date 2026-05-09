@@ -44,7 +44,7 @@ public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
     // 상호작용 문구를 반환한다.
     public string GetPrompt(PlayerObjectiveInteractor interactor)
     {
-        return "[F] Take " + GetItemDisplayName() + " x" + Mathf.Max(1, amount);
+        return "[F] " + InGameLocalization.Text("Take") + " " + GetItemDisplayName() + " x" + Mathf.Max(1, amount);
     }
 
     // 아직 먹지 않았으면 상호작용 가능하다.
@@ -83,7 +83,7 @@ public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
 
         if (!added)
         {
-            Debug.Log("Inventory is full.");
+            Debug.Log(InGameLocalization.Text("Inventory is full."));
             return;
         }
 
@@ -209,16 +209,16 @@ public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
         switch (itemType)
         {
             case ItemType.Camera:
-                return "Camera";
+                return InGameLocalization.ItemName(itemType);
 
             case ItemType.Knife:
-                return "Knife";
+                return InGameLocalization.ItemName(itemType);
 
             case ItemType.Medkit:
-                return "Medkit";
+                return InGameLocalization.ItemName(itemType);
 
             default:
-                return "Item";
+                return InGameLocalization.ItemName(itemType);
         }
     }
 }

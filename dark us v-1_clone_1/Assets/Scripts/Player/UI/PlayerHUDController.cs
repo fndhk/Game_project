@@ -12,6 +12,7 @@ public class PlayerHUDController : MonoBehaviour
     public LidarSpotScanner targetScanner;
     public PlayerInventory targetInventory;
     public InstancedScanDotRenderer targetDotRenderer;
+    public PlayerCombatTarget targetCombatTarget;
 
     [Header("Legacy HUD References")]
     public Image[] vitalBlocks;
@@ -37,6 +38,7 @@ public class PlayerHUDController : MonoBehaviour
     public int vitalSegmentCount = 12;
     public int staminaSegmentCount = 14;
     public int dotMeterSegmentCount = 28;
+    public float roleRevealDuration = 4f;
 
     private Canvas hudCanvas;
     private RectTransform hudRoot;
@@ -45,6 +47,12 @@ public class PlayerHUDController : MonoBehaviour
     private Image[] dotMeterBlocks;
     private TMP_Text dotCounterText;
     private TMP_Text objectiveRuntimeText;
+    private TMP_Text vitalLabelText;
+    private TMP_Text staminaLabelText;
+    private TMP_Text dotMemoryLabelText;
+    private RectTransform roleRevealRoot;
+    private TMP_Text roleRevealTitleText;
+    private TMP_Text roleRevealRoleText;
     private TMP_Text scanCooldownText;
     private RectTransform scanSweepRect;
     private Image scanCooldownFill;
@@ -70,6 +78,10 @@ public class PlayerHUDController : MonoBehaviour
     private readonly Color amberColor = new Color(1f, 0.74f, 0.18f, 0.92f);
     private readonly Color cyanColor = new Color(0.54f, 0.88f, 1f, 0.82f);
     private bool hasBuiltHud;
+    private PlayerRole lastDisplayedRole;
+    private bool hasDisplayedRole;
+    private float roleRevealEndTime;
+    private int lastLanguageIndex = -1;
 
     private void Awake()
     {
@@ -90,6 +102,8 @@ public class PlayerHUDController : MonoBehaviour
         UpdateScanCooldown();
         UpdateDotMemory();
         UpdateObjectiveText();
+        UpdateLocalizedStaticText();
+        UpdateRoleReveal();
         UpdateHudAnimation();
     }
 
@@ -118,6 +132,11 @@ public class PlayerHUDController : MonoBehaviour
         if (targetInventory == null)
         {
             targetInventory = GetComponent<PlayerInventory>();
+        }
+
+        if (targetCombatTarget == null)
+        {
+            targetCombatTarget = GetComponent<PlayerCombatTarget>();
         }
 
         if (targetScanner == null)
@@ -232,6 +251,7 @@ public class PlayerHUDController : MonoBehaviour
         BuildCenterScanModule();
         BuildDotMemoryModule();
         BuildObjectiveModule();
+        BuildRoleRevealModule();
     }
 
     private void DestroyHudObject(GameObject target)
@@ -277,8 +297,8 @@ public class PlayerHUDController : MonoBehaviour
         root.sizeDelta = new Vector2(255f, 74f);
         AddPanel(root, new Color(0f, 0f, 0f, 0.12f));
 
-        CreateLabel("VITAL", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -2f), 18, lineColor, TextAlignmentOptions.Left);
-        CreateLabel("STAM", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(7f, -31f), 15, new Color(0.66f, 0.72f, 0.70f, 0.7f), TextAlignmentOptions.Left);
+        vitalLabelText = CreateLabel(T("VITAL"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -2f), 18, lineColor, TextAlignmentOptions.Left);
+        staminaLabelText = CreateLabel(T("STAM"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(7f, -31f), 15, new Color(0.66f, 0.72f, 0.70f, 0.7f), TextAlignmentOptions.Left);
 
         runtimeVitalBlocks = CreateSegmentRow("VitalBlocks", root, vitalSegmentCount, new Vector2(68f, -2f), new Vector2(11f, 22f), 6f);
         runtimeStaminaBlocks = CreateSegmentRow("StaminaBlocks", root, staminaSegmentCount, new Vector2(68f, -35f), new Vector2(9f, 13f), 5f);
@@ -353,7 +373,7 @@ public class PlayerHUDController : MonoBehaviour
         scanSweepRect.sizeDelta = new Vector2(1f, 18f);
         scanSweepRect.anchoredPosition = new Vector2(0f, 9f);
 
-        scanCooldownText = CreateLabel("SCAN", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -2f), 10, new Color(0.72f, 0.83f, 0.86f, 0.58f), TextAlignmentOptions.Center);
+        scanCooldownText = CreateLabel(T("SCAN"), root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -2f), 10, new Color(0.72f, 0.83f, 0.86f, 0.58f), TextAlignmentOptions.Center);
     }
 
     private void BuildDotMemoryModule()
@@ -361,15 +381,32 @@ public class PlayerHUDController : MonoBehaviour
         RectTransform root = CreateRect("DotMemory", hudRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(56f, -46f));
         root.sizeDelta = new Vector2(385f, 52f);
 
-        CreateLabel("DOT MEMORY", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, 15, new Color(0.78f, 0.82f, 0.80f, 0.72f), TextAlignmentOptions.Left);
+        dotMemoryLabelText = CreateLabel(T("DOT MEMORY"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, 15, new Color(0.78f, 0.82f, 0.80f, 0.72f), TextAlignmentOptions.Left);
         dotCounterText = CreateLabel("0 / 150k", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, 15, lineColor, TextAlignmentOptions.Right);
         dotMeterBlocks = CreateSegmentRow("DotMeter", root, dotMeterSegmentCount, new Vector2(0f, -29f), new Vector2(8f, 10f), 4f);
     }
 
     private void BuildObjectiveModule()
     {
-        objectiveRuntimeText = CreateLabel(defaultObjectiveText, hudRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -44f), 17, lineColor, TextAlignmentOptions.Right);
+        objectiveRuntimeText = CreateLabel(T("Restore Computers") + " 0/4", hudRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -44f), 17, lineColor, TextAlignmentOptions.Right);
         objectiveRuntimeText.rectTransform.sizeDelta = new Vector2(360f, 34f);
+    }
+
+    private void BuildRoleRevealModule()
+    {
+        roleRevealRoot = CreateRect("RoleReveal", hudRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f));
+        roleRevealRoot.sizeDelta = new Vector2(560f, 190f);
+        AddPanel(roleRevealRoot, new Color(0f, 0f, 0f, 0.62f));
+
+        roleRevealTitleText = CreateLabel(T("Role"), roleRevealRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -28f), 28, new Color(0.76f, 0.82f, 0.84f, 1f), TextAlignmentOptions.Center);
+        roleRevealTitleText.rectTransform.sizeDelta = new Vector2(500f, 48f);
+
+        roleRevealRoleText = CreateLabel(T("Citizen"), roleRevealRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), 58, vitalColor, TextAlignmentOptions.Center);
+        roleRevealRoleText.rectTransform.sizeDelta = new Vector2(500f, 90f);
+
+        LocalizedTmpFontProvider.Apply(roleRevealTitleText);
+        LocalizedTmpFontProvider.Apply(roleRevealRoleText);
+        roleRevealRoot.gameObject.SetActive(false);
     }
 
     private void RefreshAll()
@@ -379,6 +416,8 @@ public class PlayerHUDController : MonoBehaviour
         UpdateScanCooldown();
         UpdateDotMemory();
         UpdateObjectiveText();
+        UpdateLocalizedStaticText();
+        UpdateRoleReveal();
     }
 
     private void UpdateVitals()
@@ -429,7 +468,7 @@ public class PlayerHUDController : MonoBehaviour
 
         scanCooldownFill.fillAmount = fill;
         scanCooldownFill.color = ready ? new Color(0.70f, 0.92f, 1f, 0.14f) : new Color(1f, 0.74f, 0.18f, 0.28f);
-        scanCooldownText.text = ready ? "SCAN RDY" : "SCAN " + Mathf.RoundToInt(fill * 100f) + "%";
+        scanCooldownText.text = ready ? T("SCAN RDY") : T("SCAN") + " " + Mathf.RoundToInt(fill * 100f) + "%";
     }
 
     private void UpdateDotMemory()
@@ -460,7 +499,73 @@ public class PlayerHUDController : MonoBehaviour
         }
         else if (string.IsNullOrWhiteSpace(objectiveRuntimeText.text))
         {
-            objectiveRuntimeText.text = defaultObjectiveText;
+            objectiveRuntimeText.text = T("Restore Computers") + " 0/4";
+        }
+    }
+
+    private void UpdateLocalizedStaticText()
+    {
+        int languageIndex = InGameLocalization.LanguageIndex;
+        if (lastLanguageIndex == languageIndex)
+        {
+            return;
+        }
+
+        lastLanguageIndex = languageIndex;
+
+        if (vitalLabelText != null)
+        {
+            vitalLabelText.text = T("VITAL");
+        }
+
+        if (staminaLabelText != null)
+        {
+            staminaLabelText.text = T("STAM");
+        }
+
+        if (dotMemoryLabelText != null)
+        {
+            dotMemoryLabelText.text = T("DOT MEMORY");
+        }
+
+        if (roleRevealTitleText != null)
+        {
+            roleRevealTitleText.text = T("Role");
+        }
+
+        hasDisplayedRole = false;
+        UpdateScanCooldown();
+        UpdateObjectiveText();
+    }
+
+    private void UpdateRoleReveal()
+    {
+        if (roleRevealRoot == null || targetCombatTarget == null)
+        {
+            return;
+        }
+
+        if (RoleAssignmentManager.IsWaitingForPhotonRole())
+        {
+            roleRevealRoot.gameObject.SetActive(false);
+            return;
+        }
+
+        if (!hasDisplayedRole || lastDisplayedRole != targetCombatTarget.role)
+        {
+            hasDisplayedRole = true;
+            lastDisplayedRole = targetCombatTarget.role;
+            roleRevealEndTime = Application.isPlaying ? Time.unscaledTime + roleRevealDuration : 0f;
+
+            bool isImposter = targetCombatTarget.role == PlayerRole.Killer;
+            roleRevealRoleText.text = InGameLocalization.RoleName(targetCombatTarget.role);
+            roleRevealRoleText.color = isImposter ? new Color(1f, 0.36f, 0.28f, 0.96f) : new Color(0.58f, 0.92f, 1f, 0.96f);
+            roleRevealRoot.gameObject.SetActive(true);
+        }
+
+        if (Application.isPlaying && Time.unscaledTime >= roleRevealEndTime)
+        {
+            roleRevealRoot.gameObject.SetActive(false);
         }
     }
 
@@ -550,7 +655,13 @@ public class PlayerHUDController : MonoBehaviour
         label.alignment = alignment;
         label.color = color;
         label.raycastTarget = false;
+        LocalizedTmpFontProvider.Apply(label);
         return label;
+    }
+
+    private string T(string key)
+    {
+        return InGameLocalization.Text(key);
     }
 
     private RectTransform CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition)

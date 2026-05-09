@@ -63,6 +63,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
         EnsureMapSeedProperty();
+        RoleAssignmentManager.EnsurePhotonImposterActor();
+        PhotonNetwork.SendAllOutgoingCommands();
         PhotonNetwork.LoadLevel(gameSceneName);
     }
 
@@ -494,15 +496,15 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         panelRect.sizeDelta = new Vector2(520f, 260f);
 
         Image panelImage = panel.GetComponent<Image>();
-        panelImage.color = new Color(0.015f, 0.018f, 0.02f, 0.66f);
+        panelImage.color = new Color(0.01f, 0.014f, 0.016f, 0.72f);
 
         Outline panelOutline = panel.GetComponent<Outline>();
-        panelOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.34f);
+        panelOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.42f);
         panelOutline.effectDistance = new Vector2(2f, -2f);
 
         VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(28, 28, 26, 26);
-        layout.spacing = 18f;
+        layout.padding = new RectOffset(32, 32, 28, 28);
+        layout.spacing = 16f;
         layout.childAlignment = TextAnchor.UpperLeft;
         layout.childControlWidth = true;
         layout.childControlHeight = false;
@@ -663,10 +665,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rect.sizeDelta = size;
 
         Image image = panel.GetComponent<Image>();
-        image.color = new Color(0.015f, 0.018f, 0.02f, 0.58f);
+        image.color = new Color(0.01f, 0.014f, 0.016f, 0.62f);
 
         Outline outline = panel.GetComponent<Outline>();
-        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.32f);
+        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.38f);
         outline.effectDistance = new Vector2(2f, -2f);
 
         return panel.transform;
@@ -900,11 +902,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rect.sizeDelta = new Vector2(width, height);
 
         Image image = buttonObject.GetComponent<Image>();
-        image.color = new Color(0.015f, 0.018f, 0.02f, 0.62f);
+        image.color = new Color(0.015f, 0.018f, 0.02f, 0.66f);
         image.type = Image.Type.Sliced;
 
         Outline outline = buttonObject.GetComponent<Outline>();
-        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.34f);
+        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.42f);
         outline.effectDistance = new Vector2(2f, -2f);
 
         TMP_Text labelText = CreateText(buttonObject.transform, "Text (TMP)", label, fontSize, FontStyles.UpperCase);
@@ -917,8 +919,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         MenuButtonHoverEffect hover = buttonObject.GetComponent<MenuButtonHoverEffect>();
         hover.buttonImage = image;
         hover.labelText = labelText;
-        hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.52f);
-        hover.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.76f);
+        hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.66f);
+        hover.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.84f);
         hover.pressedBackgroundColor = new Color(0.16f, 0.18f, 0.17f, 0.86f);
         hover.normalTextColor = new Color(0.76f, 0.82f, 0.84f, 1f);
         hover.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);

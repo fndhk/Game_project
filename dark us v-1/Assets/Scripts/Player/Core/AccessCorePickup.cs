@@ -35,7 +35,7 @@ public class AccessCorePickup : MonoBehaviour, IPlayerInteractable
     // 상호작용 문구를 반환한다.
     public string GetPrompt(PlayerObjectiveInteractor interactor)
     {
-        return "[E] Take Access Core";
+        return "[E] " + InGameLocalization.Text("Take Access Core");
     }
 
     // 아직 먹지 않은 상태면 상호작용 가능하다.

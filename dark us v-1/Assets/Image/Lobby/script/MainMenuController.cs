@@ -518,12 +518,158 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         ConfigureMenuButtonSelection("JoinFriendButton");
         ConfigureMenuButtonSelection("SettingsButton");
         ConfigureMenuButtonSelection("ExitButton");
+        EnsureMainMenuChrome(buttonGroup);
 
         RectTransform groupRect = buttonGroup.GetComponent<RectTransform>();
         if (groupRect != null)
         {
-            groupRect.sizeDelta = new Vector2(groupRect.sizeDelta.x, 650f);
+            groupRect.anchorMin = new Vector2(0f, 0.5f);
+            groupRect.anchorMax = new Vector2(0f, 0.5f);
+            groupRect.pivot = new Vector2(0f, 0.5f);
+            groupRect.anchoredPosition = new Vector2(76f, 46f);
+            groupRect.sizeDelta = new Vector2(420f, 560f);
         }
+
+        VerticalLayoutGroup verticalLayout = buttonGroup.GetComponent<VerticalLayoutGroup>();
+        if (verticalLayout != null)
+        {
+            verticalLayout.enabled = false;
+        }
+
+        PositionMainMenuButton("CreateRoomButton", new Vector2(0f, 206f));
+        PositionMainMenuButton("FindRoomButton", new Vector2(0f, 136f));
+        PositionMainMenuButton("JoinFriendButton", new Vector2(0f, 66f));
+        PositionMainMenuButton("SettingsButton", new Vector2(0f, -4f));
+        PositionMainMenuButton("ExitButton", new Vector2(0f, -350f));
+        AlignLogoToMainMenuButtons();
+    }
+
+    private void AlignLogoToMainMenuButtons()
+    {
+        Transform logoTransform = FindUiTransform("LogoImage");
+        Transform firstButtonTransform = FindUiTransform("CreateRoomButton");
+        if (logoTransform == null || firstButtonTransform == null)
+        {
+            return;
+        }
+
+        RectTransform logoRect = logoTransform.GetComponent<RectTransform>();
+        RectTransform buttonRect = firstButtonTransform.GetComponent<RectTransform>();
+        if (logoRect == null || buttonRect == null)
+        {
+            return;
+        }
+
+        Vector3[] buttonCorners = new Vector3[4];
+        buttonRect.GetWorldCorners(buttonCorners);
+        float buttonCenterX = (buttonCorners[0].x + buttonCorners[2].x) * 0.5f;
+
+        Vector3 logoPosition = logoRect.position;
+        logoPosition.x = buttonCenterX;
+        logoRect.position = logoPosition;
+    }
+
+    private void PositionMainMenuButton(string buttonName, Vector2 anchoredPosition)
+    {
+        Transform buttonTransform = FindUiTransform(buttonName);
+        if (buttonTransform == null)
+        {
+            return;
+        }
+
+        RectTransform rectTransform = buttonTransform.GetComponent<RectTransform>();
+        if (rectTransform == null)
+        {
+            return;
+        }
+
+        rectTransform.anchorMin = new Vector2(0f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0f, 0.5f);
+        rectTransform.pivot = new Vector2(0f, 0.5f);
+        rectTransform.anchoredPosition = anchoredPosition;
+        rectTransform.sizeDelta = new Vector2(420f, 50f);
+
+        LayoutElement layout = buttonTransform.GetComponent<LayoutElement>();
+        if (layout != null)
+        {
+            layout.ignoreLayout = true;
+        }
+    }
+
+    private void EnsureMainMenuChrome(Transform buttonGroup)
+    {
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        Transform existing = canvas.transform.Find("MainMenuChrome");
+        if (existing != null)
+        {
+            DestroyUiObject(existing.gameObject);
+        }
+
+        // 기존 배경/타이틀을 가리지 않도록 추가 장식 패널은 만들지 않는다.
+        // 버튼 스타일만 정리해서 메인 메뉴 원본 구도를 유지한다.
+        if (buttonGroup != null)
+        {
+            buttonGroup.SetAsLastSibling();
+        }
+    }
+
+    private GameObject CreateMenuChromePanel(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, Vector2 anchor, Vector2 pivot, Color color)
+    {
+        GameObject panel = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+        panel.layer = parent.gameObject.layer;
+        panel.transform.SetParent(parent, false);
+
+        RectTransform rect = panel.GetComponent<RectTransform>();
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = pivot;
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = size;
+
+        Image image = panel.GetComponent<Image>();
+        image.color = color;
+
+        Outline outline = panel.GetComponent<Outline>();
+        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.18f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        return panel;
+    }
+
+    private TMP_Text CreateChromeText(Transform parent, string objectName, string text, float fontSize, FontStyles fontStyle, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 size, TextAlignmentOptions alignment, Color color)
+    {
+        TMP_Text label = CreateLabel(parent, objectName, text, fontSize, fontStyle);
+        RectTransform rect = label.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = size;
+        label.alignment = alignment;
+        label.color = color;
+        LocalizedTmpFontProvider.Apply(label);
+        return label;
+    }
+
+    private void CreateAccentLine(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, Vector2 anchor, Color color)
+    {
+        GameObject line = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        line.layer = parent.gameObject.layer;
+        line.transform.SetParent(parent, false);
+
+        RectTransform rect = line.GetComponent<RectTransform>();
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = new Vector2(anchor.x, anchor.y);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = size;
+
+        Image image = line.GetComponent<Image>();
+        image.color = color;
     }
 
     private void SetMenuButtonLabel(string buttonName, string label)
@@ -553,7 +699,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         Image image = buttonTransform.GetComponent<Image>();
         if (image != null)
         {
-            image.color = new Color(0.015f, 0.018f, 0.02f, 0f);
+            image.color = new Color(0.015f, 0.018f, 0.02f, 0.58f);
         }
 
         TMP_Text text = buttonTransform.GetComponentInChildren<TMP_Text>(true);
@@ -561,13 +707,41 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         {
             text.fontStyle = FontStyles.Normal;
             text.color = new Color(0.76f, 0.82f, 0.84f, 1f);
+            text.fontSize = 28f;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+            RectTransform textRect = text.GetComponent<RectTransform>();
+            if (textRect != null)
+            {
+                textRect.offsetMin = new Vector2(20f, 0f);
+                textRect.offsetMax = new Vector2(-16f, 0f);
+            }
+        }
+
+        RectTransform rectTransform = buttonTransform.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.sizeDelta = new Vector2(420f, 50f);
+        }
+
+        LayoutElement layout = buttonTransform.GetComponent<LayoutElement>();
+        if (layout != null)
+        {
+            layout.preferredWidth = 420f;
+            layout.preferredHeight = 50f;
+        }
+
+        Outline outline = buttonTransform.GetComponent<Outline>();
+        if (outline != null)
+        {
+            outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.20f);
+            outline.effectDistance = new Vector2(2f, -2f);
         }
 
         MenuButtonHoverEffect hover = buttonTransform.GetComponent<MenuButtonHoverEffect>();
         if (hover != null)
         {
-            hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0f);
-            hover.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.76f);
+            hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.58f);
+            hover.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.82f);
             hover.pressedBackgroundColor = new Color(0.16f, 0.18f, 0.17f, 0.86f);
             hover.normalTextColor = new Color(0.76f, 0.82f, 0.84f, 1f);
             hover.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);
@@ -1264,11 +1438,10 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private Transform BuildGraphicsSettings(Transform parent)
     {
-        Transform section = CreateSettingsSection(parent, "Graphics & Display", 620f);
+        Transform section = CreateSettingsSection(parent, "Graphics & Display", 560f);
         CreateCycleRow(section, "Screen Mode", () => GetScreenModeLabel(), CycleScreenMode);
         CreateSliderRow(section, "Texture Detail", 0f, 3f, 3f, true, "setting_texture");
         CreateSliderRow(section, "Shadow Detail", 0f, 3f, 2f, true, "setting_shadow");
-        CreateSliderRow(section, "Field of View", 60f, 100f, 75f, false, "setting_fov");
         CreateSliderRow(section, "Anti-aliasing", 0f, 8f, 2f, true, "setting_aa");
         CreateToggleRow(section, "V-Sync", QualitySettings.vSyncCount > 0, "setting_vsync");
         CreateCycleRow(section, "FPS Limit", () => GetFpsLimitLabel(), CycleFpsLimit);
@@ -1701,13 +1874,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         Application.targetFrameRate = fpsLimit;
         AudioListener.volume = PlayerPrefs.GetFloat("setting_master_volume", 1f);
 
-        float fieldOfView = PlayerPrefs.GetFloat("setting_fov", 75f);
-        Camera[] cameras = FindObjectsOfType<Camera>();
-        foreach (Camera targetCamera in cameras)
-        {
-            targetCamera.fieldOfView = fieldOfView;
-        }
-
         PlayerPrefs.Save();
         RefreshDynamicSettingLabels();
         ApplyLanguage();
@@ -1720,7 +1886,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         PlayerPrefs.DeleteKey("setting_quality");
         PlayerPrefs.DeleteKey("setting_texture");
         PlayerPrefs.DeleteKey("setting_shadow");
-        PlayerPrefs.DeleteKey("setting_fov");
         PlayerPrefs.DeleteKey("setting_aa");
         PlayerPrefs.DeleteKey("setting_vsync");
         PlayerPrefs.DeleteKey("setting_fps_limit");
@@ -1850,12 +2015,14 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /&-.?"
             + "방만들기찾설정나가기닫적용초기화변경확인취소게임을종료할까요"
             + "비공개친구참가"
-            + "그래픽및화면표시오디오조작키플레이접근성모드텍스처품질그림자시야각수직동기제한"
+            + "신호터미널명령시스템상태네트워크대기음성링크준비대원인증필요"
+            + "그래픽및화면표시오디오조작키플레이접근성모드텍스처품질그림자수직동기제한"
             + "모션블러카메라흔마스터볼륨배경음효과음음성이동상호작용눌러서말하기마우스감도반전패드진동자막크기언어색약튜토리얼전체창테두리없음한국어영어일본어"
             + "ルーム作成検索設定終了閉じる適用リセット変更確認キャンセルゲームを終了しますか"
             + "公開フレンド参加"
+            + "信号端末コマンドシステム状態ネットワーク待機ボイスリンク準備クルー認証必要"
             + "プライベート作戦待信号リスト参加探グラフィック表示画面オーディオ操作キーゲームプレイアクセシビリティ"
-            + "モードテクスチャ品質影視野角垂直同期制限ブラー揺れ音量移動インタラクトプッシュトゥトーク"
+            + "モードテクスチャ品質影垂直同期制限ブラー揺れ音量移動インタラクトプッシュトゥトーク"
             + "マウス感度反転パッド振動字幕サイズ背景言語色覚サポートチュートリアルフルスクリーンウィンドウボーダーレス無韓国語英日本";
     }
 
@@ -1903,6 +2070,12 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Search": return "검색";
             case "Open a private operation room and wait for the crew.": return "비공개 작전 방을 만들고 대원을 기다립니다.";
             case "Enter the signal list and search for an active room.": return "신호 목록으로 들어가 활성화된 방을 찾습니다.";
+            case "R-03 SIGNAL TERMINAL": return "R-03 신호 터미널";
+            case "COMMAND": return "명령";
+            case "SYSTEM STATUS": return "시스템 상태";
+            case "NETWORK STANDBY": return "네트워크 대기";
+            case "VOICE LINK READY": return "음성 링크 준비";
+            case "CREW AUTH REQUIRED": return "대원 인증 필요";
             case "Graphics Display": return "그래픽 표시";
             case "Graphics & Display": return "그래픽 및 화면";
             case "Audio": return "오디오";
@@ -1913,7 +2086,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Screen Mode": return "화면 모드";
             case "Texture Detail": return "텍스처 품질";
             case "Shadow Detail": return "그림자 품질";
-            case "Field of View": return "시야각";
             case "Anti-aliasing": return "안티앨리어싱";
             case "V-Sync": return "수직 동기화";
             case "FPS Limit": return "FPS 제한";
@@ -1973,6 +2145,12 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Search": return "検索";
             case "Open a private operation room and wait for the crew.": return "プライベート作戦ルームを開き、クルーを待ちます。";
             case "Enter the signal list and search for an active room.": return "信号リストに入り、参加できるルームを探します。";
+            case "R-03 SIGNAL TERMINAL": return "R-03信号端末";
+            case "COMMAND": return "コマンド";
+            case "SYSTEM STATUS": return "システム状態";
+            case "NETWORK STANDBY": return "ネットワーク待機";
+            case "VOICE LINK READY": return "ボイスリンク準備";
+            case "CREW AUTH REQUIRED": return "クルー認証が必要";
             case "Graphics Display": return "グラフィック表示";
             case "Graphics & Display": return "グラフィックと画面";
             case "Audio": return "オーディオ";
@@ -1983,7 +2161,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Screen Mode": return "画面モード";
             case "Texture Detail": return "テクスチャ品質";
             case "Shadow Detail": return "影の品質";
-            case "Field of View": return "視野角";
             case "Anti-aliasing": return "アンチエイリアス";
             case "V-Sync": return "垂直同期";
             case "FPS Limit": return "FPS制限";

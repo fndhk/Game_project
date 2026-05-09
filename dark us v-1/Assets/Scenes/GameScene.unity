@@ -388,7 +388,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b41a5fc0a616c14e81fe5e899338ac6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCombatTarget
-  role: 1
+  role: 0
   isDead: 0
   scriptsToDisableOnDeath: []
   collidersToDisable: []

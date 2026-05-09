@@ -70,15 +70,15 @@ public class EmergencyExitDoor : MonoBehaviour, IPlayerInteractable
     {
         if (locked)
         {
-            return "Exit Locked";
+            return T("Exit Locked");
         }
 
         if (opened)
         {
-            return "Escape Route Open";
+            return T("Escape Route Open");
         }
 
-        return "[E] Open Exit";
+        return "[E] " + T("Open Exit");
     }
 
     // 탈출문은 잠겨 있어도 상태 확인 문구를 보여준다.
@@ -141,5 +141,10 @@ public class EmergencyExitDoor : MonoBehaviour, IPlayerInteractable
                 colliders[i].enabled = false;
             }
         }
+    }
+
+    private string T(string key)
+    {
+        return InGameLocalization.Text(key);
     }
 }

@@ -150,22 +150,22 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     {
         if (isRestored)
         {
-            return isSelectedObjective ? "Escape Computer Restored" : "Wrong Computer Restored";
+            return isSelectedObjective ? T("Escape Computer Restored") : T("Wrong Computer Restored");
         }
 
         int percent = Mathf.RoundToInt(GetRestoreNormalized() * 100f);
 
         if (currentInteractor == interactor)
         {
-            return "Restoring Computer " + percent + "%";
+            return T("Restoring Computer") + " " + percent + "%";
         }
 
         if (restoreProgress > 0f)
         {
-            return "[Hold E] Restore Computer " + percent + "%";
+            return "[Hold E] " + T("Restore Computer") + " " + percent + "%";
         }
 
-        return "[Hold E] Restore Computer";
+        return "[Hold E] " + T("Restore Computer");
     }
 
     // 지금 상호작용 가능한지 반환한다.
@@ -486,5 +486,10 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         {
             targetAudioSource.Play();
         }
+    }
+
+    private string T(string key)
+    {
+        return InGameLocalization.Text(key);
     }
 }

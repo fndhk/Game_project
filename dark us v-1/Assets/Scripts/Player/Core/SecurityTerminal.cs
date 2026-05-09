@@ -17,20 +17,20 @@ public class SecurityTerminal : MonoBehaviour, IPlayerInteractable
 
         if (manager == null)
         {
-            return "[E] Use Terminal";
+            return "[E] " + T("Use Terminal");
         }
 
         if (manager.ExitUnlocked)
         {
-            return showPromptAfterUnlocked ? "Exit Power Restored" : string.Empty;
+            return showPromptAfterUnlocked ? T("Exit Power Restored") : string.Empty;
         }
 
         if (manager.CarriedCoreCount <= 0)
         {
-            return "Need Access Core " + manager.GetTerminalProgressText();
+            return T("Need Access Core") + " " + manager.GetTerminalProgressText();
         }
 
-        return "[E] Insert Access Core " + manager.GetTerminalProgressText();
+        return "[E] " + T("Insert Access Core") + " " + manager.GetTerminalProgressText();
     }
 
     // 탈출구가 이미 열렸더라도 안내를 보여줄 수 있다.
@@ -69,5 +69,10 @@ public class SecurityTerminal : MonoBehaviour, IPlayerInteractable
         {
             manager.TryInstallOneCore();
         }
+    }
+
+    private string T(string key)
+    {
+        return InGameLocalization.Text(key);
     }
 }

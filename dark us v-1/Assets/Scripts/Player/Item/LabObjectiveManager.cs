@@ -256,10 +256,10 @@ public class LabObjectiveManager : MonoBehaviour
     {
         if (exitUnlocked)
         {
-            return "Exit Unlocked";
+            return T("Exit Unlocked");
         }
 
-        return "Restore Computers " + restoredComputerCount + "/" + RequiredComputerCount;
+        return T("Restore Computers") + " " + restoredComputerCount + "/" + RequiredComputerCount;
     }
 
     // Access Core 방식의 HUD 문구를 반환한다.
@@ -267,20 +267,20 @@ public class LabObjectiveManager : MonoBehaviour
     {
         if (exitUnlocked)
         {
-            return "Exit Unlocked";
+            return T("Exit Unlocked");
         }
 
         if (installedCoreCount <= 0 && carriedCoreCount <= 0)
         {
-            return "Find Access Cores 0/" + RequiredCoreCount;
+            return T("Find Access Cores") + " 0/" + RequiredCoreCount;
         }
 
         if (installedCoreCount < RequiredCoreCount)
         {
-            return "Install Access Cores " + installedCoreCount + "/" + RequiredCoreCount;
+            return T("Install Access Cores") + " " + installedCoreCount + "/" + RequiredCoreCount;
         }
 
-        return "Reach The Exit";
+        return T("Reach The Exit");
     }
 
     // Terminal에서 보여줄 진행 문구를 반환한다.
@@ -314,5 +314,10 @@ public class LabObjectiveManager : MonoBehaviour
 
         promptText.text = message;
         promptText.gameObject.SetActive(!string.IsNullOrWhiteSpace(message));
+    }
+
+    private string T(string key)
+    {
+        return InGameLocalization.Text(key);
     }
 }
