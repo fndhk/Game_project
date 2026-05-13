@@ -29,6 +29,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
     private void Start()
     {
         PhotonConnectionDefaults.Apply();
+        MenuCursorState.UnlockCursor();
         languageIndex = PlayerPrefs.GetInt("setting_language", 0);
         EnsureEventSystem();
         BuildUi();

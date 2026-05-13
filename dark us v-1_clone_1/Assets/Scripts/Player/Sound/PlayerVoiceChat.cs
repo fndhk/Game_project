@@ -1,19 +1,22 @@
 using System.Collections.Generic;
-using Unity.Collections;
-using Unity.Netcode;
+using ExitGames.Client.Photon;
+using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 
-public class PlayerVoiceChat : NetworkBehaviour
+public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
 {
-    private const string VoiceToServerMessage = "DarkUsVoiceToServer";
-    private const string VoiceToClientMessage = "DarkUsVoiceToClient";
+    private const byte VoiceEventCode = 43;
 
-    private static readonly Dictionary<ulong, PlayerVoiceChat> playersByOwnerId = new Dictionary<ulong, PlayerVoiceChat>();
-    private static NetworkManager registeredNetworkManager;
-    private static bool handlersRegistered;
+    private static readonly Dictionary<int, AudioSource> remotePlaybackSources = new Dictionary<int, AudioSource>();
+    private static readonly Dictionary<int, float> lastVoiceReceivedTimeByActor = new Dictionary<int, float>();
+    private static PlayerVoiceChat localVoiceChat;
+    private static bool localVoiceMuted;
+    private static float lastMuteToggleTime = -100f;
 
     [Header("Input")]
     public KeyCode pushToTalkKey = KeyCode.V;
+    public KeyCode muteToggleKey = KeyCode.B;
     public bool voiceEnabled = true;
     public bool enableLocalMonitor = false;
 
@@ -41,54 +44,49 @@ public class PlayerVoiceChat : NetworkBehaviour
     private bool isCapturing;
     private bool isTalking;
     private float inputLevel;
+    private bool muteKeyWasDown;
 
     private void Awake()
     {
+        playbackSource = GetOrCreatePlaybackSource(gameObject);
+        ConfigurePlaybackSource(playbackSource);
         ApplySavedVoiceVolume();
-
-        playbackSource = GetComponent<AudioSource>();
-        if (playbackSource == null)
-        {
-            playbackSource = gameObject.AddComponent<AudioSource>();
-        }
-
-        playbackSource.playOnAwake = false;
-        playbackSource.loop = false;
-        playbackSource.spatialBlend = spatialBlend;
-        playbackSource.minDistance = minDistance;
-        playbackSource.maxDistance = maxDistance;
-        playbackSource.rolloffMode = AudioRolloffMode.Logarithmic;
     }
 
-    public override void OnNetworkSpawn()
+    private void OnEnable()
     {
-        playersByOwnerId[OwnerClientId] = this;
-        ApplySavedVoiceVolume();
-        RegisterVoiceHandlers();
+        PhotonNetwork.AddCallbackTarget(this);
+        if (IsLocalVoiceOwner())
+        {
+            localVoiceChat = this;
+        }
     }
 
-    public override void OnNetworkDespawn()
+    private void OnDisable()
     {
-        if (playersByOwnerId.TryGetValue(OwnerClientId, out PlayerVoiceChat current) && current == this)
-        {
-            playersByOwnerId.Remove(OwnerClientId);
-        }
-
+        PhotonNetwork.RemoveCallbackTarget(this);
         StopMicrophone();
+
+        if (localVoiceChat == this)
+        {
+            localVoiceChat = null;
+        }
     }
 
-    public override void OnDestroy()
+    private void OnDestroy()
     {
-        base.OnDestroy();
         StopMicrophone();
     }
 
     private void Update()
     {
         ApplySavedVoiceVolume();
+        HandleMuteToggle();
+        voiceEnabled = !localVoiceMuted;
 
-        if (!IsOwner)
+        if (!CanCaptureLocalVoice())
         {
+            StopMicrophone();
             return;
         }
 
@@ -98,20 +96,46 @@ public class PlayerVoiceChat : NetworkBehaviour
             return;
         }
 
-        if (Input.GetKey(pushToTalkKey))
+        if (!isCapturing)
         {
-            if (!isCapturing)
-            {
-                StartMicrophone();
-            }
-
-            CaptureAndSendAvailableChunks();
-            return;
+            StartMicrophone();
         }
 
-        isTalking = false;
-        inputLevel = 0f;
-        StopMicrophone();
+        CaptureAndSendAvailableChunks();
+    }
+
+    private void HandleMuteToggle()
+    {
+        bool isMuteKeyDown = Input.GetKey(muteToggleKey);
+        if (isMuteKeyDown && !muteKeyWasDown)
+        {
+            localVoiceMuted = !localVoiceMuted;
+            voiceEnabled = !localVoiceMuted;
+            lastMuteToggleTime = Time.unscaledTime;
+
+            if (!voiceEnabled)
+            {
+                StopMicrophone();
+            }
+        }
+
+        muteKeyWasDown = isMuteKeyDown;
+    }
+
+    private bool CanCaptureLocalVoice()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return false;
+        }
+
+        return IsLocalVoiceOwner();
+    }
+
+    private bool IsLocalVoiceOwner()
+    {
+        PhotonView view = GetComponent<PhotonView>();
+        return view == null || view.IsMine;
     }
 
     private void StartMicrophone()
@@ -196,152 +220,194 @@ public class PlayerVoiceChat : NetworkBehaviour
 
     private void SendVoiceChunk(float[] samples, int sampleCount)
     {
-        if (NetworkManager.Singleton == null || NetworkManager.Singleton.CustomMessagingManager == null)
+        if (!PhotonNetwork.InRoom)
         {
             return;
         }
 
         if (enableLocalMonitor)
         {
-            PlayVoiceChunk(samples, sampleCount);
+            PlayVoiceChunk(samples, sampleCount, PhotonNetwork.LocalPlayer.ActorNumber);
         }
 
-        using FastBufferWriter writer = new FastBufferWriter(sizeof(ulong) + sizeof(int) + sizeof(int) + sampleCount * sizeof(short), Allocator.Temp);
-        WriteVoicePayload(writer, OwnerClientId, sampleRate, samples, sampleCount);
-
-        if (IsServer)
+        object[] payload =
         {
-            RelayVoicePayload(OwnerClientId, sampleRate, samples, sampleCount);
-            return;
-        }
+            sampleRate,
+            EncodeSamples(samples, sampleCount)
+        };
 
-        NetworkManager.Singleton.CustomMessagingManager.SendNamedMessage(
-            VoiceToServerMessage,
-            NetworkManager.ServerClientId,
-            writer,
-            NetworkDelivery.UnreliableSequenced
-        );
+        RaiseEventOptions options = new RaiseEventOptions
+        {
+            Receivers = ReceiverGroup.Others
+        };
+
+        PhotonNetwork.RaiseEvent(VoiceEventCode, payload, options, SendOptions.SendUnreliable);
     }
 
-    private static void RegisterVoiceHandlers()
+    public void OnEvent(EventData photonEvent)
     {
-        if (NetworkManager.Singleton == null || NetworkManager.Singleton.CustomMessagingManager == null)
+        if (photonEvent.Code != VoiceEventCode)
         {
             return;
         }
 
-        if (handlersRegistered && registeredNetworkManager == NetworkManager.Singleton)
+        if (PhotonNetwork.LocalPlayer != null && photonEvent.Sender == PhotonNetwork.LocalPlayer.ActorNumber)
         {
             return;
         }
 
-        registeredNetworkManager = NetworkManager.Singleton;
-        NetworkManager.Singleton.CustomMessagingManager.RegisterNamedMessageHandler(VoiceToServerMessage, OnVoiceToServerMessage);
-        NetworkManager.Singleton.CustomMessagingManager.RegisterNamedMessageHandler(VoiceToClientMessage, OnVoiceToClientMessage);
-        handlersRegistered = true;
+        object[] payload = photonEvent.CustomData as object[];
+        if (payload == null || payload.Length < 2)
+        {
+            return;
+        }
+
+        int payloadSampleRate = ToInt(payload[0], sampleRate);
+        byte[] encodedSamples = payload[1] as byte[];
+        if (encodedSamples == null || encodedSamples.Length <= 0)
+        {
+            return;
+        }
+
+        PlayerVoiceChat receiver = localVoiceChat != null ? localVoiceChat : this;
+        receiver.sampleRate = payloadSampleRate;
+        lastVoiceReceivedTimeByActor[photonEvent.Sender] = Time.unscaledTime;
+        receiver.PlayVoiceChunk(DecodeSamples(encodedSamples), encodedSamples.Length / 2, photonEvent.Sender);
     }
 
-    private static void OnVoiceToServerMessage(ulong senderClientId, FastBufferReader reader)
+    public static bool IsActorSpeaking(int actorNumber)
     {
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
+        if (actorNumber <= 0)
         {
-            return;
+            return false;
         }
 
-        ReadVoicePayload(reader, out ulong ownerClientId, out int payloadSampleRate, out float[] samples);
-
-        if (ownerClientId != senderClientId)
+        if (PhotonNetwork.LocalPlayer != null &&
+            PhotonNetwork.LocalPlayer.ActorNumber == actorNumber &&
+            localVoiceChat != null)
         {
-            ownerClientId = senderClientId;
+            return !localVoiceMuted && localVoiceChat.isTalking;
         }
 
-        RelayVoicePayload(ownerClientId, payloadSampleRate, samples, samples.Length);
+        return lastVoiceReceivedTimeByActor.TryGetValue(actorNumber, out float lastVoiceTime) &&
+               Time.unscaledTime - lastVoiceTime <= 0.45f;
     }
 
-    private static void OnVoiceToClientMessage(ulong senderClientId, FastBufferReader reader)
+    public static bool IsLocalMuted()
     {
-        ReadVoicePayload(reader, out ulong ownerClientId, out int payloadSampleRate, out float[] samples);
-
-        if (NetworkManager.Singleton != null && ownerClientId == NetworkManager.Singleton.LocalClientId)
-        {
-            return;
-        }
-
-        if (!playersByOwnerId.TryGetValue(ownerClientId, out PlayerVoiceChat voiceChat) || voiceChat == null)
-        {
-            return;
-        }
-
-        voiceChat.sampleRate = payloadSampleRate;
-        voiceChat.PlayVoiceChunk(samples, samples.Length);
+        return localVoiceMuted;
     }
 
-    private static void RelayVoicePayload(ulong ownerClientId, int payloadSampleRate, float[] samples, int sampleCount)
+    public static float LastMuteToggleTime
     {
-        if (NetworkManager.Singleton == null || NetworkManager.Singleton.CustomMessagingManager == null)
-        {
-            return;
-        }
-
-        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
-        {
-            if (clientId == ownerClientId)
-            {
-                continue;
-            }
-
-            using FastBufferWriter writer = new FastBufferWriter(sizeof(ulong) + sizeof(int) + sizeof(int) + sampleCount * sizeof(short), Allocator.Temp);
-            WriteVoicePayload(writer, ownerClientId, payloadSampleRate, samples, sampleCount);
-
-            NetworkManager.Singleton.CustomMessagingManager.SendNamedMessage(
-                VoiceToClientMessage,
-                clientId,
-                writer,
-                NetworkDelivery.UnreliableSequenced
-            );
-        }
+        get { return lastMuteToggleTime; }
     }
 
-    private static void WriteVoicePayload(FastBufferWriter writer, ulong ownerClientId, int payloadSampleRate, float[] samples, int sampleCount)
+    private byte[] EncodeSamples(float[] samples, int sampleCount)
     {
-        writer.WriteValueSafe(ownerClientId);
-        writer.WriteValueSafe(payloadSampleRate);
-        writer.WriteValueSafe(sampleCount);
+        sampleCount = Mathf.Clamp(sampleCount, 1, samples.Length);
+        byte[] encodedSamples = new byte[sampleCount * 2];
 
         for (int i = 0; i < sampleCount; i++)
         {
             short encodedSample = (short)Mathf.Clamp(Mathf.RoundToInt(samples[i] * short.MaxValue), short.MinValue, short.MaxValue);
-            writer.WriteValueSafe(encodedSample);
+            encodedSamples[i * 2] = (byte)(encodedSample & 0xFF);
+            encodedSamples[i * 2 + 1] = (byte)((encodedSample >> 8) & 0xFF);
         }
+
+        return encodedSamples;
     }
 
-    private static void ReadVoicePayload(FastBufferReader reader, out ulong ownerClientId, out int payloadSampleRate, out float[] samples)
+    private float[] DecodeSamples(byte[] encodedSamples)
     {
-        reader.ReadValueSafe(out ownerClientId);
-        reader.ReadValueSafe(out payloadSampleRate);
-        reader.ReadValueSafe(out int sampleCount);
-
-        sampleCount = Mathf.Clamp(sampleCount, 1, 4096);
-        samples = new float[sampleCount];
+        int sampleCount = encodedSamples.Length / 2;
+        float[] samples = new float[sampleCount];
 
         for (int i = 0; i < sampleCount; i++)
         {
-            reader.ReadValueSafe(out short encodedSample);
+            short encodedSample = (short)(encodedSamples[i * 2] | (encodedSamples[i * 2 + 1] << 8));
             samples[i] = encodedSample / (float)short.MaxValue;
         }
+
+        return samples;
     }
 
-    private void PlayVoiceChunk(float[] samples, int sampleCount)
+    private void PlayVoiceChunk(float[] samples, int sampleCount, int actorNumber)
     {
-        if (playbackSource == null || sampleCount <= 0)
+        if (samples == null || sampleCount <= 0)
         {
             return;
         }
 
-        AudioClip clip = AudioClip.Create("VoiceChunk", sampleCount, 1, sampleRate, false);
+        AudioSource targetSource = GetPlaybackSourceForActor(actorNumber);
+        if (targetSource == null)
+        {
+            return;
+        }
+
+        AudioClip clip = AudioClip.Create("PhotonVoiceChunk", sampleCount, 1, sampleRate, false);
         clip.SetData(samples, 0);
-        playbackSource.PlayOneShot(clip, remoteVoiceVolume);
+        targetSource.PlayOneShot(clip, GetSavedVoiceVolume(actorNumber));
         Destroy(clip, Mathf.Max(0.5f, sampleCount / (float)sampleRate + 0.25f));
+    }
+
+    private AudioSource GetPlaybackSourceForActor(int actorNumber)
+    {
+        if (actorNumber > 0 &&
+            remotePlaybackSources.TryGetValue(actorNumber, out AudioSource cachedSource) &&
+            cachedSource != null)
+        {
+            return cachedSource;
+        }
+
+        Transform remoteTransform = FindRemoteActorTransform(actorNumber);
+        GameObject sourceObject = remoteTransform != null ? remoteTransform.gameObject : gameObject;
+        AudioSource source = GetOrCreatePlaybackSource(sourceObject);
+        ConfigurePlaybackSource(source);
+
+        if (actorNumber > 0)
+        {
+            remotePlaybackSources[actorNumber] = source;
+        }
+
+        return source;
+    }
+
+    private Transform FindRemoteActorTransform(int actorNumber)
+    {
+        if (actorNumber <= 0)
+        {
+            return null;
+        }
+
+        GameObject remoteObject = GameObject.Find("RemotePlayer_" + actorNumber);
+        return remoteObject != null ? remoteObject.transform : null;
+    }
+
+    private AudioSource GetOrCreatePlaybackSource(GameObject sourceObject)
+    {
+        AudioSource source = sourceObject.GetComponent<AudioSource>();
+        if (source == null)
+        {
+            source = sourceObject.AddComponent<AudioSource>();
+        }
+
+        return source;
+    }
+
+    private void ConfigurePlaybackSource(AudioSource source)
+    {
+        if (source == null)
+        {
+            return;
+        }
+
+        source.playOnAwake = false;
+        source.loop = false;
+        source.spatialBlend = spatialBlend;
+        source.minDistance = minDistance;
+        source.maxDistance = maxDistance;
+        source.rolloffMode = AudioRolloffMode.Logarithmic;
     }
 
     public static void ApplySavedVoiceVolumeToAll()
@@ -355,34 +421,55 @@ public class PlayerVoiceChat : NetworkBehaviour
 
     private void ApplySavedVoiceVolume()
     {
-        remoteVoiceVolume = GetSavedVoiceVolume(OwnerClientId);
+        int actorNumber = PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : 0;
+        remoteVoiceVolume = GetSavedVoiceVolume(actorNumber);
     }
 
-    private static float GetSavedVoiceVolume(ulong ownerClientId)
+    private static float GetSavedVoiceVolume(int actorNumber)
     {
-        string clientKey = "setting_voice_volume_client_" + ownerClientId;
+        string actorKey = "setting_voice_volume_actor_" + actorNumber;
+        if (actorNumber > 0 && PlayerPrefs.HasKey(actorKey))
+        {
+            return Mathf.Clamp(PlayerPrefs.GetFloat(actorKey, 1f), 0f, 2f);
+        }
+
+        string clientKey = "setting_voice_volume_client_" + Mathf.Max(0, actorNumber - 1);
         if (PlayerPrefs.HasKey(clientKey))
         {
             return Mathf.Clamp(PlayerPrefs.GetFloat(clientKey, 1f), 0f, 2f);
         }
 
-        string actorFallbackKey = "setting_voice_volume_actor_" + (ownerClientId + 1UL);
-        if (PlayerPrefs.HasKey(actorFallbackKey))
+        return Mathf.Clamp(PlayerPrefs.GetFloat("setting_voice_volume", 1f), 0f, 2f);
+    }
+
+    private int ToInt(object value, int fallback)
+    {
+        if (value is int intValue)
         {
-            return Mathf.Clamp(PlayerPrefs.GetFloat(actorFallbackKey, 1f), 0f, 2f);
+            return intValue;
         }
 
-        return Mathf.Clamp(PlayerPrefs.GetFloat("setting_voice_volume", 1f), 0f, 2f);
+        if (value is short shortValue)
+        {
+            return shortValue;
+        }
+
+        if (value is byte byteValue)
+        {
+            return byteValue;
+        }
+
+        return fallback;
     }
 
     private void OnGUI()
     {
-        if (!showLocalMicHud || !IsOwner)
+        if (!showLocalMicHud || !CanCaptureLocalVoice())
         {
             return;
         }
 
-        string state = isTalking ? "MIC TRANSMITTING" : "HOLD V TO TALK";
+        string state = voiceEnabled ? (isTalking ? "MIC TRANSMITTING" : "MIC OPEN") : "MIC MUTED";
         GUI.Label(new Rect(18f, Screen.height - 42f, 260f, 24f), state + "  " + inputLevel.ToString("0.00"));
     }
 }

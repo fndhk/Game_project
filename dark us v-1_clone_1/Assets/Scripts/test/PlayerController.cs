@@ -1,34 +1,41 @@
-using Unity.Netcode;
+癤퓎sing Photon.Pun;
 using UnityEngine;
-using UnityEngine.InputSystem; // 상단에 반드시 추가
+using UnityEngine.InputSystem;
 
-public class PlayerController : NetworkBehaviour
+public class PlayerController : MonoBehaviourPunCallbacks
 {
     [SerializeField] private float moveSpeed = 5f;
 
-    void Update()
+    private void Update()
     {
-        if (!IsOwner) return;
+        PhotonView view = GetComponent<PhotonView>();
+        if (view != null && !view.IsMine)
+        {
+            return;
+        }
 
-        // New Input System 방식의 간단한 키 입력 처리
         Vector2 input = Vector2.zero;
         if (Keyboard.current != null)
         {
-            if (Keyboard.current.wKey.isPressed) input.y = 1;
-            if (Keyboard.current.sKey.isPressed) input.y = -1;
-            if (Keyboard.current.aKey.isPressed) input.x = -1;
-            if (Keyboard.current.dKey.isPressed) input.x = 1;
+            if (Keyboard.current.wKey.isPressed) input.y = 1f;
+            if (Keyboard.current.sKey.isPressed) input.y = -1f;
+            if (Keyboard.current.aKey.isPressed) input.x = -1f;
+            if (Keyboard.current.dKey.isPressed) input.x = 1f;
         }
 
-        Vector3 move = new Vector3(input.x, 0, input.y);
+        Vector3 move = new Vector3(input.x, 0f, input.y);
         transform.position += move * moveSpeed * Time.deltaTime;
     }
 
-    public override void OnNetworkSpawn()
+    private void Start()
     {
-        if (GetComponent<Renderer>() != null)
+        Renderer targetRenderer = GetComponent<Renderer>();
+        if (targetRenderer == null)
         {
-            GetComponent<Renderer>().material.color = IsOwner ? Color.red : Color.blue;
+            return;
         }
+
+        PhotonView view = GetComponent<PhotonView>();
+        targetRenderer.material.color = view == null || view.IsMine ? Color.red : Color.blue;
     }
 }

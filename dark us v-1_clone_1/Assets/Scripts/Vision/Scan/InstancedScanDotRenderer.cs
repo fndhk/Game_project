@@ -154,6 +154,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // DrawMeshInstanced 1회 최대 개수는 1023개라서 배치 버퍼를 쓴다.
     private readonly Matrix4x4[] drawBatch = new Matrix4x4[1023];
     private int activeDotCount;
+    private bool loggedFirstDraw;
 
     // 색상 프로퍼티 이름 캐시이다.
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -840,6 +841,13 @@ public class InstancedScanDotRenderer : MonoBehaviour
                     LightProbeUsage.Off,
                     null
                 );
+
+                if (!loggedFirstDraw)
+                {
+                    loggedFirstDraw = true;
+                    string shaderName = groupMaterial.shader != null ? groupMaterial.shader.name : "null";
+                    Debug.Log("[InstancedScanDotRenderer] First draw. activeDots=" + activeDotCount + ", group=" + groupIndex + ", batch=" + drawCount + ", mesh=" + instanceMesh.name + ", shader=" + shaderName + ", layer=" + gameObject.layer);
+                }
 
                 offset += drawCount;
                 remaining -= drawCount;

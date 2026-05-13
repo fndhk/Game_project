@@ -1,57 +1,59 @@
-using UnityEngine;
-using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
+using ExitGames.Client.Photon;
+using Photon.Pun;
+using Photon.Realtime;
 using TMPro;
-using UnityEngine.UI;
-using System.Collections;
+using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
-public class MultiplayerController : NetworkBehaviour
+public class MultiplayerController : MonoBehaviourPunCallbacks
 {
     public static MultiplayerController Instance;
 
     [Header("Panels")]
-    [SerializeField] private GameObject lobbyPanel;  // ���� ȭ�� (�游���/����)
-    [SerializeField] private GameObject roomPanel;   // ���� (�ڵ�ǥ��/����/������)
-    [SerializeField] private GameObject loadingPanel; // "���� ��..." �޽��� �г�
-    [SerializeField] private GameObject errorPanel;   // ���� �˾�
+    [SerializeField] private GameObject lobbyPanel;
+    [SerializeField] private GameObject roomPanel;
+    [SerializeField] private GameObject loadingPanel;
+    [SerializeField] private GameObject errorPanel;
     [SerializeField] private GameObject backgroundPanel;
 
     [Header("UI References")]
-    [SerializeField] private TMP_InputField codeInputField; // �� ��ȣ �Է�â
-    [SerializeField] private TMP_Text roomCodeText;        // �� �� ��ȣ ǥ��
-    [SerializeField] private TMP_Text errorText;           // ���� �޽��� ����
-    [SerializeField] private Button startButton;           // ���� ���� ��ư
-    [SerializeField] private Button leaveButton;           // �� ������ ��ư
+    [SerializeField] private TMP_InputField codeInputField;
+    [SerializeField] private TMP_Text roomCodeText;
+    [SerializeField] private TMP_Text errorText;
+    [SerializeField] private Button startButton;
+    [SerializeField] private Button leaveButton;
 
     [Header("Settings")]
     [SerializeField] private int minPlayers = 2;
+    [SerializeField] private int maxPlayers = 12;
+    [SerializeField] private string gameSceneName = "labor";
 
-    private UnityTransport transport;
-    private const string DEFAULT_IP = "127.0.0.1";
+    private string pendingRoomCode;
+    private bool pendingCreateRoom;
+    private bool pendingJoinRoom;
 
     private void Awake()
     {
         Instance = this;
-        transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        PhotonConnectionDefaults.Apply();
+        PhotonNetwork.AutomaticallySyncScene = true;
 
-        // ��ǲ�ʵ� ����Ű �̺�Ʈ ����
         if (codeInputField != null)
         {
             codeInputField.onSubmit.AddListener(delegate { JoinRoomWithCode(); });
         }
 
-        // �ʱ� ȭ�� ����
         ShowLobby();
     }
 
-    // --- [�г� ���� �Լ�] ---
     private void ShowLobby()
     {
         lobbyPanel?.SetActive(true);
         roomPanel?.SetActive(false);
         loadingPanel?.SetActive(false);
         errorPanel?.SetActive(false);
+        backgroundPanel?.SetActive(true);
     }
 
     private void ShowRoom()
@@ -59,182 +61,243 @@ public class MultiplayerController : NetworkBehaviour
         lobbyPanel?.SetActive(false);
         roomPanel?.SetActive(true);
         loadingPanel?.SetActive(false);
+        errorPanel?.SetActive(false);
         backgroundPanel?.SetActive(false);
-    }
 
-    // --- [�� ����� - Host] ---
-    public void CreateRoom()
-    {
-        ushort randomCode = (ushort)UnityEngine.Random.Range(10000, 99999);
-        transport.ConnectionData.Port = randomCode;
-
-        if (roomCodeText != null) roomCodeText.text = $"���ڵ�\n{randomCode}";
-
-        if (NetworkManager.Singleton.StartHost())
+        if (startButton != null)
         {
-            ShowRoom();
-            if (startButton != null) startButton.gameObject.SetActive(true);
-            if (leaveButton != null) leaveButton.gameObject.SetActive(true);
+            startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient);
+        }
+
+        if (leaveButton != null)
+        {
+            leaveButton.gameObject.SetActive(true);
         }
     }
 
-    // --- [�� ���� - Client] ---
+    public void CreateRoom()
+    {
+        pendingRoomCode = Random.Range(0, 10000).ToString("0000");
+        pendingCreateRoom = true;
+        pendingJoinRoom = false;
+
+        if (roomCodeText != null)
+        {
+            roomCodeText.text = "방 코드\n" + pendingRoomCode;
+        }
+
+        loadingPanel?.SetActive(true);
+        ExecuteOrConnect();
+    }
+
     public void JoinRoomWithCode()
     {
-        // 1. �̹� ���� �õ� ������ üũ
-        if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer) return;
-
-        // 2. �Է°� ��ȿ�� �˻�
-        if (!ushort.TryParse(codeInputField.text, out ushort port))
+        if (PhotonNetwork.InRoom)
         {
-            ShowErrorPopup("���� 5�ڸ��� �Է����ּ���.");
             return;
         }
 
-        // 3. �ε�â ����
-        if (loadingPanel != null) loadingPanel.SetActive(true);
-
-        transport.ConnectionData.Address = DEFAULT_IP;
-        transport.ConnectionData.Port = port;
-
-        if (NetworkManager.Singleton.StartClient())
+        string input = codeInputField != null ? codeInputField.text.Trim() : string.Empty;
+        if (!IsValidRoomCode(input))
         {
-            StopAllCoroutines();
-            StartCoroutine(CheckConnectionTimeout());
+            ShowErrorPopup("4자리 방 코드를 입력하세요.");
+            return;
         }
-        else
-        {
-            CancelConnection();
-            ShowErrorPopup("���� �õ��� ������ �� �����ϴ�.");
-        }
+
+        pendingRoomCode = input;
+        pendingCreateRoom = false;
+        pendingJoinRoom = true;
+
+        loadingPanel?.SetActive(true);
+        ExecuteOrConnect();
     }
 
-    // --- [���� ��� ��ư ����] ---
     public void CancelConnection()
     {
-        StopAllCoroutines();
-        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
+        pendingCreateRoom = false;
+        pendingJoinRoom = false;
 
-        if (loadingPanel != null) loadingPanel.SetActive(false);
+        if (PhotonNetwork.InRoom)
+        {
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
+
+        loadingPanel?.SetActive(false);
         ShowLobby();
     }
 
-    // --- [�ο��� üũ] ---
     private void Update()
     {
-        // ������ ��쿡�� ���� ��ư Ȱ��ȭ/��Ȱ��ȭ ����
-        if (IsServer && startButton != null && startButton.gameObject.activeSelf)
+        if (startButton != null && startButton.gameObject.activeSelf)
         {
-            int count = NetworkManager.Singleton.ConnectedClientsList.Count;
-            startButton.interactable = (count >= minPlayers);
+            int count = PhotonNetwork.InRoom ? PhotonNetwork.CurrentRoom.PlayerCount : 0;
+            startButton.interactable = PhotonNetwork.IsMasterClient && count >= minPlayers;
         }
     }
 
-    private IEnumerator CheckConnectionTimeout()
+    private void ExecuteOrConnect()
     {
-        float timeout = 5f;
-        float timer = 0f;
+        PhotonNetwork.AutomaticallySyncScene = true;
 
-        while (timer < timeout)
+        if (PhotonNetwork.IsConnectedAndReady)
         {
-            if (NetworkManager.Singleton.IsConnectedClient)
-            {
-                // ���� ����
-                ShowRoom();
-                if (startButton != null) startButton.gameObject.SetActive(false); // �����ڴ� ���۹�ưX
-                yield break;
-            }
-            timer += Time.deltaTime;
-            yield return null;
+            ExecutePendingRoomAction();
+            return;
         }
 
-        // Ÿ�Ӿƿ� �߻�
-        if (!NetworkManager.Singleton.IsConnectedClient)
+        PhotonNetwork.ConnectUsingSettings();
+    }
+
+    private void ExecutePendingRoomAction()
+    {
+        if (pendingCreateRoom)
         {
-            CancelConnection();
-            ShowErrorPopup("������ ã�� �� �����ϴ�.");
+            RoomOptions options = new RoomOptions
+            {
+                MaxPlayers = Mathf.Clamp(maxPlayers, 1, 20),
+                IsOpen = true,
+                IsVisible = false,
+                CleanupCacheOnLeave = true,
+                CustomRoomProperties = new Hashtable
+                {
+                    { "mapSeed", Random.Range(1, int.MaxValue) }
+                },
+                CustomRoomPropertiesForLobby = new[] { "mapSeed" }
+            };
+
+            PhotonNetwork.CreateRoom(pendingRoomCode, options, TypedLobby.Default);
+            return;
+        }
+
+        if (pendingJoinRoom)
+        {
+            PhotonNetwork.JoinRoom(pendingRoomCode);
         }
     }
 
-    // --- [���� ó��] ---
+    public override void OnConnectedToMaster()
+    {
+        ExecutePendingRoomAction();
+    }
+
+    public override void OnCreatedRoom()
+    {
+        ShowRoom();
+    }
+
+    public override void OnJoinedRoom()
+    {
+        if (roomCodeText != null)
+        {
+            roomCodeText.text = "방 코드\n" + PhotonNetwork.CurrentRoom.Name;
+        }
+
+        ShowRoom();
+    }
+
+    public override void OnCreateRoomFailed(short returnCode, string message)
+    {
+        ShowErrorPopup("방 생성 실패: " + message);
+    }
+
+    public override void OnJoinRoomFailed(short returnCode, string message)
+    {
+        ShowErrorPopup("방을 찾을 수 없습니다: " + pendingRoomCode);
+    }
+
+    public override void OnLeftRoom()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
     private void ShowErrorPopup(string message)
     {
+        loadingPanel?.SetActive(false);
+
         if (errorPanel != null)
         {
             errorPanel.SetActive(true);
-            if (errorText != null) errorText.text = message;
+            if (errorText != null)
+            {
+                errorText.text = message;
+            }
         }
     }
 
-    // ���� â�� 'Ȯ��' ��ư�� ����� �Լ�
     public void CloseErrorPopup()
     {
         if (errorPanel != null)
         {
-            errorPanel.SetActive(false); // ���� �г� ��Ȱ��ȭ
+            errorPanel.SetActive(false);
         }
 
-        // ������ Ȯ�������� �κ� �г��� Ȯ���� ���̵��� ó��
         ShowLobby();
 
-        // ��ǲ�ʵ� �ʱ�ȭ (���� ����: �ٽ� �Է��ϱ� ���ϰ�)
         if (codeInputField != null)
         {
             codeInputField.text = "";
-            codeInputField.ActivateInputField(); // �ٷ� Ÿ���� �����ϰ� ��Ŀ�� �ֱ�
+            codeInputField.ActivateInputField();
         }
     }
 
-    // --- [�� ������ - ���� �ʱ�ȭ] ---
     public void LeaveRoom()
     {
-        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
+        if (PhotonNetwork.InRoom)
+        {
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
 
-        // ���� ���ΰ�ħ�Ͽ� ��� ��Ʈ��ũ ���¿� UI �ܻ��� �� ���� ����
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
-    // --- [���� ���� - �� ��ȯ] ---
     public void OnStartButtonPressed()
     {
-        // 1. ���� ����(Server)�� ���� �ѱ� ������ ����
-        if (IsServer)
+        if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
         {
-            Debug.Log("���� ����! ��� �÷��̾ �̵���ŵ�ϴ�.");
-
-            // 2. Netcode ���� �� �Ŵ����� ����Ͽ� ����ȭ�� �� ��ȯ ����
-            // ���⼭ "GameScene"�� Build Settings�� ��ϵ� �̸��� ��Ȯ�� ���ƾ� ��
-            var status = NetworkManager.Singleton.SceneManager.LoadScene(
-                "labor",
-                UnityEngine.SceneManagement.LoadSceneMode.Single
-            );
-
-            if (status != SceneEventProgressStatus.Started)
-            {
-                Debug.LogWarning($"�� �ε� ����: {status}");
-            }
+            return;
         }
+
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+        PhotonNetwork.CurrentRoom.IsVisible = false;
+        RoleAssignmentManager.EnsurePhotonImposterActor();
+        PhotonNetwork.LoadLevel(gameSceneName);
     }
 
     public void QuitGame()
     {
-        Debug.Log("���� ���� �õ� ��...");
-
-        // 1. ��Ʈ��ũ ������ �Ǿ� �ִٸ� ���� �����ϰ� ����
-        if (NetworkManager.Singleton != null)
+        if (PhotonNetwork.InRoom)
         {
-            // ���� ����(Host)�̶�� ���� �����ϰ�, ������(Client)��� ���� �����ϴ�.
-            NetworkManager.Singleton.Shutdown();
-            Debug.Log("��Ʈ��ũ ������ ���������� �����߽��ϴ�.");
+            PhotonNetwork.LeaveRoom();
+        }
+        else if (PhotonNetwork.IsConnected)
+        {
+            PhotonNetwork.Disconnect();
         }
 
-        // 2. �÷����� ���� ���� ó��
-        #if UNITY_EDITOR
-    // ����Ƽ �����Ϳ��� �÷��� ��带 �������� ���� ȿ��
-    UnityEditor.EditorApplication.isPlaying = false;
-        #else
-        // ���� ����� ���� ���α׷� ����
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
         Application.Quit();
-        #endif
+#endif
+    }
+
+    private bool IsValidRoomCode(string roomCode)
+    {
+        if (roomCode.Length != 4)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < roomCode.Length; i++)
+        {
+            if (!char.IsDigit(roomCode[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

@@ -243,6 +243,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerVoiceChat
   pushToTalkKey: 118
+  muteToggleKey: 98
   voiceEnabled: 1
   enableLocalMonitor: 0
   microphoneDeviceName: 

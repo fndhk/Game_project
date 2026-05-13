@@ -1,33 +1,40 @@
+using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
-using Unity.Netcode;
-using System;
 
-public class GameSessionManager : NetworkBehaviour
+public class GameSessionManager : MonoBehaviourPunCallbacks
 {
     [SerializeField] private int minPlayers = 4;
     [SerializeField] private int maxPlayers = 12;
 
-    public override void OnNetworkSpawn()
+    private void Start()
     {
-        if (IsServer)
-        {
-            NetworkManager.Singleton.OnClientConnectedCallback += CheckPlayerCount;
-        }
+        CheckPlayerCount();
     }
 
-    private void CheckPlayerCount(ulong clientId)
+    public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-        int currentPlayers = NetworkManager.Singleton.ConnectedClientsList.Count;
-
-        if (currentPlayers >= minPlayers)
-        {
-            StartGame();
-        }
+        CheckPlayerCount();
     }
 
-    private void StartGame()
+    public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-        // ���� ��ƾ ���� �� �� ��ȯ ����
-        Debug.Log(".");
+        CheckPlayerCount();
+    }
+
+    private void CheckPlayerCount()
+    {
+        if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
+        {
+            return;
+        }
+
+        int currentPlayers = PhotonNetwork.CurrentRoom.PlayerCount;
+        int requiredPlayers = Mathf.Clamp(minPlayers, 1, Mathf.Max(1, maxPlayers));
+
+        if (currentPlayers >= requiredPlayers)
+        {
+            Debug.Log("Photon room has enough players.");
+        }
     }
 }

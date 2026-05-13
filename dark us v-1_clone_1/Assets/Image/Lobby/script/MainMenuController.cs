@@ -77,6 +77,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     private void Start()
     {
         PhotonConnectionDefaults.Apply();
+        MenuCursorState.UnlockCursor();
 
         if (!Application.isPlaying)
         {
@@ -225,9 +226,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
 
         PlayerPrefs.SetString(RoomCodePrefsKey, roomCode);
-        PlayerPrefs.SetString(RoomTitlePrefsKey, "Public Room");
+        PlayerPrefs.SetString(RoomTitlePrefsKey, "Private Room");
         PlayerPrefs.SetInt(RoomHostPrefsKey, 0);
-        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 1);
+        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 0);
         PlayerPrefs.Save();
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
     }
@@ -820,13 +821,13 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             joinFriendPanel = existingPanel != null ? existingPanel.gameObject : CreateMenuPanel(
                 "JoinFriendPanel",
                 "Join Friend",
-                "Steam friend invites will be connected here later.",
-                "Close",
-                () => OnClickClosePanel(joinFriendPanel)
+                "Enter the 4-digit room code from the host.",
+                "Join",
+                OnClickFindRoomConfirm
             );
         }
 
-        PrepareExistingPanel(joinFriendPanel, "Join Friend", "Steam friend invites will be connected here later.", "Close", () => OnClickClosePanel(joinFriendPanel));
+        PrepareJoinFriendPanel(joinFriendPanel);
     }
 
     private GameObject CreateMenuPanel(string objectName, string title, string body, string primaryLabel, UnityEngine.Events.UnityAction primaryAction)
@@ -997,6 +998,40 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
 
         BuildPanelContents(panelObject, title, body, primaryLabel, primaryAction);
+    }
+
+    private void PrepareJoinFriendPanel(GameObject panelObject)
+    {
+        if (panelObject == null)
+        {
+            return;
+        }
+
+        RectTransform rectTransform = panelObject.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            PrepareOverlayRect(rectTransform);
+        }
+
+        if (panelObject.GetComponent<Image>() == null)
+        {
+            panelObject.AddComponent<CanvasRenderer>();
+            panelObject.AddComponent<Image>();
+        }
+
+        Transform existingInput = panelObject.transform.Find("Dialog/RoomCodeInput");
+        if (existingInput != null)
+        {
+            findRoomCodeInput = existingInput.GetComponent<TMP_InputField>();
+            return;
+        }
+
+        for (int i = panelObject.transform.childCount - 1; i >= 0; i--)
+        {
+            DestroyUiObject(panelObject.transform.GetChild(i).gameObject);
+        }
+
+        BuildPanelContents(panelObject, "Join Friend", "Enter the 4-digit room code from the host.", "Join", OnClickFindRoomConfirm);
     }
 
     private void StartPublicRoomListFlow()
@@ -1217,7 +1252,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         bodyText.enableWordWrapping = true;
         bodyText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
-        if (title == "Find Room")
+        if (title == "Find Room" || title == "Join Friend")
         {
             bodyRect.anchoredPosition = new Vector2(0f, 54f);
             bodyRect.sizeDelta = new Vector2(-120f, 86f);
@@ -1465,7 +1500,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         Transform section = CreateSettingsSection(parent, "Controls & Keybindings", 540f);
         CreateDisplayRow(section, "Move", "W A S D");
         CreateDisplayRow(section, "Interact", "E");
-        CreateDisplayRow(section, "Push To Talk", "V");
+        CreateDisplayRow(section, "Mic Mute", "B");
         CreateSliderRow(section, "Mouse Sensitivity X", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_x", 1f), false, "setting_mouse_x");
         CreateSliderRow(section, "Mouse Sensitivity Y", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_y", 1f), false, "setting_mouse_y");
         CreateToggleRow(section, "Invert Mouse Y", false, "setting_invert_y");
@@ -2054,6 +2089,8 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Public Game": return "공개 게임";
             case "Join Friend": return "친구 참가";
             case "Steam friend invites will be connected here later.": return "Steam 친구 초대는 여기에 나중에 연결됩니다.";
+            case "Enter the 4-digit room code from the host.": return "호스트 화면에 보이는 4자리 방 코드를 입력하세요.";
+            case "Join": return "참가";
             case "Setting": return "설정";
             case "Settings": return "설정";
             case "SETTINGS": return "설정";
@@ -2098,6 +2135,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Move": return "이동";
             case "Interact": return "상호작용";
             case "Push To Talk": return "눌러서 말하기";
+            case "Mic Mute": return "마이크 음소거";
             case "Mouse Sensitivity X": return "마우스 감도 X";
             case "Mouse Sensitivity Y": return "마우스 감도 Y";
             case "Invert Mouse Y": return "마우스 Y축 반전";
@@ -2129,6 +2167,8 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Public Game": return "公開ゲーム";
             case "Join Friend": return "フレンド参加";
             case "Steam friend invites will be connected here later.": return "Steamフレンド招待は後でここに接続されます。";
+            case "Enter the 4-digit room code from the host.": return "ホスト画面の4桁ルームコードを入力してください。";
+            case "Join": return "参加";
             case "Setting": return "設定";
             case "Settings": return "設定";
             case "SETTINGS": return "設定";
@@ -2173,6 +2213,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Move": return "移動";
             case "Interact": return "インタラクト";
             case "Push To Talk": return "プッシュトゥトーク";
+            case "Mic Mute": return "マイクミュート";
             case "Mouse Sensitivity X": return "マウス感度 X";
             case "Mouse Sensitivity Y": return "マウス感度 Y";
             case "Invert Mouse Y": return "マウスY反転";

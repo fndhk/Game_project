@@ -264,6 +264,7 @@ public class InGamePauseMenu : MonoBehaviour
     private void ReturnToLobby()
     {
         SetOpen(false);
+        MenuCursorState.UnlockCursor();
 
         if (PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient)
         {
@@ -282,6 +283,7 @@ public class InGamePauseMenu : MonoBehaviour
     private void QuitToMainMenu()
     {
         SetOpen(false);
+        MenuCursorState.UnlockCursor();
 
         if (PhotonNetwork.InRoom)
         {
@@ -417,7 +419,6 @@ public class InGamePauseMenu : MonoBehaviour
         CreateButton(leftPanel.transform, "ControlsButton", T("Controls"), ShowControlsPanel);
         CreateButton(leftPanel.transform, "PlayersButton", T("Players"), ShowPlayersPanel);
         CreateSpacer(leftPanel.transform, 18f);
-        CreateButton(leftPanel.transform, "ReturnLobbyButton", T("Return to Lobby"), ConfirmReturnToLobby);
         CreateButton(leftPanel.transform, "MainMenuButton", T("Quit to Main Menu"), ConfirmQuitToMainMenu);
         CreateButton(leftPanel.transform, "QuitGameButton", T("Quit Game"), ConfirmQuitGame);
 

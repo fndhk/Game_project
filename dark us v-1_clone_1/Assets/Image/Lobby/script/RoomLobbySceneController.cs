@@ -32,6 +32,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private TMP_Text roomCodeText;
     private Transform voiceListRoot;
     private RectTransform backgroundSweepLine;
+    private PlayerVoiceChat lobbyVoiceChat;
     private Button readyButton;
     private Button startButton;
     private string pendingRoomCode;
@@ -40,13 +41,16 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private int languageIndex;
     private bool isStartingGame;
     private float uiStartedAt;
+    private float nextVoicePanelRefreshTime;
 
     private void Start()
     {
         PhotonConnectionDefaults.Apply();
+        MenuCursorState.UnlockCursor();
         languageIndex = PlayerPrefs.GetInt("setting_language", 0);
         uiStartedAt = Time.unscaledTime;
         EnsureEventSystem();
+        EnsureLobbyVoiceChat();
         BuildRoomLobbyUi();
         StartPhotonRoomFlow();
     }
@@ -54,6 +58,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private void Update()
     {
         AnimateLobbyUi();
+        RefreshVoicePanelOnInterval();
     }
 
     private void AnimateLobbyUi()
@@ -77,6 +82,31 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             float pulse = 1f + Mathf.Sin(elapsed * 1.35f + i * 0.8f) * 0.0035f;
             panel.localScale = new Vector3(pulse, pulse, 1f);
         }
+    }
+
+    private void RefreshVoicePanelOnInterval()
+    {
+        if (!Application.isPlaying || Time.unscaledTime < nextVoicePanelRefreshTime)
+        {
+            return;
+        }
+
+        nextVoicePanelRefreshTime = Time.unscaledTime + 0.18f;
+        RefreshVoicePanel();
+    }
+
+    private void EnsureLobbyVoiceChat()
+    {
+        lobbyVoiceChat = GetComponent<PlayerVoiceChat>();
+        if (lobbyVoiceChat == null)
+        {
+            lobbyVoiceChat = gameObject.AddComponent<PlayerVoiceChat>();
+        }
+
+        lobbyVoiceChat.voiceEnabled = true;
+        lobbyVoiceChat.muteToggleKey = KeyCode.B;
+        lobbyVoiceChat.spatialBlend = 0f;
+        lobbyVoiceChat.showLocalMicHud = false;
     }
 
     public void OnClickStartGame()
@@ -175,7 +205,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
-        SetNetworkStatus("ROOM NOT FOUND");
+        SetNetworkStatus("ROOM NOT FOUND: " + pendingRoomCode);
     }
 
     public override void OnJoinedRoom()
@@ -726,7 +756,23 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rowRect.sizeDelta = new Vector2(0f, 40f);
 
         Image rowImage = row.GetComponent<Image>();
-        rowImage.color = index % 2 == 0 ? new Color(0.02f, 0.026f, 0.028f, 0.5f) : new Color(0.04f, 0.052f, 0.056f, 0.36f);
+        bool isSpeaking = PlayerVoiceChat.IsActorSpeaking(player.ActorNumber);
+        bool isLocalMuted = player.IsLocal && PlayerVoiceChat.IsLocalMuted();
+        rowImage.color = isSpeaking
+            ? new Color(0.10f, 0.22f, 0.18f, 0.68f)
+            : (index % 2 == 0 ? new Color(0.02f, 0.026f, 0.028f, 0.5f) : new Color(0.04f, 0.052f, 0.056f, 0.36f));
+
+        string stateLabel = isLocalMuted ? T("MIC MUTED") : (isSpeaking ? T("TALKING") : T("MIC OPEN"));
+        TMP_Text stateText = CreateText(row.transform, "VoiceStateText", stateLabel, 17f, FontStyles.UpperCase);
+        RectTransform stateRect = stateText.GetComponent<RectTransform>();
+        stateRect.anchorMin = new Vector2(1f, 0.5f);
+        stateRect.anchorMax = new Vector2(1f, 0.5f);
+        stateRect.anchoredPosition = new Vector2(-360f, 0f);
+        stateRect.sizeDelta = new Vector2(132f, 26f);
+        stateText.alignment = TextAlignmentOptions.Right;
+        stateText.color = isLocalMuted
+            ? new Color(1f, 0.34f, 0.28f, 1f)
+            : (isSpeaking ? new Color(0.48f, 1f, 0.68f, 1f) : new Color(0.46f, 0.56f, 0.58f, 0.78f));
 
         string displayName = GetPlayerDisplayName(player);
         TMP_Text nameText = CreateText(row.transform, "NameText", displayName, 20f, FontStyles.UpperCase);
@@ -862,6 +908,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             return T("DISCONNECTED") + ": " + key.Substring("DISCONNECTED: ".Length);
         }
 
+        if (key.StartsWith("ROOM NOT FOUND: "))
+        {
+            return T("ROOM NOT FOUND") + " " + key.Substring("ROOM NOT FOUND: ".Length);
+        }
+
         switch (languageIndex)
         {
             case 1:
@@ -928,6 +979,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "CREW VOICE": return "대원 음성";
             case "ADJUST EACH PLAYER": return "플레이어별 수신 음량을 조절합니다";
             case "Voice Volume": return "마이크 볼륨";
+            case "TALKING": return "말함";
+            case "MUTED": return "음소거";
+            case "IDLE": return "대기";
+            case "MIC MUTED": return "마이크 꺼짐";
+            case "MIC OPEN": return "마이크 켜짐";
             case "Room initialized": return "방 초기화됨";
             case "Voice channel standby": return "음성 채널 대기";
             case "Waiting for players": return "플레이어 대기 중";
@@ -980,6 +1036,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "CREW VOICE": return "クルーボイス";
             case "ADJUST EACH PLAYER": return "プレイヤーごとの受信音量を調整";
             case "Voice Volume": return "マイク音量";
+            case "TALKING": return "発話中";
+            case "MUTED": return "ミュート";
+            case "IDLE": return "待機";
+            case "MIC MUTED": return "マイクOFF";
+            case "MIC OPEN": return "マイクON";
             case "Room initialized": return "ルーム初期化";
             case "Voice channel standby": return "ボイスチャンネル待機";
             case "Waiting for players": return "プレイヤー待機中";

@@ -52,6 +52,9 @@ public class PlayerHUDController : MonoBehaviour
     private TMP_Text staminaLabelText;
     private TMP_Text dotMemoryLabelText;
     private TMP_Text roundTimerText;
+    private RectTransform micStatusRoot;
+    private Image micStatusIcon;
+    private TMP_Text micStatusText;
     private RectTransform roleRevealRoot;
     private TMP_Text roleRevealTitleText;
     private TMP_Text roleRevealRoleText;
@@ -70,6 +73,8 @@ public class PlayerHUDController : MonoBehaviour
     private Sprite cameraIconSprite;
     private Sprite knifeIconSprite;
     private Sprite medkitIconSprite;
+    private Sprite micOpenIconSprite;
+    private Sprite micMutedIconSprite;
     private Sprite emptyIconSprite;
 
     private readonly Color panelColor = new Color(0f, 0f, 0f, 0.82f);
@@ -84,6 +89,9 @@ public class PlayerHUDController : MonoBehaviour
     private bool hasDisplayedRole;
     private float roleRevealEndTime;
     private int lastLanguageIndex = -1;
+    private bool lastMicMutedState;
+    private bool hasMicState;
+    private float micStatusVisibleUntil;
 
     private void Awake()
     {
@@ -113,6 +121,7 @@ public class PlayerHUDController : MonoBehaviour
         UpdateLocalizedStaticText();
         UpdateHudOpacity();
         UpdateRoundTimer();
+        UpdateVoiceStatus();
         UpdateHudAnimation();
     }
 
@@ -291,6 +300,7 @@ public class PlayerHUDController : MonoBehaviour
         BuildDotMemoryModule();
         BuildObjectiveModule();
         BuildRoundTimerModule();
+        BuildVoiceStatusModule();
     }
 
     private bool IsValidHudCanvas(Canvas candidate)
@@ -458,6 +468,22 @@ public class PlayerHUDController : MonoBehaviour
         roundTimerText.rectTransform.sizeDelta = new Vector2(220f, 42f);
     }
 
+    private void BuildVoiceStatusModule()
+    {
+        micStatusRoot = CreateRect("MicStatus", hudRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 142f));
+        micStatusRoot.sizeDelta = new Vector2(190f, 42f);
+        AddPanel(micStatusRoot, new Color(0f, 0f, 0f, 0.72f));
+        AddOutline(micStatusRoot, new Color(0.72f, 0.82f, 0.82f, 0.42f), new Vector2(1f, -1f));
+
+        micStatusIcon = AddImage(CreateRect("MicIcon", micStatusRoot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18f, 0f)), cyanColor);
+        micStatusIcon.rectTransform.sizeDelta = new Vector2(30f, 30f);
+        micStatusIcon.sprite = micOpenIconSprite;
+
+        micStatusText = CreateLabel("MIC OPEN", micStatusRoot, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(58f, 0f), 16, cyanColor, TextAlignmentOptions.Left);
+        micStatusText.rectTransform.sizeDelta = new Vector2(-70f, 28f);
+        micStatusRoot.gameObject.SetActive(false);
+    }
+
     private void BuildRoleRevealModule()
     {
         roleRevealRoot = CreateRect("RoleReveal", hudRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f));
@@ -621,6 +647,40 @@ public class PlayerHUDController : MonoBehaviour
         roundTimerText.color = remaining <= 60f
             ? new Color(1f, 0.28f, 0.20f, 0.98f)
             : new Color(0.95f, 0.76f, 0.30f, 0.96f);
+    }
+
+    private void UpdateVoiceStatus()
+    {
+        if (micStatusRoot == null || micStatusIcon == null || micStatusText == null)
+        {
+            return;
+        }
+
+        bool muted = PlayerVoiceChat.IsLocalMuted();
+        if (!hasMicState || muted != lastMicMutedState)
+        {
+            hasMicState = true;
+            lastMicMutedState = muted;
+            micStatusVisibleUntil = Time.unscaledTime + 2.2f;
+        }
+
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            micStatusVisibleUntil = Time.unscaledTime + 2.2f;
+        }
+
+        bool shouldShow = muted || Time.unscaledTime <= micStatusVisibleUntil;
+
+        micStatusRoot.gameObject.SetActive(shouldShow);
+        if (!shouldShow)
+        {
+            return;
+        }
+
+        micStatusText.text = muted ? "MIC MUTED" : "MIC OPEN";
+        micStatusText.color = muted ? new Color(1f, 0.32f, 0.24f, 0.96f) : new Color(0.48f, 1f, 0.68f, 0.96f);
+        micStatusIcon.sprite = muted ? micMutedIconSprite : micOpenIconSprite;
+        micStatusIcon.color = micStatusText.color;
     }
 
     private void UpdateHudOpacity()
@@ -835,6 +895,12 @@ public class PlayerHUDController : MonoBehaviour
             medkitIconSprite = CreateIconSprite(IconKind.Medkit);
         }
 
+        if (micOpenIconSprite == null || micMutedIconSprite == null)
+        {
+            micOpenIconSprite = CreateIconSprite(IconKind.MicOpen);
+            micMutedIconSprite = CreateIconSprite(IconKind.MicMuted);
+        }
+
     }
 
     private enum IconKind
@@ -842,7 +908,9 @@ public class PlayerHUDController : MonoBehaviour
         Empty,
         Camera,
         Knife,
-        Medkit
+        Medkit,
+        MicOpen,
+        MicMuted
     }
 
     private Sprite CreateIconSprite(IconKind kind)
@@ -913,6 +981,22 @@ public class PlayerHUDController : MonoBehaviour
             FillRect(texture, 18, 9, 12, 7, c);
             FillRect(texture, 22, 20, 5, 14, clear);
             FillRect(texture, 17, 25, 15, 5, clear);
+        }
+        else if (kind == IconKind.MicOpen || kind == IconKind.MicMuted)
+        {
+            FillRect(texture, 18, 7, 12, 24, c);
+            FillCircle(texture, 24, 8, 6, c);
+            FillCircle(texture, 24, 30, 6, c);
+            FillRect(texture, 14, 25, 4, 8, c);
+            FillRect(texture, 30, 25, 4, 8, c);
+            FillRect(texture, 21, 33, 6, 7, c);
+            FillRect(texture, 16, 40, 16, 4, c);
+
+            if (kind == IconKind.MicMuted)
+            {
+                DrawThickLine(texture, new Vector2(10f, 8f), new Vector2(38f, 40f), 6f, new Color(0f, 0f, 0f, 0f));
+                DrawThickLine(texture, new Vector2(10f, 8f), new Vector2(38f, 40f), 3f, c);
+            }
         }
         else
         {

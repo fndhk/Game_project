@@ -1317,7 +1317,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4b013e3f3262da45a439071c39d2c3f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MultiplayerController
-  ShowTopMostFoldoutHeaderGroup: 1
   lobbyPanel: {fileID: 0}
   roomPanel: {fileID: 0}
   loadingPanel: {fileID: 0}
@@ -1329,6 +1328,8 @@ MonoBehaviour:
   startButton: {fileID: 0}
   leaveButton: {fileID: 0}
   minPlayers: 1
+  maxPlayers: 12
+  gameSceneName: labor
 --- !u!4 &745068024
 Transform:
   m_ObjectHideFlags: 0

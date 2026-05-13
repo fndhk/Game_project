@@ -1,11 +1,14 @@
-using Unity.Netcode.Components;
+癤퓎sing Photon.Pun;
 using UnityEngine;
 
-// 클라이언트가 직접 자신의 위치 권한을 갖게 하는 프로의 방식
-public class OwnerNetworkTransform : NetworkTransform
+public class OwnerNetworkTransform : MonoBehaviourPunCallbacks
 {
-    protected override bool OnIsServerAuthoritative()
+    public bool IsLocallyControlled
     {
-        return false; // 서버 권한을 끄고 소유자(Client) 권한으로 설정
+        get
+        {
+            PhotonView view = GetComponent<PhotonView>();
+            return view == null || view.IsMine;
+        }
     }
 }

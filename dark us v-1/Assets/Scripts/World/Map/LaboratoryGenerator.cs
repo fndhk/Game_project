@@ -225,7 +225,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         public bool HideGeneratedVisualsOnlyInPlayMode = true;
 
         [Tooltip("켜면 생성된 맵/아이템의 일반 BoxCollider를 끄고 MeshCollider 표면만 스캔/충돌에 사용")]
-        public bool UseMeshCollidersInsteadOfBoxColliders = true;
+        public bool UseMeshCollidersInsteadOfBoxColliders = false;
 
         [Header("Generated Light Optimization")]
         [Tooltip("생성된 방/복도/문 안에 있는 Light의 그림자 설정을 자동으로 정리해서 URP shadow atlas 경고를 줄임")]
@@ -2304,6 +2304,11 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 MeshFilter meshFilter = meshFilters[i];
 
                 if (meshFilter == null || meshFilter.sharedMesh == null)
+                {
+                    continue;
+                }
+
+                if (!meshFilter.sharedMesh.isReadable)
                 {
                     continue;
                 }
