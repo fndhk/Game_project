@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 // 플레이어 시점에서 E키 상호작용을 처리한다.
 // 기존 클릭 상호작용과 새 길게 누르기 상호작용을 모두 지원한다.
@@ -40,6 +41,7 @@ public class PlayerObjectiveInteractor : MonoBehaviour
 
     // 현재 길게 누르기 상호작용 중인지 저장한다.
     private bool isHoldingInteraction = false;
+    private bool promptStylePrepared = false;
 
     // 필요한 참조를 자동으로 찾는다.
     private void Awake()
@@ -332,6 +334,7 @@ public class PlayerObjectiveInteractor : MonoBehaviour
     {
         if (promptText != null)
         {
+            PreparePromptStyle();
             promptText.text = message;
             promptText.gameObject.SetActive(!string.IsNullOrWhiteSpace(message));
             return;
@@ -340,6 +343,30 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         if (LabObjectiveManager.Instance != null)
         {
             LabObjectiveManager.Instance.SetPromptText(message);
+        }
+    }
+
+    private void PreparePromptStyle()
+    {
+        if (promptStylePrepared || promptText == null)
+        {
+            return;
+        }
+
+        promptStylePrepared = true;
+        promptText.color = new Color(0.94f, 0.98f, 1f, 0.98f);
+        promptText.fontSize = Mathf.Max(promptText.fontSize, 22f);
+        promptText.enableAutoSizing = true;
+        promptText.fontSizeMin = 14f;
+        promptText.fontSizeMax = Mathf.Max(promptText.fontSize, 24f);
+        promptText.alignment = TextAlignmentOptions.Center;
+        promptText.raycastTarget = false;
+
+        if (promptText.GetComponent<Shadow>() == null)
+        {
+            Shadow shadow = promptText.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            shadow.effectDistance = new Vector2(1.6f, -1.6f);
         }
     }
 }

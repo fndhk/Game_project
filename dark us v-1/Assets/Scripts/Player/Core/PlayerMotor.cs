@@ -87,6 +87,13 @@ public class PlayerMotor : MonoBehaviour
     // 컨트롤러 높이가 부드럽게 바뀌는 속도이다.
     public float controllerHeightSmooth = 10f;
 
+    [Header("웅크리기 해제 검사")]
+    // 서려고 할 때 머리 위 공간을 검사할 레이어이다.
+    public LayerMask standCheckMask = ~0;
+
+    // 머리 위 검사 캡슐을 살짝 줄여서 벽에 거의 닿은 상태의 오검출을 줄인다.
+    public float standCheckPadding = 0.03f;
+
     // CharacterController를 저장하는 변수이다.
     private CharacterController controller;
 
@@ -198,9 +205,60 @@ public class PlayerMotor : MonoBehaviour
         }
         else
         {
-            // Ctrl을 떼면 다시 서 있는 상태로 바꾼다.
-            isCrouching = false;
+            // Ctrl을 떼도 머리 위가 막혀 있으면 웅크린 상태를 유지한다.
+            isCrouching = !CanStandUp();
         }
+    }
+
+    // 서 있는 높이로 돌아갈 공간이 있는지 검사한다.
+    private bool CanStandUp()
+    {
+        if (controller == null)
+        {
+            return true;
+        }
+
+        if (!isCrouching && controller.height >= standingControllerHeight - 0.02f)
+        {
+            return true;
+        }
+
+        Vector3 up = transform.up;
+        float radius = Mathf.Max(0.01f, controller.radius - standCheckPadding);
+        float currentHeight = Mathf.Max(controller.height, radius * 2f);
+        float standingHeight = Mathf.Max(standingControllerHeight, radius * 2f);
+        Vector3 currentCenter = transform.TransformPoint(controller.center);
+        Vector3 currentBottomSphere = currentCenter - up * (currentHeight * 0.5f - radius);
+        Vector3 standingCenter = currentBottomSphere + up * (standingHeight * 0.5f - radius);
+        Vector3 standingTopSphere = standingCenter + up * (standingHeight * 0.5f - radius);
+        Vector3 currentTopSphere = currentCenter + up * (currentHeight * 0.5f - radius);
+
+        Collider[] hits = Physics.OverlapCapsule(
+            currentTopSphere,
+            standingTopSphere,
+            radius,
+            standCheckMask,
+            QueryTriggerInteraction.Ignore
+        );
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hit = hits[i];
+
+            if (hit == null)
+            {
+                continue;
+            }
+
+            if (hit.transform == transform || hit.transform.IsChildOf(transform))
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     // 현재 스태미나 값에 따라 탈진 상태를 갱신하는 함수이다.

@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 // 연구소 목표 흐름 종류이다.
 public enum LabObjectiveFlow
@@ -53,6 +54,7 @@ public class LabObjectiveManager : MonoBehaviour
 
     // 현재 등록된 탈출구이다.
     private EmergencyExitDoor registeredExitDoor;
+    private bool promptStylePrepared = false;
 
     public int RequiredCoreCount => Mathf.Max(1, requiredCoreCount);
     public int CarriedCoreCount => carriedCoreCount;
@@ -256,10 +258,10 @@ public class LabObjectiveManager : MonoBehaviour
     {
         if (exitUnlocked)
         {
-            return T("Exit Unlocked");
+            return T("Exit Open");
         }
 
-        return T("Restore Computers") + " " + restoredComputerCount + "/" + RequiredComputerCount;
+        return T("Find Target Computers") + " " + restoredComputerCount + "/" + RequiredComputerCount;
     }
 
     // Access Core 방식의 HUD 문구를 반환한다.
@@ -267,7 +269,7 @@ public class LabObjectiveManager : MonoBehaviour
     {
         if (exitUnlocked)
         {
-            return T("Exit Unlocked");
+            return T("Exit Open");
         }
 
         if (installedCoreCount <= 0 && carriedCoreCount <= 0)
@@ -312,8 +314,33 @@ public class LabObjectiveManager : MonoBehaviour
             return;
         }
 
+        PreparePromptStyle();
         promptText.text = message;
         promptText.gameObject.SetActive(!string.IsNullOrWhiteSpace(message));
+    }
+
+    private void PreparePromptStyle()
+    {
+        if (promptStylePrepared || promptText == null)
+        {
+            return;
+        }
+
+        promptStylePrepared = true;
+        promptText.color = new Color(0.94f, 0.98f, 1f, 0.98f);
+        promptText.fontSize = Mathf.Max(promptText.fontSize, 22f);
+        promptText.enableAutoSizing = true;
+        promptText.fontSizeMin = 14f;
+        promptText.fontSizeMax = Mathf.Max(promptText.fontSize, 24f);
+        promptText.alignment = TextAlignmentOptions.Center;
+        promptText.raycastTarget = false;
+
+        if (promptText.GetComponent<Shadow>() == null)
+        {
+            Shadow shadow = promptText.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            shadow.effectDistance = new Vector2(1.6f, -1.6f);
+        }
     }
 
     private string T(string key)

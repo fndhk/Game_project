@@ -5,6 +5,9 @@ using UnityEngine.Serialization;
 // 모든 컴퓨터는 복구 가능하지만, 랜덤으로 선택된 컴퓨터만 탈출 진행도에 반영된다.
 public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
 {
+    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorId = Shader.PropertyToID("_Color");
+
     [Header("Objective State")]
     // 이번 판에 실제 탈출 시스템 컴퓨터로 선택되었는지 저장한다.
     [SerializeField] private bool isSelectedObjective = false;
@@ -67,6 +70,11 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 점 렌더러 참조이다. 비워두면 씬에서 자동으로 찾는다.
     public InstancedScanDotRenderer[] scanDotRenderers;
 
+    [Header("Runtime Visual Tint")]
+    public bool tintRenderersOnRestore = true;
+    public Color fakeRestoredTint = new Color(1f, 0.14f, 0.1f, 1f);
+    public Color escapeRestoredTint = new Color(0.18f, 0.55f, 1f, 1f);
+
     [Header("Audio")]
     // 복구 시작 시 재생할 소리이다.
     public AudioSource startAudioSource;
@@ -110,6 +118,8 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 이 컴퓨터가 복구 완료된 진짜 탈출 컴퓨터인지 확인하는 프로퍼티이다.
     public bool IsEscapeRestoredComputer => isRestored && isSelectedObjective;
 
+    public ScanSurfaceType CurrentScanSurfaceType => GetCurrentScanSurfaceType();
+
     // 시작 전에 참조를 자동으로 채운다.
     private void Awake()
     {
@@ -150,22 +160,22 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     {
         if (isRestored)
         {
-            return isSelectedObjective ? T("Escape Computer Restored") : T("Wrong Computer Restored");
+            return isSelectedObjective ? T("Target Computer Found") : T("Wrong Computer");
         }
 
         int percent = Mathf.RoundToInt(GetRestoreNormalized() * 100f);
 
         if (currentInteractor == interactor)
         {
-            return T("Restoring Computer") + " " + percent + "%";
+            return T("Checking Computer") + " " + percent + "%";
         }
 
         if (restoreProgress > 0f)
         {
-            return "[Hold E] " + T("Restore Computer") + " " + percent + "%";
+            return "[Hold E] " + T("Check Computer") + " " + percent + "%";
         }
 
-        return "[Hold E] " + T("Restore Computer");
+        return "[Hold E] " + T("Check Computer");
     }
 
     // 지금 상호작용 가능한지 반환한다.
@@ -346,12 +356,13 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         Vector3 center = existingDotRecolorCenter != null ? existingDotRecolorCenter.position : transform.position;
 
         // 진짜/가짜 여부에 따라 바꿀 최종 색상 그룹을 정한다.
-        ScanSurfaceType resultSurfaceType = isSelectedObjective ? escapeRestoredScanType : fakeRestoredScanType;
+        ScanSurfaceType resultSurfaceType = GetCurrentScanSurfaceType();
         ScanDotColorGroup resultColorGroup = SurfaceTypeToDotColorGroup(resultSurfaceType);
 
         // 복구 전 컴퓨터 색상 그룹만 바꾼다.
         // 이렇게 해야 컴퓨터 주변 바닥/벽 점까지 같이 빨간색/파란색으로 바뀌는 일을 줄일 수 있다.
         ScanDotColorGroup beforeColorGroup = SurfaceTypeToDotColorGroup(beforeRestoreScanType);
+        ScanDotColorGroup wrongComputerGroup = SurfaceTypeToDotColorGroup(fakeRestoredScanType);
 
         for (int i = 0; i < scanDotRenderers.Length; i++)
         {
@@ -366,6 +377,16 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
                 resultColorGroup,
                 beforeColorGroup
             );
+
+            if (isSelectedObjective)
+            {
+                scanDotRenderers[i].RecolorDotsInSphere(
+                    center,
+                    existingDotRecolorRadius,
+                    resultColorGroup,
+                    wrongComputerGroup
+                );
+            }
         }
     }
 
@@ -394,6 +415,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         SetVisualRootActive(activeVisualRoot, showSelectedVisual);
         SetVisualRootActive(restoredVisualRoot, isRestored);
         ApplyScanSurfaceType();
+        ApplyRendererStateTint();
     }
 
     // 특정 시각 루트를 켜거나 끈다.
@@ -408,17 +430,14 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 스캔 점 색상 구분 타입을 현재 상태에 맞게 바꾼다.
     private void ApplyScanSurfaceType()
     {
+        scanSurfaceInfos = GetComponentsInChildren<ScanSurfaceInfo>(true);
+
         if (scanSurfaceInfos == null)
         {
             return;
         }
 
-        ScanSurfaceType targetType = beforeRestoreScanType;
-
-        if (isRestored)
-        {
-            targetType = isSelectedObjective ? escapeRestoredScanType : fakeRestoredScanType;
-        }
+        ScanSurfaceType targetType = GetCurrentScanSurfaceType();
 
         for (int i = 0; i < scanSurfaceInfos.Length; i++)
         {
@@ -426,6 +445,47 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
             {
                 scanSurfaceInfos[i].surfaceType = targetType;
             }
+        }
+    }
+
+    private ScanSurfaceType GetCurrentScanSurfaceType()
+    {
+        if (!isRestored)
+        {
+            return beforeRestoreScanType;
+        }
+
+        return isSelectedObjective ? escapeRestoredScanType : fakeRestoredScanType;
+    }
+
+    private void ApplyRendererStateTint()
+    {
+        if (!tintRenderersOnRestore)
+        {
+            return;
+        }
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer targetRenderer = renderers[i];
+            if (targetRenderer == null)
+            {
+                continue;
+            }
+
+            if (!isRestored)
+            {
+                targetRenderer.SetPropertyBlock(null);
+                continue;
+            }
+
+            Color targetColor = isSelectedObjective ? escapeRestoredTint : fakeRestoredTint;
+            MaterialPropertyBlock block = new MaterialPropertyBlock();
+            targetRenderer.GetPropertyBlock(block);
+            block.SetColor(BaseColorId, targetColor);
+            block.SetColor(ColorId, targetColor);
+            targetRenderer.SetPropertyBlock(block);
         }
     }
 

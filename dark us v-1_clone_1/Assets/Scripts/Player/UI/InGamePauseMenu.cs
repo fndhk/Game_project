@@ -31,6 +31,11 @@ public class InGamePauseMenu : MonoBehaviour
     private System.Action pendingConfirmAction;
     private Sprite roundSliderHandleSprite;
 
+    public static bool IsOpen
+    {
+        get { return instance != null && instance.isOpen; }
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateForLoadedScene()
     {
@@ -584,6 +589,7 @@ public class InGamePauseMenu : MonoBehaviour
         CreateSettingsSliderRow(content.transform, "Voice Volume", "setting_voice_volume", 0f, 1f, PlayerPrefs.GetFloat("setting_voice_volume", 1f), false);
         CreateSettingsSliderRow(content.transform, "Mouse Sens X", "setting_mouse_x", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_x", 1f), false);
         CreateSettingsSliderRow(content.transform, "Mouse Sens Y", "setting_mouse_y", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_y", 1f), false);
+        CreateSettingsSliderRow(content.transform, "HUD Opacity", "setting_hud_opacity", 0.45f, 1f, PlayerPrefs.GetFloat("setting_hud_opacity", 1f), false);
 
         if (settingsActionRoot != null)
         {
@@ -794,7 +800,7 @@ public class InGamePauseMenu : MonoBehaviour
         PlayerPrefs.SetFloat("setting_voice_volume", 1f);
         PlayerPrefs.SetFloat("setting_mouse_x", 1f);
         PlayerPrefs.SetFloat("setting_mouse_y", 1f);
-        PlayerPrefs.SetInt("setting_subtitle", 1);
+        PlayerPrefs.SetFloat("setting_hud_opacity", 1f);
         ApplyInGameSettings();
 
         if (settingsRoot != null)

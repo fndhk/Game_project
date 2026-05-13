@@ -1476,9 +1476,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
     private Transform BuildGameplaySettings(Transform parent)
     {
         Transform section = CreateSettingsSection(parent, "Gameplay", 340f);
-        CreateToggleRow(section, "Subtitle", true, "setting_subtitle");
-        CreateSliderRow(section, "Subtitle Size", 18f, 42f, 28f, true, "setting_subtitle_size");
-        CreateSliderRow(section, "Subtitle Background", 0f, 1f, 0.55f, false, "setting_subtitle_bg");
+        CreateSliderRow(section, "HUD Opacity", 0.45f, 1f, PlayerPrefs.GetFloat("setting_hud_opacity", 1f), false, "setting_hud_opacity");
+        CreateSliderRow(section, "Scan Density", 0.35f, 1.5f, PlayerPrefs.GetFloat("setting_scan_density", 1f), false, "setting_scan_density");
+        CreateSliderRow(section, "Scan Dot Size", 0.6f, 1.4f, PlayerPrefs.GetFloat("setting_scan_dot_size", 1f), false, "setting_scan_dot_size");
         CreateCycleRow(section, "Language", () => GetLanguageLabel(), CycleLanguage);
         return section;
     }
@@ -1899,9 +1899,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         PlayerPrefs.DeleteKey("setting_mouse_y");
         PlayerPrefs.DeleteKey("setting_invert_y");
         PlayerPrefs.DeleteKey("setting_gamepad_vibration");
-        PlayerPrefs.DeleteKey("setting_subtitle");
-        PlayerPrefs.DeleteKey("setting_subtitle_size");
-        PlayerPrefs.DeleteKey("setting_subtitle_bg");
+        PlayerPrefs.DeleteKey("setting_hud_opacity");
+        PlayerPrefs.DeleteKey("setting_scan_density");
+        PlayerPrefs.DeleteKey("setting_scan_dot_size");
         PlayerPrefs.DeleteKey("setting_language");
         PlayerPrefs.DeleteKey("setting_color_blind");
         PlayerPrefs.DeleteKey("setting_tutorial");
@@ -2017,13 +2017,13 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             + "비공개친구참가"
             + "신호터미널명령시스템상태네트워크대기음성링크준비대원인증필요"
             + "그래픽및화면표시오디오조작키플레이접근성모드텍스처품질그림자수직동기제한"
-            + "모션블러카메라흔마스터볼륨배경음효과음음성이동상호작용눌러서말하기마우스감도반전패드진동자막크기언어색약튜토리얼전체창테두리없음한국어영어일본어"
+            + "모션블러카메라흔마스터볼륨배경음효과음음성이동상호작용눌러서말하기마우스감도반전패드진동HUD투명도스캔밀도점크기언어색약튜토리얼전체창테두리없음한국어영어일본어"
             + "ルーム作成検索設定終了閉じる適用リセット変更確認キャンセルゲームを終了しますか"
             + "公開フレンド参加"
             + "信号端末コマンドシステム状態ネットワーク待機ボイスリンク準備クルー認証必要"
             + "プライベート作戦待信号リスト参加探グラフィック表示画面オーディオ操作キーゲームプレイアクセシビリティ"
             + "モードテクスチャ品質影垂直同期制限ブラー揺れ音量移動インタラクトプッシュトゥトーク"
-            + "マウス感度反転パッド振動字幕サイズ背景言語色覚サポートチュートリアルフルスクリーンウィンドウボーダーレス無韓国語英日本";
+            + "マウス感度反転パッド振動HUD透明度スキャン密度点サイズ言語色覚サポートチュートリアルフルスクリーンウィンドウボーダーレス無韓国語英日本";
     }
 
     private string Translate(string key)
@@ -2102,9 +2102,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Mouse Sensitivity Y": return "마우스 감도 Y";
             case "Invert Mouse Y": return "마우스 Y축 반전";
             case "Gamepad Vibration": return "게임패드 진동";
-            case "Subtitle": return "자막";
-            case "Subtitle Size": return "자막 크기";
-            case "Subtitle Background": return "자막 배경";
+            case "HUD Opacity": return "HUD 투명도";
+            case "Scan Density": return "스캔 밀도";
+            case "Scan Dot Size": return "스캔 점 크기";
             case "Language": return "언어";
             case "Color Blind Mode": return "색약 모드";
             case "Tutorial": return "튜토리얼";
@@ -2177,9 +2177,9 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "Mouse Sensitivity Y": return "マウス感度 Y";
             case "Invert Mouse Y": return "マウスY反転";
             case "Gamepad Vibration": return "ゲームパッド振動";
-            case "Subtitle": return "字幕";
-            case "Subtitle Size": return "字幕サイズ";
-            case "Subtitle Background": return "字幕背景";
+            case "HUD Opacity": return "HUD透明度";
+            case "Scan Density": return "スキャン密度";
+            case "Scan Dot Size": return "スキャン点サイズ";
             case "Language": return "言語";
             case "Color Blind Mode": return "色覚サポート";
             case "Tutorial": return "チュートリアル";

@@ -224,6 +224,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("켜면 Play Mode에서만 Renderer를 끔. 에디터에서 Generate했을 때는 계속 보이게 두기 좋음")]
         public bool HideGeneratedVisualsOnlyInPlayMode = true;
 
+        [Tooltip("켜면 생성된 맵/아이템의 일반 BoxCollider를 끄고 MeshCollider 표면만 스캔/충돌에 사용")]
+        public bool UseMeshCollidersInsteadOfBoxColliders = true;
+
         [Header("Generated Light Optimization")]
         [Tooltip("생성된 방/복도/문 안에 있는 Light의 그림자 설정을 자동으로 정리해서 URP shadow atlas 경고를 줄임")]
         public bool OptimizeGeneratedLightShadows = true;
@@ -324,6 +327,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         private bool hasPhotonMapSeed;
         private int photonMapSeed;
 
+        public static event Action<string, float> LoadingPhaseChanged;
+        public static event Action GenerationFinished;
+
+        public static bool IsAnyGenerationRunning { get; private set; }
+        public bool IsGenerationComplete { get; private set; }
+
         private void Start()
         {
             ApplyPhotonRoomSeed();
@@ -336,14 +345,26 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             {
                 // 미리 생성해 둔 맵을 그대로 쓰는 경우에도 게임 시작 시에는 보이지 않게 처리한다.
                 ApplyRuntimeVisualState();
+                IsGenerationComplete = true;
+                SetLoadingPhase("SCAN READY", 1f);
+                GenerationFinished?.Invoke();
             }
         }
 
         // 외부에서 조건으로 맵을 다시 생성할 수 있도록 public으로 둔다.
         public IEnumerator StartGeneration()
         {
+            IsAnyGenerationRunning = true;
+            IsGenerationComplete = false;
+            SetLoadingPhase("SCANNING AREA...", 0.06f);
+            yield return null;
+
+            bool generated = false;
+
             for (int attempt = 0; attempt < MaxFullGenerationAttempts; attempt++)
             {
+                SetLoadingPhase("BUILDING PATHS...", Mathf.Lerp(0.12f, 0.42f, MaxFullGenerationAttempts <= 1 ? 1f : attempt / (float)(MaxFullGenerationAttempts - 1)));
+
                 if (ClearPreviousGeneratedChildren)
                 {
                     ClearGeneratedChildren();
@@ -356,14 +377,28 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 if (success)
                 {
                     Debug.Log("[LaboratoryGenerator] Generation finished.");
-                    yield break;
+                    generated = true;
+                    break;
                 }
 
                 Debug.LogWarning("[LaboratoryGenerator] Generation retry: " + (attempt + 1));
                 yield return null;
             }
 
-            Debug.LogError("[LaboratoryGenerator] Generation failed.");
+            if (!generated)
+            {
+                Debug.LogError("[LaboratoryGenerator] Generation failed.");
+                SetLoadingPhase("SCAN FAILED", 1f);
+            }
+
+            IsAnyGenerationRunning = false;
+            IsGenerationComplete = generated;
+
+            if (generated)
+            {
+                SetLoadingPhase("SCAN READY", 1f);
+                GenerationFinished?.Invoke();
+            }
         }
 
         // 맵 1회 생성을 시도한다.
@@ -472,13 +507,22 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return false;
             }
 
+            SetLoadingPhase("CLOSING PATHS...", 0.64f);
             BlockRemainingExits();
+            SetLoadingPhase("CALIBRATING SCANNER...", 0.72f);
             ApplyRuntimeVisualState();
+            SetLoadingPhase("SYNCING PLAYERS...", 0.82f);
             SpawnPlayersAfterGeneratedMap();
             ApplyPhotonStageSeed(2000003, "item");
+            SetLoadingPhase("PLACING SIGNALS...", 0.92f);
             SpawnItemsAfterGeneratedMap();
 
             return true;
+        }
+
+        private static void SetLoadingPhase(string message, float progress)
+        {
+            LoadingPhaseChanged?.Invoke(message, Mathf.Clamp01(progress));
         }
 
         // 메인 맵 확장에 사용할 열린 출구를 고른다.
@@ -1150,6 +1194,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             ApplyGeneratedLightOptimization(cell.gameObject);
+            EnsureScanMeshColliders(cell.gameObject);
+            DisableRuntimeBoxColliders(cell.gameObject, cell.TriggerBox);
+            DisableGeneratedHelperColliders(cell.gameObject);
 
             IncreaseSpawnCount(sourcePrefab);
         }
@@ -1648,6 +1695,8 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 GameObject createdItem = Instantiate(itemPrefab, spawnPosition, spawnRotation, parent);
 
                 SnapSpawnedItemToSpawnPointGround(createdItem, selectedPoint.Point.position, selectedPoint.OwnerCell);
+                EnsureScanMeshColliders(createdItem);
+                DisableRuntimeBoxColliders(createdItem, null);
                 ApplyGeneratedItemVisualState(createdItem);
 
                 usedPoints.Add(selectedPoint);
@@ -2239,6 +2288,211 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 renderers[i].enabled = false;
             }
+        }
+
+        private void EnsureScanMeshColliders(GameObject root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            MeshFilter[] meshFilters = root.GetComponentsInChildren<MeshFilter>(true);
+
+            for (int i = 0; i < meshFilters.Length; i++)
+            {
+                MeshFilter meshFilter = meshFilters[i];
+
+                if (meshFilter == null || meshFilter.sharedMesh == null)
+                {
+                    continue;
+                }
+
+                if (IsGeneratedHelperObject(meshFilter.transform))
+                {
+                    continue;
+                }
+
+                Renderer renderer = meshFilter.GetComponent<Renderer>();
+
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                MeshCollider meshCollider = meshFilter.GetComponent<MeshCollider>();
+
+                if (meshCollider == null)
+                {
+                    meshCollider = meshFilter.gameObject.AddComponent<MeshCollider>();
+                }
+
+                meshCollider.sharedMesh = meshFilter.sharedMesh;
+                Rigidbody attachedRigidbody = meshFilter.GetComponentInParent<Rigidbody>();
+                meshCollider.convex = attachedRigidbody != null && !attachedRigidbody.isKinematic;
+                meshCollider.isTrigger = false;
+                meshCollider.enabled = true;
+
+                CopyScanSurfaceInfoFromParents(meshFilter.gameObject);
+            }
+        }
+
+        private void DisableRuntimeBoxColliders(GameObject root, BoxCollider colliderToKeep)
+        {
+            if (!UseMeshCollidersInsteadOfBoxColliders || root == null)
+            {
+                return;
+            }
+
+            BoxCollider[] boxColliders = root.GetComponentsInChildren<BoxCollider>(true);
+
+            for (int i = 0; i < boxColliders.Length; i++)
+            {
+                BoxCollider boxCollider = boxColliders[i];
+
+                if (boxCollider == null || boxCollider == colliderToKeep)
+                {
+                    continue;
+                }
+
+                if (IsGeneratedHelperObject(boxCollider.transform))
+                {
+                    boxCollider.enabled = false;
+                    continue;
+                }
+
+                if (boxCollider.isTrigger)
+                {
+                    continue;
+                }
+
+                if (!HasUsableMeshColliderNearby(boxCollider.transform, root.transform))
+                {
+                    continue;
+                }
+
+                boxCollider.enabled = false;
+            }
+        }
+
+        private bool HasUsableMeshColliderNearby(Transform target, Transform root)
+        {
+            if (target == null)
+            {
+                return false;
+            }
+
+            MeshCollider ownMeshCollider = target.GetComponent<MeshCollider>();
+
+            if (ownMeshCollider != null && ownMeshCollider.enabled && ownMeshCollider.sharedMesh != null)
+            {
+                return true;
+            }
+
+            MeshCollider[] childMeshColliders = target.GetComponentsInChildren<MeshCollider>(true);
+
+            for (int i = 0; i < childMeshColliders.Length; i++)
+            {
+                MeshCollider meshCollider = childMeshColliders[i];
+
+                if (meshCollider != null && meshCollider.enabled && meshCollider.sharedMesh != null)
+                {
+                    return true;
+                }
+            }
+
+            Transform current = target.parent;
+
+            while (current != null)
+            {
+                MeshCollider parentMeshCollider = current.GetComponent<MeshCollider>();
+
+                if (parentMeshCollider != null && parentMeshCollider.enabled && parentMeshCollider.sharedMesh != null)
+                {
+                    return true;
+                }
+
+                if (current == root)
+                {
+                    break;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
+        }
+
+        private void DisableGeneratedHelperColliders(GameObject root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider targetCollider = colliders[i];
+
+                if (targetCollider == null)
+                {
+                    continue;
+                }
+
+                if (IsGeneratedHelperObject(targetCollider.transform))
+                {
+                    targetCollider.enabled = false;
+                }
+            }
+        }
+
+        private bool IsGeneratedHelperObject(Transform target)
+        {
+            Transform current = target;
+
+            while (current != null && current != transform)
+            {
+                string objectName = current.name;
+
+                if (ContainsIgnoreCase(objectName, PlayerSpawnPointPrefix) ||
+                    ContainsIgnoreCase(objectName, ItemSpawnPointPrefix) ||
+                    ContainsIgnoreCase(objectName, "DoorPoint") ||
+                    ContainsIgnoreCase(objectName, "TempPortal"))
+                {
+                    return true;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
+        }
+
+        private bool ContainsIgnoreCase(string source, string value)
+        {
+            return !string.IsNullOrEmpty(source) &&
+                   !string.IsNullOrEmpty(value) &&
+                   source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private void CopyScanSurfaceInfoFromParents(GameObject target)
+        {
+            if (target == null || target.GetComponent<ScanSurfaceInfo>() != null)
+            {
+                return;
+            }
+
+            ScanSurfaceInfo parentInfo = target.GetComponentInParent<ScanSurfaceInfo>();
+
+            if (parentInfo == null)
+            {
+                return;
+            }
+
+            ScanSurfaceInfo copiedInfo = target.AddComponent<ScanSurfaceInfo>();
+            copiedInfo.surfaceType = parentInfo.surfaceType;
         }
 
         // 아이템 위치가 플레이어 시작 위치와 너무 가까운지 검사한다.

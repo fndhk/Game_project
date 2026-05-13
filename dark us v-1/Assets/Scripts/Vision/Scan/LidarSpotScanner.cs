@@ -77,8 +77,16 @@ public class LidarSpotScanner : MonoBehaviour
     // 트리거 처리 방식이다.
     [SerializeField] private QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.Ignore;
 
+    // BoxCollider와 MeshCollider가 같이 맞으면 실제 모델 윤곽을 가진 MeshCollider를 우선 사용한다.
+    [SerializeField] private bool preferMeshColliderHits = true;
+
+    // BoxCollider 바로 뒤의 MeshCollider까지만 같은 오브젝트 윤곽으로 본다. 너무 먼 MeshCollider를 고르면 벽 뒤가 찍힐 수 있다.
+    [SerializeField] private float meshColliderPreferenceDepth = 0.75f;
+
     // 다음 스캔 가능 시간이다.
     private float nextPulseTime = 0f;
+    private int basePointsPerPulse;
+    private readonly RaycastHit[] raycastHits = new RaycastHit[64];
 
     // 현재 진행 중인 파동 목록이다.
     private readonly List<ActivePulse> activePulses = new List<ActivePulse>();
@@ -105,11 +113,13 @@ public class LidarSpotScanner : MonoBehaviour
     {
         // 최소값 보정이다.
         pointsPerPulse = Mathf.Max(1, pointsPerPulse);
+        basePointsPerPulse = pointsPerPulse;
         maxSpawnAttemptsPerDot = Mathf.Max(1, maxSpawnAttemptsPerDot);
         pulseTravelDuration = Mathf.Max(0.01f, pulseTravelDuration);
         waveThickness = Mathf.Max(0.05f, waveThickness);
         maxSamplesPerFrame = Mathf.Max(1, maxSamplesPerFrame);
         minDotDistanceFromCamera = Mathf.Max(0f, minDotDistanceFromCamera);
+        meshColliderPreferenceDepth = Mathf.Max(0f, meshColliderPreferenceDepth);
         groundDotChance = Mathf.Clamp01(groundDotChance);
         ceilingDotChance = Mathf.Clamp01(ceilingDotChance);
         wallAndObjectDotChance = Mathf.Clamp01(wallAndObjectDotChance);
@@ -137,10 +147,27 @@ public class LidarSpotScanner : MonoBehaviour
         }
 
         // 입력을 처리한다.
+        ApplySavedScanSettings();
         HandlePulseInput();
 
         // 진행 중인 파동을 갱신한다.
         UpdateActivePulses();
+    }
+
+    private class RaycastHitDistanceComparer : IComparer<RaycastHit>
+    {
+        public static readonly RaycastHitDistanceComparer Instance = new RaycastHitDistanceComparer();
+
+        public int Compare(RaycastHit left, RaycastHit right)
+        {
+            return left.distance.CompareTo(right.distance);
+        }
+    }
+
+    private void ApplySavedScanSettings()
+    {
+        float scanDensity = Mathf.Clamp(PlayerPrefs.GetFloat("setting_scan_density", 1f), 0.35f, 1.5f);
+        pointsPerPulse = Mathf.Max(1, Mathf.RoundToInt(basePointsPerPulse * scanDensity));
     }
 
     // 스캐너를 사용할 수 있는지 확인하는 함수이다.
@@ -275,24 +302,12 @@ public class LidarSpotScanner : MonoBehaviour
             // 카메라 기준 레이를 만든다.
             Ray ray = scanCamera.ViewportPointToRay(new Vector3(viewportPoint.x, viewportPoint.y, 0f));
 
-            // 표면을 맞추지 못하면 다음 시도다.
-            if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, scanMask, triggerInteraction))
-            {
-                continue;
-            }
-
             // 현재 파동 띠 범위를 계산한다.
             float bandStart = Mathf.Max(0f, currentRadius - waveThickness);
             float bandEnd = currentRadius;
 
-            // 현재 띠 밖이면 제외한다.
-            if (hit.distance < bandStart || hit.distance > bandEnd)
-            {
-                continue;
-            }
-
-            // 가독성 필터를 통과하지 못하면 제외한다.
-            if (!ShouldKeepHitForReadability(hit))
+            // 표면을 맞추지 못하면 다음 시도다.
+            if (!TryGetBestScanHit(ray, bandStart, bandEnd, out RaycastHit hit))
             {
                 continue;
             }
@@ -308,6 +323,168 @@ public class LidarSpotScanner : MonoBehaviour
             instancedDotRenderer.AddDot(spawnPosition, hit.normal, colorGroup);
             return;
         }
+    }
+
+    private bool TryGetBestScanHit(Ray ray, float bandStart, float bandEnd, out RaycastHit bestHit)
+    {
+        bestHit = default;
+
+        if (!preferMeshColliderHits)
+        {
+            if (!Physics.Raycast(ray, out RaycastHit singleHit, maxDistance, scanMask, triggerInteraction))
+            {
+                return false;
+            }
+
+            if (!IsUsableHit(singleHit, bandStart, bandEnd))
+            {
+                return false;
+            }
+
+            bestHit = singleHit;
+            return true;
+        }
+
+        int hitCount = Physics.RaycastNonAlloc(ray, raycastHits, maxDistance, scanMask, triggerInteraction);
+
+        if (hitCount <= 0)
+        {
+            return false;
+        }
+
+        System.Array.Sort(raycastHits, 0, hitCount, RaycastHitDistanceComparer.Instance);
+
+        RaycastHit firstSurfaceHit = default;
+        bool hasFirstSurface = false;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = raycastHits[i];
+
+            if (hit.collider == null || ShouldIgnoreScanHit(hit))
+            {
+                continue;
+            }
+
+            firstSurfaceHit = hit;
+            hasFirstSurface = true;
+            break;
+        }
+
+        if (!hasFirstSurface)
+        {
+            return false;
+        }
+
+        if (!IsHitInCurrentBand(firstSurfaceHit, bandStart, bandEnd))
+        {
+            return false;
+        }
+
+        if (!ShouldKeepHitForReadability(firstSurfaceHit))
+        {
+            return false;
+        }
+
+        if (firstSurfaceHit.collider is MeshCollider)
+        {
+            bestHit = firstSurfaceHit;
+            return true;
+        }
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = raycastHits[i];
+
+            if (hit.collider == null || !(hit.collider is MeshCollider))
+            {
+                continue;
+            }
+
+            if (ShouldIgnoreScanHit(hit))
+            {
+                continue;
+            }
+
+            if (hit.distance < firstSurfaceHit.distance || hit.distance > firstSurfaceHit.distance + meshColliderPreferenceDepth)
+            {
+                continue;
+            }
+
+            if (!IsHitInCurrentBand(hit, bandStart, bandEnd))
+            {
+                continue;
+            }
+
+            bestHit = hit;
+            return true;
+        }
+
+        bestHit = firstSurfaceHit;
+        return true;
+    }
+
+    private bool IsUsableHit(RaycastHit hit, float bandStart, float bandEnd)
+    {
+        if (!IsHitInCurrentBand(hit, bandStart, bandEnd))
+        {
+            return false;
+        }
+
+        if (ShouldIgnoreScanHit(hit))
+        {
+            return false;
+        }
+
+        return ShouldKeepHitForReadability(hit);
+    }
+
+    private bool IsHitInCurrentBand(RaycastHit hit, float bandStart, float bandEnd)
+    {
+        if (hit.collider == null)
+        {
+            return false;
+        }
+
+        return hit.distance >= bandStart && hit.distance <= bandEnd;
+    }
+
+    private bool ShouldIgnoreScanHit(RaycastHit hit)
+    {
+        if (hit.collider == null)
+        {
+            return true;
+        }
+
+        return IsGeneratedHelperTransform(hit.collider.transform);
+    }
+
+    private bool IsGeneratedHelperTransform(Transform target)
+    {
+        Transform current = target;
+
+        while (current != null && current != transform)
+        {
+            string objectName = current.name;
+
+            if (ContainsIgnoreCase(objectName, "DoorPoint") ||
+                ContainsIgnoreCase(objectName, "TempPortal") ||
+                ContainsIgnoreCase(objectName, "PlayerSpawnPoint") ||
+                ContainsIgnoreCase(objectName, "ItemSpawnPoint"))
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+    private bool ContainsIgnoreCase(string source, string value)
+    {
+        return !string.IsNullOrEmpty(source) &&
+               source.IndexOf(value, System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     // 스캔 표면의 큰 분류이다.
@@ -380,6 +557,12 @@ public class LidarSpotScanner : MonoBehaviour
             return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
+        ObjectiveComputer objectiveComputer = hit.collider.GetComponentInParent<ObjectiveComputer>();
+        if (objectiveComputer != null)
+        {
+            return SurfaceTypeToDotColorGroup(objectiveComputer.CurrentScanSurfaceType, hit.normal);
+        }
+
         // 자기 자신에서 먼저 찾는다.
         ScanSurfaceInfo surfaceInfo = hit.collider.GetComponent<ScanSurfaceInfo>();
 
@@ -395,7 +578,12 @@ public class LidarSpotScanner : MonoBehaviour
             return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
-        switch (surfaceInfo.surfaceType)
+        return SurfaceTypeToDotColorGroup(surfaceInfo.surfaceType, hit.normal);
+    }
+
+    private ScanDotColorGroup SurfaceTypeToDotColorGroup(ScanSurfaceType surfaceType, Vector3 fallbackNormal)
+    {
+        switch (surfaceType)
         {
             case ScanSurfaceType.Floor:
                 return ScanDotColorGroup.Floor;
@@ -434,7 +622,7 @@ public class LidarSpotScanner : MonoBehaviour
                 return ScanDotColorGroup.Item;
 
             default:
-                return ResolveFallbackDotColorGroupByNormal(hit.normal);
+                return ResolveFallbackDotColorGroupByNormal(fallbackNormal);
         }
     }
 

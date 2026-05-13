@@ -63,6 +63,7 @@ public class PlayerVoiceChat : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         playersByOwnerId[OwnerClientId] = this;
+        ApplySavedVoiceVolume();
         RegisterVoiceHandlers();
     }
 
@@ -339,7 +340,7 @@ public class PlayerVoiceChat : NetworkBehaviour
 
         AudioClip clip = AudioClip.Create("VoiceChunk", sampleCount, 1, sampleRate, false);
         clip.SetData(samples, 0);
-        playbackSource.PlayOneShot(clip, GetSavedVoiceVolume());
+        playbackSource.PlayOneShot(clip, remoteVoiceVolume);
         Destroy(clip, Mathf.Max(0.5f, sampleCount / (float)sampleRate + 0.25f));
     }
 
@@ -354,12 +355,24 @@ public class PlayerVoiceChat : NetworkBehaviour
 
     private void ApplySavedVoiceVolume()
     {
-        remoteVoiceVolume = GetSavedVoiceVolume();
+        remoteVoiceVolume = GetSavedVoiceVolume(OwnerClientId);
     }
 
-    private static float GetSavedVoiceVolume()
+    private static float GetSavedVoiceVolume(ulong ownerClientId)
     {
-        return Mathf.Clamp01(PlayerPrefs.GetFloat("setting_voice_volume", 1f));
+        string clientKey = "setting_voice_volume_client_" + ownerClientId;
+        if (PlayerPrefs.HasKey(clientKey))
+        {
+            return Mathf.Clamp(PlayerPrefs.GetFloat(clientKey, 1f), 0f, 2f);
+        }
+
+        string actorFallbackKey = "setting_voice_volume_actor_" + (ownerClientId + 1UL);
+        if (PlayerPrefs.HasKey(actorFallbackKey))
+        {
+            return Mathf.Clamp(PlayerPrefs.GetFloat(actorFallbackKey, 1f), 0f, 2f);
+        }
+
+        return Mathf.Clamp(PlayerPrefs.GetFloat("setting_voice_volume", 1f), 0f, 2f);
     }
 
     private void OnGUI()

@@ -31,7 +31,7 @@ public class PlayerHUDController : MonoBehaviour
 
     [Header("Objective")]
     [TextArea]
-    public string defaultObjectiveText = "Restore Computers 0/4";
+    public string defaultObjectiveText = "Find Target Computers 0/4";
 
     [Header("Runtime HUD")]
     public bool buildRuntimeHud = true;
@@ -42,6 +42,7 @@ public class PlayerHUDController : MonoBehaviour
 
     private Canvas hudCanvas;
     private RectTransform hudRoot;
+    private CanvasGroup hudCanvasGroup;
     private Image[] runtimeVitalBlocks;
     private Image[] runtimeStaminaBlocks;
     private Image[] dotMeterBlocks;
@@ -50,6 +51,7 @@ public class PlayerHUDController : MonoBehaviour
     private TMP_Text vitalLabelText;
     private TMP_Text staminaLabelText;
     private TMP_Text dotMemoryLabelText;
+    private TMP_Text roundTimerText;
     private RectTransform roleRevealRoot;
     private TMP_Text roleRevealTitleText;
     private TMP_Text roleRevealRoleText;
@@ -70,13 +72,13 @@ public class PlayerHUDController : MonoBehaviour
     private Sprite medkitIconSprite;
     private Sprite emptyIconSprite;
 
-    private readonly Color panelColor = new Color(0.01f, 0.012f, 0.012f, 0.34f);
-    private readonly Color lineColor = new Color(0.78f, 0.80f, 0.76f, 0.64f);
-    private readonly Color dimLineColor = new Color(0.45f, 0.48f, 0.47f, 0.24f);
-    private readonly Color vitalColor = new Color(0.84f, 0.84f, 0.78f, 0.92f);
-    private readonly Color staminaColor = new Color(0.58f, 0.74f, 0.78f, 0.78f);
-    private readonly Color amberColor = new Color(1f, 0.74f, 0.18f, 0.92f);
-    private readonly Color cyanColor = new Color(0.54f, 0.88f, 1f, 0.82f);
+    private readonly Color panelColor = new Color(0f, 0f, 0f, 0.82f);
+    private readonly Color lineColor = new Color(0.92f, 0.96f, 0.92f, 0.96f);
+    private readonly Color dimLineColor = new Color(0.56f, 0.62f, 0.60f, 0.38f);
+    private readonly Color vitalColor = new Color(0.96f, 0.96f, 0.86f, 1f);
+    private readonly Color staminaColor = new Color(0.62f, 0.92f, 1f, 0.96f);
+    private readonly Color amberColor = new Color(1f, 0.74f, 0.18f, 1f);
+    private readonly Color cyanColor = new Color(0.54f, 0.88f, 1f, 0.96f);
     private bool hasBuiltHud;
     private PlayerRole lastDisplayedRole;
     private bool hasDisplayedRole;
@@ -96,6 +98,12 @@ public class PlayerHUDController : MonoBehaviour
     private void Update()
     {
         EnsureHudReady();
+
+        if (ApplyOverlayVisibility())
+        {
+            return;
+        }
+
         AutoFindReferences();
         UpdateVitals();
         UpdateInventory();
@@ -103,7 +111,8 @@ public class PlayerHUDController : MonoBehaviour
         UpdateDotMemory();
         UpdateObjectiveText();
         UpdateLocalizedStaticText();
-        UpdateRoleReveal();
+        UpdateHudOpacity();
+        UpdateRoundTimer();
         UpdateHudAnimation();
     }
 
@@ -120,6 +129,23 @@ public class PlayerHUDController : MonoBehaviour
         }
 
         RefreshAll();
+    }
+
+    private bool ApplyOverlayVisibility()
+    {
+        if (hudRoot == null)
+        {
+            return false;
+        }
+
+        bool hideHud = Application.isPlaying && (InGamePauseMenu.IsOpen || RoleRevealIntro.IsShowing);
+
+        if (hudRoot.gameObject.activeSelf == hideHud)
+        {
+            hudRoot.gameObject.SetActive(!hideHud);
+        }
+
+        return hideHud;
     }
 
     private void AutoFindReferences()
@@ -216,12 +242,21 @@ public class PlayerHUDController : MonoBehaviour
     {
         hudCanvas = GetComponentInChildren<Canvas>(true);
 
-        if (hudCanvas == null)
+        if (!IsValidHudCanvas(hudCanvas))
         {
-            hudCanvas = FindObjectOfType<Canvas>();
+            Canvas[] canvases = FindObjectsOfType<Canvas>(true);
+
+            for (int i = 0; i < canvases.Length; i++)
+            {
+                if (IsValidHudCanvas(canvases[i]))
+                {
+                    hudCanvas = canvases[i];
+                    break;
+                }
+            }
         }
 
-        if (hudCanvas == null)
+        if (!IsValidHudCanvas(hudCanvas))
         {
             GameObject canvasObject = new GameObject("Canvas_HUD");
             hudCanvas = canvasObject.AddComponent<Canvas>();
@@ -232,6 +267,9 @@ public class PlayerHUDController : MonoBehaviour
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
         }
+
+        hudCanvas.overrideSorting = true;
+        hudCanvas.sortingOrder = 100;
 
         HideExistingCanvasHudChildren();
 
@@ -245,13 +283,26 @@ public class PlayerHUDController : MonoBehaviour
         hudRoot = CreateRect("Runtime_LidarHud", hudCanvas.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         hudRoot.offsetMin = Vector2.zero;
         hudRoot.offsetMax = Vector2.zero;
+        hudCanvasGroup = hudRoot.gameObject.AddComponent<CanvasGroup>();
 
         BuildVitalModule();
         BuildInventoryModule();
         BuildCenterScanModule();
         BuildDotMemoryModule();
         BuildObjectiveModule();
-        BuildRoleRevealModule();
+        BuildRoundTimerModule();
+    }
+
+    private bool IsValidHudCanvas(Canvas candidate)
+    {
+        if (candidate == null)
+        {
+            return false;
+        }
+
+        string canvasName = candidate.gameObject.name;
+        return canvasName != "InGamePauseCanvas" &&
+               canvasName != "Dark Scan Loading Screen";
     }
 
     private void DestroyHudObject(GameObject target)
@@ -287,21 +338,28 @@ public class PlayerHUDController : MonoBehaviour
                 continue;
             }
 
+            if (child.GetComponent<InGamePauseMenu>() != null || child.name.Contains("Pause"))
+            {
+                continue;
+            }
+
             child.gameObject.SetActive(false);
         }
     }
 
     private void BuildVitalModule()
     {
-        RectTransform root = CreateRect("Vitals", hudRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(70f, 62f));
-        root.sizeDelta = new Vector2(255f, 74f);
-        AddPanel(root, new Color(0f, 0f, 0f, 0.12f));
+        RectTransform root = CreateRect("Vitals", hudRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(70f, 66f));
+        root.sizeDelta = new Vector2(315f, 80f);
+        AddPanel(root, new Color(0f, 0f, 0f, 0.82f));
 
-        vitalLabelText = CreateLabel(T("VITAL"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -2f), 18, lineColor, TextAlignmentOptions.Left);
-        staminaLabelText = CreateLabel(T("STAM"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(7f, -31f), 15, new Color(0.66f, 0.72f, 0.70f, 0.7f), TextAlignmentOptions.Left);
+        vitalLabelText = CreateLabel(T("VITAL"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -4f), 15, lineColor, TextAlignmentOptions.Left);
+        vitalLabelText.rectTransform.sizeDelta = new Vector2(78f, 24f);
+        staminaLabelText = CreateLabel(T("STAM"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -36f), 13, new Color(0.82f, 0.90f, 0.90f, 0.92f), TextAlignmentOptions.Left);
+        staminaLabelText.rectTransform.sizeDelta = new Vector2(78f, 24f);
 
-        runtimeVitalBlocks = CreateSegmentRow("VitalBlocks", root, vitalSegmentCount, new Vector2(68f, -2f), new Vector2(11f, 22f), 6f);
-        runtimeStaminaBlocks = CreateSegmentRow("StaminaBlocks", root, staminaSegmentCount, new Vector2(68f, -35f), new Vector2(9f, 13f), 5f);
+        runtimeVitalBlocks = CreateSegmentRow("VitalBlocks", root, vitalSegmentCount, new Vector2(84f, -4f), new Vector2(11f, 22f), 6f);
+        runtimeStaminaBlocks = CreateSegmentRow("StaminaBlocks", root, staminaSegmentCount, new Vector2(84f, -38f), new Vector2(9f, 13f), 5f);
     }
 
     private void BuildInventoryModule()
@@ -373,23 +431,31 @@ public class PlayerHUDController : MonoBehaviour
         scanSweepRect.sizeDelta = new Vector2(1f, 18f);
         scanSweepRect.anchoredPosition = new Vector2(0f, 9f);
 
-        scanCooldownText = CreateLabel(T("SCAN"), root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -2f), 10, new Color(0.72f, 0.83f, 0.86f, 0.58f), TextAlignmentOptions.Center);
+        scanCooldownText = CreateLabel(T("SCAN"), root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0f, -2f), 10, new Color(0.82f, 0.94f, 1f, 0.9f), TextAlignmentOptions.Center);
     }
 
     private void BuildDotMemoryModule()
     {
         RectTransform root = CreateRect("DotMemory", hudRoot, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(56f, -46f));
-        root.sizeDelta = new Vector2(385f, 52f);
+        root.sizeDelta = new Vector2(430f, 58f);
 
-        dotMemoryLabelText = CreateLabel(T("DOT MEMORY"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, 15, new Color(0.78f, 0.82f, 0.80f, 0.72f), TextAlignmentOptions.Left);
-        dotCounterText = CreateLabel("0 / 150k", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, 15, lineColor, TextAlignmentOptions.Right);
-        dotMeterBlocks = CreateSegmentRow("DotMeter", root, dotMeterSegmentCount, new Vector2(0f, -29f), new Vector2(8f, 10f), 4f);
+        dotMemoryLabelText = CreateLabel(T("DOT MEMORY"), root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, 13, lineColor, TextAlignmentOptions.Left);
+        dotMemoryLabelText.rectTransform.sizeDelta = new Vector2(190f, 24f);
+        dotCounterText = CreateLabel("0 / 150k", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, 13, lineColor, TextAlignmentOptions.Right);
+        dotCounterText.rectTransform.sizeDelta = new Vector2(160f, 24f);
+        dotMeterBlocks = CreateSegmentRow("DotMeter", root, dotMeterSegmentCount, new Vector2(0f, -31f), new Vector2(8f, 10f), 4f);
     }
 
     private void BuildObjectiveModule()
     {
-        objectiveRuntimeText = CreateLabel(T("Restore Computers") + " 0/4", hudRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -44f), 17, lineColor, TextAlignmentOptions.Right);
-        objectiveRuntimeText.rectTransform.sizeDelta = new Vector2(360f, 34f);
+        objectiveRuntimeText = CreateLabel(T("Find Target Computers") + " 0/4", hudRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -50f), 17, lineColor, TextAlignmentOptions.Right);
+        objectiveRuntimeText.rectTransform.sizeDelta = new Vector2(520f, 38f);
+    }
+
+    private void BuildRoundTimerModule()
+    {
+        roundTimerText = CreateLabel("20:00", hudRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), 24, new Color(0.95f, 0.76f, 0.30f, 0.96f), TextAlignmentOptions.Center);
+        roundTimerText.rectTransform.sizeDelta = new Vector2(220f, 42f);
     }
 
     private void BuildRoleRevealModule()
@@ -417,7 +483,7 @@ public class PlayerHUDController : MonoBehaviour
         UpdateDotMemory();
         UpdateObjectiveText();
         UpdateLocalizedStaticText();
-        UpdateRoleReveal();
+        UpdateRoundTimer();
     }
 
     private void UpdateVitals()
@@ -427,8 +493,8 @@ public class PlayerHUDController : MonoBehaviour
             return;
         }
 
-        SetSegmentFill(runtimeVitalBlocks, targetStats.GetHealthNormalized(), vitalColor, new Color(0.36f, 0.37f, 0.35f, 0.28f));
-        SetSegmentFill(runtimeStaminaBlocks, targetStats.GetStaminaNormalized(), staminaColor, new Color(0.28f, 0.36f, 0.38f, 0.22f));
+        SetSegmentFill(runtimeVitalBlocks, targetStats.GetHealthNormalized(), vitalColor, new Color(0.38f, 0.39f, 0.36f, 0.38f));
+        SetSegmentFill(runtimeStaminaBlocks, targetStats.GetStaminaNormalized(), staminaColor, new Color(0.28f, 0.38f, 0.42f, 0.34f));
     }
 
     private void UpdateInventory()
@@ -450,7 +516,7 @@ public class PlayerHUDController : MonoBehaviour
             slotIcons[i].color = itemType == ItemType.None ? new Color(0.45f, 0.48f, 0.46f, 0.22f) : new Color(0.88f, 0.90f, 0.84f, 0.92f);
             slotCountTexts[i].text = amount > 0 ? "x" + amount : "";
             slotHighlights[i].gameObject.SetActive(i == selected);
-            slotFrames[i].color = i == selected ? new Color(0.02f, 0.018f, 0.01f, 0.46f) : panelColor;
+            slotFrames[i].color = i == selected ? new Color(0f, 0f, 0f, 0.92f) : panelColor;
             slotKeyTexts[i].color = i == selected ? amberColor : new Color(0.76f, 0.75f, 0.66f, 0.52f);
         }
     }
@@ -499,7 +565,7 @@ public class PlayerHUDController : MonoBehaviour
         }
         else if (string.IsNullOrWhiteSpace(objectiveRuntimeText.text))
         {
-            objectiveRuntimeText.text = T("Restore Computers") + " 0/4";
+            objectiveRuntimeText.text = T("Find Target Computers") + " 0/4";
         }
     }
 
@@ -516,16 +582,19 @@ public class PlayerHUDController : MonoBehaviour
         if (vitalLabelText != null)
         {
             vitalLabelText.text = T("VITAL");
+            vitalLabelText.rectTransform.sizeDelta = new Vector2(78f, 24f);
         }
 
         if (staminaLabelText != null)
         {
             staminaLabelText.text = T("STAM");
+            staminaLabelText.rectTransform.sizeDelta = new Vector2(78f, 24f);
         }
 
         if (dotMemoryLabelText != null)
         {
             dotMemoryLabelText.text = T("DOT MEMORY");
+            dotMemoryLabelText.rectTransform.sizeDelta = new Vector2(190f, 24f);
         }
 
         if (roleRevealTitleText != null)
@@ -536,6 +605,32 @@ public class PlayerHUDController : MonoBehaviour
         hasDisplayedRole = false;
         UpdateScanCooldown();
         UpdateObjectiveText();
+    }
+
+    private void UpdateRoundTimer()
+    {
+        if (roundTimerText == null)
+        {
+            return;
+        }
+
+        float remaining = RoundTimer.RemainingSeconds;
+        int minutes = Mathf.FloorToInt(remaining / 60f);
+        int seconds = Mathf.FloorToInt(remaining % 60f);
+        roundTimerText.text = minutes.ToString("00") + ":" + seconds.ToString("00");
+        roundTimerText.color = remaining <= 60f
+            ? new Color(1f, 0.28f, 0.20f, 0.98f)
+            : new Color(0.95f, 0.76f, 0.30f, 0.96f);
+    }
+
+    private void UpdateHudOpacity()
+    {
+        if (hudCanvasGroup == null)
+        {
+            return;
+        }
+
+        hudCanvasGroup.alpha = Mathf.Clamp(PlayerPrefs.GetFloat("setting_hud_opacity", 1f), 0.45f, 1f);
     }
 
     private void UpdateRoleReveal()
@@ -651,10 +746,17 @@ public class PlayerHUDController : MonoBehaviour
         TMP_Text label = rect.gameObject.AddComponent<TextMeshProUGUI>();
         label.text = text;
         label.fontSize = fontSize;
-        label.enableAutoSizing = false;
+        label.enableAutoSizing = true;
+        label.fontSizeMax = fontSize;
+        label.fontSizeMin = Mathf.Max(8f, fontSize - 5f);
         label.alignment = alignment;
         label.color = color;
         label.raycastTarget = false;
+        label.enableWordWrapping = false;
+        label.overflowMode = TextOverflowModes.Ellipsis;
+        Shadow shadow = rect.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.86f);
+        shadow.effectDistance = new Vector2(1.4f, -1.4f);
         LocalizedTmpFontProvider.Apply(label);
         return label;
     }
@@ -680,7 +782,7 @@ public class PlayerHUDController : MonoBehaviour
     private Image AddPanel(RectTransform rect, Color color)
     {
         Image image = AddImage(rect, color);
-        AddOutline(rect, new Color(0.72f, 0.76f, 0.72f, 0.08f), new Vector2(1f, -1f));
+        AddOutline(rect, new Color(0.72f, 0.82f, 0.82f, 0.18f), new Vector2(1f, -1f));
         return image;
     }
 

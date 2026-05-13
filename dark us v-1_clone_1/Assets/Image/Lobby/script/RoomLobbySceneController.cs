@@ -22,32 +22,70 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private const string RoomTitlePropertyKey = "title";
     private const string MapSeedPropertyKey = "mapSeed";
     private const string ReadyPropertyKey = "ready";
+    private const string StartSignalPropertyKey = "gameStarting";
     private const byte MaxPlayers = 12;
 
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
-    private readonly List<TMP_Text> briefingValueTexts = new List<TMP_Text>();
+    private readonly List<RectTransform> animatedPanels = new List<RectTransform>();
     private TMP_Text networkStatusText;
     private TMP_Text roomTitleText;
     private TMP_Text roomCodeText;
-    private TMP_Text systemLogText;
+    private Transform voiceListRoot;
+    private RectTransform backgroundSweepLine;
     private Button readyButton;
     private Button startButton;
     private string pendingRoomCode;
     private bool pendingCreateRoom;
     private int createRetryCount;
     private int languageIndex;
+    private bool isStartingGame;
+    private float uiStartedAt;
 
     private void Start()
     {
         PhotonConnectionDefaults.Apply();
         languageIndex = PlayerPrefs.GetInt("setting_language", 0);
+        uiStartedAt = Time.unscaledTime;
         EnsureEventSystem();
         BuildRoomLobbyUi();
         StartPhotonRoomFlow();
     }
 
+    private void Update()
+    {
+        AnimateLobbyUi();
+    }
+
+    private void AnimateLobbyUi()
+    {
+        float elapsed = Time.unscaledTime - uiStartedAt;
+
+        if (backgroundSweepLine != null)
+        {
+            float x = Mathf.Lerp(-960f, 960f, Mathf.PingPong(elapsed * 0.055f, 1f));
+            backgroundSweepLine.anchoredPosition = new Vector2(x, 0f);
+        }
+
+        for (int i = 0; i < animatedPanels.Count; i++)
+        {
+            RectTransform panel = animatedPanels[i];
+            if (panel == null)
+            {
+                continue;
+            }
+
+            float pulse = 1f + Mathf.Sin(elapsed * 1.35f + i * 0.8f) * 0.0035f;
+            panel.localScale = new Vector3(pulse, pulse, 1f);
+        }
+    }
+
     public void OnClickStartGame()
     {
+        if (isStartingGame)
+        {
+            return;
+        }
+
         if (!PhotonNetwork.IsMasterClient)
         {
             SetNetworkStatus("HOST ONLY");
@@ -60,12 +98,39 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             return;
         }
 
+        StartCoroutine(StartGameWithLoading());
+    }
+
+    private System.Collections.IEnumerator StartGameWithLoading()
+    {
+        isStartingGame = true;
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
         EnsureMapSeedProperty();
         RoleAssignmentManager.EnsurePhotonImposterActor();
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { StartSignalPropertyKey, true }
+        });
         PhotonNetwork.SendAllOutgoingCommands();
+        SetNetworkStatus("STARTING");
+
+        DarkScanLoadingScreen.ShowImmediate("MATCH LOCKED...");
+        yield return null;
+
         PhotonNetwork.LoadLevel(gameSceneName);
+    }
+
+    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    {
+        if (propertiesThatChanged != null &&
+            propertiesThatChanged.ContainsKey(StartSignalPropertyKey) &&
+            propertiesThatChanged[StartSignalPropertyKey] is bool starting &&
+            starting)
+        {
+            SetNetworkStatus("STARTING");
+            DarkScanLoadingScreen.ShowImmediate("MATCH LOCKED...");
+        }
     }
 
     public void OnClickBack()
@@ -268,7 +333,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             }
         }
 
-        RefreshBriefingPanel();
+        RefreshVoicePanel();
     }
 
     public void OnClickReady()
@@ -324,21 +389,6 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         return true;
-    }
-
-    private void RefreshBriefingPanel()
-    {
-        if (briefingValueTexts.Count < 5)
-        {
-            return;
-        }
-
-        int playerCount = PhotonNetwork.InRoom ? PhotonNetwork.CurrentRoom.PlayerCount : 1;
-        briefingValueTexts[0].text = "R-03";
-        briefingValueTexts[1].text = T("INVESTIGATE SIGNAL");
-        briefingValueTexts[2].text = T("UNKNOWN");
-        briefingValueTexts[3].text = playerCount + " / " + MaxPlayers;
-        briefingValueTexts[4].text = PhotonNetwork.InRoom ? T("WAITING FOR CREW") : T("CONNECTING");
     }
 
     private string GetRoomCode()
@@ -459,30 +509,30 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         RectTransform titleRect = title.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(0f, 1f);
-        titleRect.anchoredPosition = new Vector2(300f, -150f);
-        titleRect.sizeDelta = new Vector2(520f, 90f);
+        titleRect.anchoredPosition = new Vector2(342f, -120f);
+        titleRect.sizeDelta = new Vector2(620f, 90f);
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
         roomTitleText = CreateText(canvas.transform, "RoomTitleText", string.Empty, 28f, FontStyles.Normal);
         RectTransform roomTitleRect = roomTitleText.GetComponent<RectTransform>();
         roomTitleRect.anchorMin = new Vector2(0f, 1f);
         roomTitleRect.anchorMax = new Vector2(0f, 1f);
-        roomTitleRect.anchoredPosition = new Vector2(300f, -214f);
-        roomTitleRect.sizeDelta = new Vector2(520f, 44f);
+        roomTitleRect.anchoredPosition = new Vector2(342f, -188f);
+        roomTitleRect.sizeDelta = new Vector2(620f, 44f);
         roomTitleText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
         roomCodeText = CreateText(canvas.transform, "RoomCodeText", TranslateRoomTitle(PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY")), 34f, FontStyles.Normal);
         RectTransform codeRect = roomCodeText.GetComponent<RectTransform>();
         codeRect.anchorMin = new Vector2(0f, 1f);
         codeRect.anchorMax = new Vector2(0f, 1f);
-        codeRect.anchoredPosition = new Vector2(300f, -230f);
-        codeRect.sizeDelta = new Vector2(520f, 56f);
+        codeRect.anchoredPosition = new Vector2(342f, -214f);
+        codeRect.sizeDelta = new Vector2(620f, 56f);
 
         networkStatusText = CreateText(canvas.transform, "NetworkStatusText", T("PHOTON READY"), 24f, FontStyles.UpperCase);
         RectTransform statusRect = networkStatusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 1f);
         statusRect.anchorMax = new Vector2(0f, 1f);
-        statusRect.anchoredPosition = new Vector2(300f, -282f);
+        statusRect.anchoredPosition = new Vector2(342f, -268f);
         statusRect.sizeDelta = new Vector2(620f, 42f);
 
         GameObject panel = new GameObject("CrewPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup));
@@ -492,8 +542,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         RectTransform panelRect = panel.GetComponent<RectTransform>();
         panelRect.anchorMin = new Vector2(0f, 1f);
         panelRect.anchorMax = new Vector2(0f, 1f);
-        panelRect.anchoredPosition = new Vector2(300f, -430f);
-        panelRect.sizeDelta = new Vector2(520f, 260f);
+        panelRect.anchoredPosition = new Vector2(342f, -570f);
+        panelRect.sizeDelta = new Vector2(620f, 520f);
 
         Image panelImage = panel.GetComponent<Image>();
         panelImage.color = new Color(0.01f, 0.014f, 0.016f, 0.72f);
@@ -504,15 +554,17 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(32, 32, 28, 28);
-        layout.spacing = 16f;
+        layout.spacing = 9f;
         layout.childAlignment = TextAnchor.UpperLeft;
         layout.childControlWidth = true;
         layout.childControlHeight = false;
 
         slotTexts.Clear();
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < MaxPlayers; i++)
         {
-            slotTexts.Add(CreateText(panel.transform, "Slot" + i, T("EMPTY").PadRight(12) + T("WAITING"), 30f, FontStyles.UpperCase));
+            TMP_Text slotText = CreateText(panel.transform, "Slot" + i, T("EMPTY").PadRight(12) + T("WAITING"), 22f, FontStyles.UpperCase);
+            slotText.alignment = TextAlignmentOptions.Left;
+            slotTexts.Add(slotText);
         }
 
         BuildRightInfoPanels(canvas.transform);
@@ -521,21 +573,21 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         RectTransform readyRect = readyButton.GetComponent<RectTransform>();
         readyRect.anchorMin = new Vector2(0f, 0f);
         readyRect.anchorMax = new Vector2(0f, 0f);
-        readyRect.anchoredPosition = new Vector2(300f, 248f);
+        readyRect.anchoredPosition = new Vector2(206f, 92f);
         readyButton.onClick.AddListener(OnClickReady);
 
         startButton = CreateButton(canvas.transform, "StartGameButton", T("Start Game"), 260f, 70f, 30f);
         RectTransform startRect = startButton.GetComponent<RectTransform>();
         startRect.anchorMin = new Vector2(0f, 0f);
         startRect.anchorMax = new Vector2(0f, 0f);
-        startRect.anchoredPosition = new Vector2(300f, 160f);
+        startRect.anchoredPosition = new Vector2(478f, 92f);
         startButton.onClick.AddListener(OnClickStartGame);
 
-        Button backButton = CreateButton(canvas.transform, "BackButton", T("Back"), 260f, 70f, 30f);
+        Button backButton = CreateButton(canvas.transform, "BackButton", T("Back"), 200f, 70f, 30f);
         RectTransform backRect = backButton.GetComponent<RectTransform>();
         backRect.anchorMin = new Vector2(0f, 0f);
         backRect.anchorMax = new Vector2(0f, 0f);
-        backRect.anchoredPosition = new Vector2(300f, 72f);
+        backRect.anchoredPosition = new Vector2(728f, 92f);
         backButton.onClick.AddListener(OnClickBack);
     }
 
@@ -565,8 +617,9 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rect.offsetMax = Vector2.zero;
 
         Image image = background.GetComponent<Image>();
-        image.sprite = lobbyBackgroundSprite;
-        image.color = lobbyBackgroundSprite != null ? new Color(0.42f, 0.48f, 0.5f, 0.42f) : new Color(0.005f, 0.007f, 0.008f, 1f);
+        Sprite backgroundSprite = lobbyBackgroundSprite != null ? lobbyBackgroundSprite : Resources.Load<Sprite>("Lobby/lobby_waiting_room_bg");
+        image.sprite = backgroundSprite;
+        image.color = backgroundSprite != null ? new Color(0.72f, 0.82f, 0.86f, 0.72f) : new Color(0.005f, 0.007f, 0.008f, 1f);
         image.preserveAspect = false;
 
         GameObject overlay = new GameObject("BackgroundDarkOverlay", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -580,76 +633,167 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         Image overlayImage = overlay.GetComponent<Image>();
         overlayImage.color = new Color(0f, 0f, 0f, 0.58f);
+
+        GameObject sweep = new GameObject("BackgroundSweepLine", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        sweep.transform.SetParent(parent, false);
+        backgroundSweepLine = sweep.GetComponent<RectTransform>();
+        backgroundSweepLine.anchorMin = new Vector2(0.5f, 0f);
+        backgroundSweepLine.anchorMax = new Vector2(0.5f, 1f);
+        backgroundSweepLine.sizeDelta = new Vector2(3f, 0f);
+        backgroundSweepLine.anchoredPosition = new Vector2(-960f, 0f);
+
+        Image sweepImage = sweep.GetComponent<Image>();
+        sweepImage.color = new Color(0.44f, 0.86f, 1f, 0.18f);
     }
 
     private void BuildRightInfoPanels(Transform parent)
     {
-        Transform briefingPanel = CreateInfoPanel(parent, "MissionBriefingPanel", new Vector2(1320f, -250f), new Vector2(620f, 320f));
-        TMP_Text briefingTitle = CreateText(briefingPanel, "BriefingTitle", T("MISSION BRIEFING"), 34f, FontStyles.UpperCase);
-        ConfigurePanelTitle(briefingTitle);
-
-        briefingValueTexts.Clear();
-        CreateBriefingRow(briefingPanel, "FACILITY", "R-03");
-        CreateBriefingRow(briefingPanel, "OBJECTIVE", T("INVESTIGATE SIGNAL"));
-        CreateBriefingRow(briefingPanel, "THREAT LEVEL", T("UNKNOWN"));
-        CreateBriefingRow(briefingPanel, "TEAM SIZE", "1 / " + MaxPlayers);
-        CreateBriefingRow(briefingPanel, "STATUS", T("CONNECTING"));
-
-        Transform logPanel = CreateInfoPanel(parent, "SystemLogPanel", new Vector2(1320f, -630f), new Vector2(620f, 320f));
-        TMP_Text logTitle = CreateText(logPanel, "LogTitle", T("SYSTEM LOG"), 34f, FontStyles.UpperCase);
-        ConfigurePanelTitle(logTitle);
-
-        systemLogText = CreateText(logPanel, "SystemLogText", "> " + T("Room initialized") + "\n> " + T("Voice channel standby") + "\n> " + T("Waiting for players"), 24f, FontStyles.Normal);
-        RectTransform logRect = systemLogText.GetComponent<RectTransform>();
-        logRect.anchorMin = new Vector2(0f, 1f);
-        logRect.anchorMax = new Vector2(1f, 1f);
-        logRect.anchoredPosition = new Vector2(0f, -160f);
-        logRect.sizeDelta = new Vector2(-64f, 170f);
-        systemLogText.alignment = TextAlignmentOptions.TopLeft;
-        systemLogText.enableWordWrapping = true;
-
-        Transform voicePanel = CreateInfoPanel(parent, "VoiceSettingsPanel", new Vector2(1320f, -910f), new Vector2(620f, 150f));
-        TMP_Text voiceTitle = CreateText(voicePanel, "VoiceTitle", T("VOICE SETTINGS"), 28f, FontStyles.UpperCase);
+        Transform voicePanel = CreateInfoPanel(parent, "CrewVoicePanel", new Vector2(1318f, -515f), new Vector2(700f, 750f));
+        TMP_Text voiceTitle = CreateText(voicePanel, "VoiceTitle", T("CREW VOICE"), 36f, FontStyles.UpperCase);
         ConfigurePanelTitle(voiceTitle);
-        CreateVoiceVolumeSlider(voicePanel);
 
-        RefreshBriefingPanel();
+        TMP_Text hint = CreateText(voicePanel, "VoiceHint", T("ADJUST EACH PLAYER"), 20f, FontStyles.Normal);
+        RectTransform hintRect = hint.GetComponent<RectTransform>();
+        hintRect.anchorMin = new Vector2(0f, 1f);
+        hintRect.anchorMax = new Vector2(1f, 1f);
+        hintRect.anchoredPosition = new Vector2(0f, -88f);
+        hintRect.sizeDelta = new Vector2(-64f, 30f);
+        hint.alignment = TextAlignmentOptions.Left;
+        hint.color = new Color(0.62f, 0.72f, 0.76f, 1f);
+
+        GameObject listObject = new GameObject("VoicePlayerList", typeof(RectTransform));
+        listObject.layer = parent.gameObject.layer;
+        listObject.transform.SetParent(voicePanel, false);
+        voiceListRoot = listObject.transform;
+
+        RectTransform listRect = listObject.GetComponent<RectTransform>();
+        listRect.anchorMin = new Vector2(0f, 0f);
+        listRect.anchorMax = new Vector2(1f, 1f);
+        listRect.offsetMin = new Vector2(42f, 42f);
+        listRect.offsetMax = new Vector2(-42f, -126f);
+
+        RefreshVoicePanel();
     }
 
-    private void CreateVoiceVolumeSlider(Transform parent)
+    private void RefreshVoicePanel()
     {
-        TMP_Text label = CreateText(parent, "VoiceVolumeLabel", T("Voice Volume"), 22f, FontStyles.Normal);
-        RectTransform labelRect = label.GetComponent<RectTransform>();
-        labelRect.anchorMin = new Vector2(0f, 1f);
-        labelRect.anchorMax = new Vector2(0f, 1f);
-        labelRect.anchoredPosition = new Vector2(148f, -92f);
-        labelRect.sizeDelta = new Vector2(210f, 34f);
-        label.alignment = TextAlignmentOptions.Left;
-        label.color = new Color(0.62f, 0.7f, 0.72f, 1f);
+        if (voiceListRoot == null)
+        {
+            return;
+        }
 
-        TMP_Text valueText = CreateText(parent, "VoiceVolumeValue", string.Empty, 22f, FontStyles.Normal);
+        for (int i = voiceListRoot.childCount - 1; i >= 0; i--)
+        {
+            Destroy(voiceListRoot.GetChild(i).gameObject);
+        }
+
+        if (!PhotonNetwork.InRoom || PhotonNetwork.PlayerList.Length <= 0)
+        {
+            CreateEmptyVoiceRow(voiceListRoot);
+            return;
+        }
+
+        Player[] players = PhotonNetwork.PlayerList;
+        for (int i = 0; i < players.Length; i++)
+        {
+            CreatePlayerVoiceRow(voiceListRoot, players[i], i);
+        }
+    }
+
+    private void CreateEmptyVoiceRow(Transform parent)
+    {
+        TMP_Text emptyText = CreateText(parent, "NoPlayersText", T("WAITING FOR CREW"), 26f, FontStyles.Normal);
+        RectTransform rect = emptyText.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.sizeDelta = new Vector2(0f, 40f);
+        emptyText.alignment = TextAlignmentOptions.Left;
+        emptyText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
+    }
+
+    private void CreatePlayerVoiceRow(Transform parent, Player player, int index)
+    {
+        float y = -34f - index * 48f;
+        GameObject row = new GameObject("VoiceRow_" + player.ActorNumber, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        row.layer = parent.gameObject.layer;
+        row.transform.SetParent(parent, false);
+
+        RectTransform rowRect = row.GetComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0f, 1f);
+        rowRect.anchorMax = new Vector2(1f, 1f);
+        rowRect.anchoredPosition = new Vector2(0f, y);
+        rowRect.sizeDelta = new Vector2(0f, 40f);
+
+        Image rowImage = row.GetComponent<Image>();
+        rowImage.color = index % 2 == 0 ? new Color(0.02f, 0.026f, 0.028f, 0.5f) : new Color(0.04f, 0.052f, 0.056f, 0.36f);
+
+        string displayName = GetPlayerDisplayName(player);
+        TMP_Text nameText = CreateText(row.transform, "NameText", displayName, 20f, FontStyles.UpperCase);
+        RectTransform nameRect = nameText.GetComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0f, 0.5f);
+        nameRect.anchorMax = new Vector2(0f, 0.5f);
+        nameRect.anchoredPosition = new Vector2(132f, 0f);
+        nameRect.sizeDelta = new Vector2(250f, 30f);
+        nameText.alignment = TextAlignmentOptions.Left;
+        nameText.color = player.IsLocal ? new Color(1f, 0.8f, 0.42f, 1f) : new Color(0.82f, 0.9f, 0.92f, 1f);
+
+        string volumeKey = GetPlayerVoiceVolumeKey(player);
+        float savedVolume = Mathf.Clamp(PlayerPrefs.GetFloat(volumeKey, 1f), 0f, 2f);
+        TMP_Text valueText = CreateText(row.transform, "ValueText", savedVolume.ToString("0.00"), 18f, FontStyles.Normal);
         RectTransform valueRect = valueText.GetComponent<RectTransform>();
-        valueRect.anchorMin = new Vector2(0f, 1f);
-        valueRect.anchorMax = new Vector2(0f, 1f);
-        valueRect.anchoredPosition = new Vector2(540f, -92f);
-        valueRect.sizeDelta = new Vector2(100f, 34f);
+        valueRect.anchorMin = new Vector2(1f, 0.5f);
+        valueRect.anchorMax = new Vector2(1f, 0.5f);
+        valueRect.anchoredPosition = new Vector2(-28f, 0f);
+        valueRect.sizeDelta = new Vector2(72f, 30f);
         valueText.alignment = TextAlignmentOptions.Right;
 
-        Slider slider = CreateSlider(parent, 0f, 1f, PlayerPrefs.GetFloat("setting_voice_volume", 1f));
+        Slider slider = CreateSlider(row.transform, 0f, 2f, savedVolume);
         RectTransform sliderRect = slider.GetComponent<RectTransform>();
-        sliderRect.anchorMin = new Vector2(0f, 1f);
-        sliderRect.anchorMax = new Vector2(0f, 1f);
-        sliderRect.anchoredPosition = new Vector2(390f, -92f);
-        sliderRect.sizeDelta = new Vector2(250f, 28f);
+        sliderRect.anchorMin = new Vector2(1f, 0.5f);
+        sliderRect.anchorMax = new Vector2(1f, 0.5f);
+        sliderRect.anchoredPosition = new Vector2(-198f, 0f);
+        sliderRect.sizeDelta = new Vector2(220f, 26f);
 
         slider.onValueChanged.AddListener(value =>
         {
-            PlayerPrefs.SetFloat("setting_voice_volume", value);
+            PlayerPrefs.SetFloat(volumeKey, value);
+            PlayerPrefs.SetFloat("setting_voice_volume_client_" + Mathf.Max(0, player.ActorNumber - 1), value);
+            if (player.IsLocal)
+            {
+                PlayerPrefs.SetFloat("setting_voice_volume", value);
+            }
+
             PlayerPrefs.Save();
             valueText.text = value.ToString("0.00");
             PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
         });
-        valueText.text = slider.value.ToString("0.00");
+    }
+
+    private string GetPlayerDisplayName(Player player)
+    {
+        if (player == null)
+        {
+            return T("PLAYER");
+        }
+
+        string baseName = !string.IsNullOrWhiteSpace(player.NickName) ? player.NickName : T("PLAYER") + " " + player.ActorNumber;
+        if (player.IsLocal)
+        {
+            return T("YOU") + "  " + baseName;
+        }
+
+        return baseName;
+    }
+
+    private string GetPlayerVoiceVolumeKey(Player player)
+    {
+        if (player == null)
+        {
+            return "setting_voice_volume";
+        }
+
+        return "setting_voice_volume_actor_" + player.ActorNumber;
     }
 
     private Transform CreateInfoPanel(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size)
@@ -671,6 +815,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.38f);
         outline.effectDistance = new Vector2(2f, -2f);
 
+        animatedPanels.Add(rect);
         return panel.transform;
     }
 
@@ -685,45 +830,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
     }
 
-    private void CreateBriefingRow(Transform parent, string label, string value)
-    {
-        int index = briefingValueTexts.Count;
-        float y = -105f - index * 40f;
-
-        TMP_Text labelText = CreateText(parent, label + "Label", T(label), 22f, FontStyles.UpperCase);
-        RectTransform labelRect = labelText.GetComponent<RectTransform>();
-        labelRect.anchorMin = new Vector2(0f, 1f);
-        labelRect.anchorMax = new Vector2(0f, 1f);
-        labelRect.anchoredPosition = new Vector2(148f, y);
-        labelRect.sizeDelta = new Vector2(210f, 34f);
-        labelText.alignment = TextAlignmentOptions.Left;
-        labelText.color = new Color(0.62f, 0.7f, 0.72f, 1f);
-
-        TMP_Text valueText = CreateText(parent, label + "Value", value, 22f, FontStyles.UpperCase);
-        RectTransform valueRect = valueText.GetComponent<RectTransform>();
-        valueRect.anchorMin = new Vector2(0f, 1f);
-        valueRect.anchorMax = new Vector2(0f, 1f);
-        valueRect.anchoredPosition = new Vector2(412f, y);
-        valueRect.sizeDelta = new Vector2(300f, 34f);
-        valueText.alignment = TextAlignmentOptions.Left;
-        valueText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
-
-        briefingValueTexts.Add(valueText);
-    }
-
     private void SetNetworkStatus(string status)
     {
         if (networkStatusText != null)
         {
             networkStatusText.text = T(status);
         }
-
-        if (systemLogText != null)
-        {
-            systemLogText.text = "> " + T(status) + "\n> " + T("Voice channel standby") + "\n> " + T("Waiting for players");
-        }
-
-        RefreshBriefingPanel();
 
         Debug.Log(status);
     }
@@ -813,6 +925,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "CONNECTING": return "연결 중";
             case "SYSTEM LOG": return "시스템 로그";
             case "VOICE SETTINGS": return "음성 설정";
+            case "CREW VOICE": return "대원 음성";
+            case "ADJUST EACH PLAYER": return "플레이어별 수신 음량을 조절합니다";
             case "Voice Volume": return "마이크 볼륨";
             case "Room initialized": return "방 초기화됨";
             case "Voice channel standby": return "음성 채널 대기";
@@ -863,6 +977,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "CONNECTING": return "接続中";
             case "SYSTEM LOG": return "システムログ";
             case "VOICE SETTINGS": return "ボイス設定";
+            case "CREW VOICE": return "クルーボイス";
+            case "ADJUST EACH PLAYER": return "プレイヤーごとの受信音量を調整";
             case "Voice Volume": return "マイク音量";
             case "Room initialized": return "ルーム初期化";
             case "Voice channel standby": return "ボイスチャンネル待機";
