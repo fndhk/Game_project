@@ -97,12 +97,43 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
         PlayerScanAvatar scanAvatar = remoteObject.AddComponent<PlayerScanAvatar>();
         scanAvatar.avatarRootName = remoteAvatarRootName;
         scanAvatar.hideRenderers = true;
-        scanAvatar.hideAttachedBodyRenderers = true;
+        scanAvatar.hideAttachedBodyRenderers = false;
         scanAvatar.disableSelfScanWhenScannerIsHere = false;
         scanAvatar.RebuildAvatar();
 
+        PlayerVisibleAvatar visibleAvatar = remoteObject.AddComponent<PlayerVisibleAvatar>();
+        visibleAvatar.hideWhenLocalScannerOwner = false;
+        visibleAvatar.addScanColliders = true;
+        visibleAvatar.RebuildAvatar();
+        DisableGeneratedScanAvatarColliders(remoteObject.transform);
+
         remotePlayers[actorNumber] = remoteObject.transform;
         return remoteObject.transform;
+    }
+
+    private void DisableGeneratedScanAvatarColliders(Transform remoteRoot)
+    {
+        if (remoteRoot == null)
+        {
+            return;
+        }
+
+        Transform scanRoot = remoteRoot.Find(remoteAvatarRootName);
+
+        if (scanRoot == null)
+        {
+            return;
+        }
+
+        Collider[] colliders = scanRoot.GetComponentsInChildren<Collider>(true);
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+            {
+                colliders[i].enabled = false;
+            }
+        }
     }
 
     private float ToFloat(object value)

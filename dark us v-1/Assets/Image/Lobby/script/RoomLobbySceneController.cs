@@ -26,12 +26,17 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private const byte MaxPlayers = 12;
 
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
+    private readonly List<Image> slotMicIcons = new List<Image>();
+    private readonly List<Slider> slotVoiceSliders = new List<Slider>();
     private readonly List<RectTransform> animatedPanels = new List<RectTransform>();
+    private readonly List<Vector2> animatedPanelBasePositions = new List<Vector2>();
+    private readonly List<CanvasGroup> animatedPanelGroups = new List<CanvasGroup>();
     private TMP_Text networkStatusText;
     private TMP_Text roomTitleText;
     private TMP_Text roomCodeText;
-    private Transform voiceListRoot;
     private RectTransform backgroundSweepLine;
+    private Sprite micOpenIconSprite;
+    private Sprite micMutedIconSprite;
     private PlayerVoiceChat lobbyVoiceChat;
     private Button readyButton;
     private Button startButton;
@@ -79,8 +84,21 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
                 continue;
             }
 
-            float pulse = 1f + Mathf.Sin(elapsed * 1.35f + i * 0.8f) * 0.0035f;
-            panel.localScale = new Vector3(pulse, pulse, 1f);
+            float delay = i * 0.09f;
+            float appear = Mathf.Clamp01((elapsed - delay) * 3.2f);
+            appear = appear * appear * (3f - 2f * appear);
+            Vector2 basePosition = i < animatedPanelBasePositions.Count ? animatedPanelBasePositions[i] : panel.anchoredPosition;
+            float slide = Mathf.Lerp(42f, 0f, appear);
+            panel.anchoredPosition = basePosition + new Vector2(0f, -slide);
+
+            float pulse = 1f + Mathf.Sin(elapsed * 1.35f + i * 0.8f) * 0.0045f;
+            float scale = Mathf.Lerp(0.965f, pulse, appear);
+            panel.localScale = new Vector3(scale, scale, 1f);
+
+            if (i < animatedPanelGroups.Count && animatedPanelGroups[i] != null)
+            {
+                animatedPanelGroups[i].alpha = appear;
+            }
         }
     }
 
@@ -92,7 +110,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         nextVoicePanelRefreshTime = Time.unscaledTime + 0.18f;
-        RefreshVoicePanel();
+        RefreshIntegratedVoiceControls();
     }
 
     private void EnsureLobbyVoiceChat()
@@ -326,25 +344,42 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         for (int i = 0; i < slotTexts.Count; i++)
         {
-            string label = T("EMPTY").PadRight(12) + T("WAITING");
+            string nameLabel = T("EMPTY");
+            string stateLabel = T("WAITING");
+            Color textColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+            Color cardColor = new Color(0.02f, 0.03f, 0.034f, 0.78f);
+
             if (PhotonNetwork.InRoom && i < PhotonNetwork.PlayerList.Length)
             {
                 Player player = PhotonNetwork.PlayerList[i];
                 string role = player.IsMasterClient ? T("HOST") : T("PLAYER");
-                string name = player.IsLocal ? T("YOU") : role;
-                string readyLabel = IsPlayerReady(player) ? T("READY") : T("WAITING");
-                label = name.PadRight(12) + readyLabel;
+                nameLabel = player.IsLocal ? T("YOU") : role;
+                stateLabel = IsPlayerReady(player) ? T("READY") : T("WAITING");
+                textColor = player.IsLocal ? new Color(1f, 0.8f, 0.42f, 1f) : new Color(0.84f, 0.92f, 0.94f, 1f);
+                cardColor = IsPlayerReady(player) ? new Color(0.03f, 0.12f, 0.10f, 0.82f) : new Color(0.035f, 0.045f, 0.052f, 0.82f);
             }
             else if (!PhotonNetwork.InRoom && i == 0 && pendingCreateRoom)
             {
-                label = T("HOST").PadRight(12) + T("READY");
+                nameLabel = T("HOST");
+                stateLabel = T("READY");
+                cardColor = new Color(0.03f, 0.12f, 0.10f, 0.82f);
             }
             else if (!PhotonNetwork.InRoom && i == 1 && !pendingCreateRoom)
             {
-                label = T("YOU").PadRight(12) + T("READY");
+                nameLabel = T("YOU");
+                stateLabel = T("READY");
+                textColor = new Color(1f, 0.8f, 0.42f, 1f);
+                cardColor = new Color(0.03f, 0.12f, 0.10f, 0.82f);
             }
 
-            slotTexts[i].text = label;
+            slotTexts[i].text = nameLabel + "\n<size=70%>" + stateLabel + "</size>";
+            slotTexts[i].color = textColor;
+
+            Image cardImage = slotTexts[i].transform.parent != null ? slotTexts[i].transform.parent.GetComponent<Image>() : null;
+            if (cardImage != null)
+            {
+                cardImage.color = cardColor;
+            }
         }
 
         if (startButton != null)
@@ -363,7 +398,48 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             }
         }
 
-        RefreshVoicePanel();
+        RefreshIntegratedVoiceControls();
+    }
+
+    private void RefreshIntegratedVoiceControls()
+    {
+        for (int i = 0; i < slotMicIcons.Count; i++)
+        {
+            bool isPreviewLocalSlot = !PhotonNetwork.InRoom && ((pendingCreateRoom && i == 0) || (!pendingCreateRoom && i == 1));
+            bool hasPlayer = (PhotonNetwork.InRoom && i < PhotonNetwork.PlayerList.Length) || isPreviewLocalSlot;
+            Player player = PhotonNetwork.InRoom && i < PhotonNetwork.PlayerList.Length ? PhotonNetwork.PlayerList[i] : null;
+            bool isSpeaking = player != null && PlayerVoiceChat.IsActorSpeaking(player.ActorNumber);
+            bool isMuted = hasPlayer && (player == null || player.IsLocal) && PlayerVoiceChat.IsLocalMuted();
+
+            Image icon = slotMicIcons[i];
+
+            if (icon != null)
+            {
+                icon.enabled = hasPlayer;
+                icon.sprite = isMuted ? GetMicMutedIconSprite() : GetMicOpenIconSprite();
+                icon.color = isMuted
+                    ? new Color(1f, 0.34f, 0.28f, 1f)
+                    : (isSpeaking ? new Color(0.48f, 1f, 0.68f, 1f) : new Color(0.70f, 0.82f, 0.86f, 0.88f));
+            }
+
+            Slider slider = i < slotVoiceSliders.Count ? slotVoiceSliders[i] : null;
+
+            if (slider != null)
+            {
+                slider.gameObject.SetActive(hasPlayer);
+
+                if (hasPlayer && !slider.interactable)
+                {
+                    slider.interactable = true;
+                }
+
+                if (hasPlayer)
+                {
+                    string volumeKey = player != null ? GetPlayerVoiceVolumeKey(player) : "setting_voice_volume";
+                    slider.SetValueWithoutNotify(Mathf.Clamp(PlayerPrefs.GetFloat(volumeKey, 1f), 0f, 2f));
+                }
+            }
+        }
     }
 
     public void OnClickReady()
@@ -497,7 +573,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         if (roomCodeText != null)
         {
-            roomCodeText.text = TranslateRoomTitle(PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"));
+            string roomCode = !string.IsNullOrWhiteSpace(pendingRoomCode) ? pendingRoomCode : GetRoomCode();
+            roomCodeText.text = T("ROOM CODE") + "  " + roomCode;
         }
     }
 
@@ -505,7 +582,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         if (roomTitleText != null)
         {
-            roomTitleText.text = string.Empty;
+            roomTitleText.text = TranslateRoomTitle(PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY"));
         }
     }
 
@@ -535,90 +612,153 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         Canvas canvas = CreateCanvas();
         CreateBackground(canvas.transform);
 
-        TMP_Text title = CreateText(canvas.transform, "TitleText", T("ROOM LOBBY"), 64f, FontStyles.UpperCase);
+        Transform headerPanel = CreateInfoPanel(canvas.transform, "LobbyHeaderPanel", new Vector2(520f, -122f), new Vector2(900f, 150f));
+        TMP_Text title = CreateText(headerPanel, "TitleText", T("ROOM LOBBY"), 58f, FontStyles.UpperCase);
         RectTransform titleRect = title.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(0f, 1f);
-        titleRect.anchoredPosition = new Vector2(342f, -120f);
-        titleRect.sizeDelta = new Vector2(620f, 90f);
+        titleRect.anchoredPosition = new Vector2(263f, -42f);
+        titleRect.sizeDelta = new Vector2(430f, 76f);
+        title.alignment = TextAlignmentOptions.Left;
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        roomTitleText = CreateText(canvas.transform, "RoomTitleText", string.Empty, 28f, FontStyles.Normal);
+        roomTitleText = CreateText(headerPanel, "RoomTitleText", string.Empty, 22f, FontStyles.Normal);
         RectTransform roomTitleRect = roomTitleText.GetComponent<RectTransform>();
         roomTitleRect.anchorMin = new Vector2(0f, 1f);
         roomTitleRect.anchorMax = new Vector2(0f, 1f);
-        roomTitleRect.anchoredPosition = new Vector2(342f, -188f);
-        roomTitleRect.sizeDelta = new Vector2(620f, 44f);
+        roomTitleRect.anchoredPosition = new Vector2(234f, -108f);
+        roomTitleRect.sizeDelta = new Vector2(360f, 34f);
+        roomTitleText.alignment = TextAlignmentOptions.Left;
         roomTitleText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
-        roomCodeText = CreateText(canvas.transform, "RoomCodeText", TranslateRoomTitle(PlayerPrefs.GetString(RoomTitlePrefsKey, "ROOM LOBBY")), 34f, FontStyles.Normal);
+        roomCodeText = CreateText(headerPanel, "RoomCodeText", T("ROOM CODE") + "  " + GetRoomCode(), 30f, FontStyles.Normal);
         RectTransform codeRect = roomCodeText.GetComponent<RectTransform>();
-        codeRect.anchorMin = new Vector2(0f, 1f);
-        codeRect.anchorMax = new Vector2(0f, 1f);
-        codeRect.anchoredPosition = new Vector2(342f, -214f);
-        codeRect.sizeDelta = new Vector2(620f, 56f);
+        codeRect.anchorMin = new Vector2(1f, 1f);
+        codeRect.anchorMax = new Vector2(1f, 1f);
+        codeRect.anchoredPosition = new Vector2(-210f, -50f);
+        codeRect.sizeDelta = new Vector2(360f, 48f);
+        roomCodeText.alignment = TextAlignmentOptions.Right;
+        roomCodeText.color = new Color(0.88f, 0.96f, 0.98f, 1f);
 
-        networkStatusText = CreateText(canvas.transform, "NetworkStatusText", T("PHOTON READY"), 24f, FontStyles.UpperCase);
+        networkStatusText = CreateText(headerPanel, "NetworkStatusText", T("PHOTON READY"), 20f, FontStyles.UpperCase);
         RectTransform statusRect = networkStatusText.GetComponent<RectTransform>();
-        statusRect.anchorMin = new Vector2(0f, 1f);
-        statusRect.anchorMax = new Vector2(0f, 1f);
-        statusRect.anchoredPosition = new Vector2(342f, -268f);
-        statusRect.sizeDelta = new Vector2(620f, 42f);
+        statusRect.anchorMin = new Vector2(1f, 1f);
+        statusRect.anchorMax = new Vector2(1f, 1f);
+        statusRect.anchoredPosition = new Vector2(-210f, -104f);
+        statusRect.sizeDelta = new Vector2(360f, 34f);
+        networkStatusText.alignment = TextAlignmentOptions.Right;
 
-        GameObject panel = new GameObject("CrewPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(VerticalLayoutGroup));
+        GameObject panel = new GameObject("CrewGridPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(GridLayoutGroup));
         panel.layer = canvas.gameObject.layer;
         panel.transform.SetParent(canvas.transform, false);
 
         RectTransform panelRect = panel.GetComponent<RectTransform>();
-        panelRect.anchorMin = new Vector2(0f, 1f);
-        panelRect.anchorMax = new Vector2(0f, 1f);
-        panelRect.anchoredPosition = new Vector2(342f, -570f);
-        panelRect.sizeDelta = new Vector2(620f, 520f);
+        panelRect.anchorMin = new Vector2(0f, 0.5f);
+        panelRect.anchorMax = new Vector2(0f, 0.5f);
+        panelRect.anchoredPosition = new Vector2(520f, -42f);
+        panelRect.sizeDelta = new Vector2(900f, 600f);
 
         Image panelImage = panel.GetComponent<Image>();
-        panelImage.color = new Color(0.01f, 0.014f, 0.016f, 0.72f);
+        panelImage.color = new Color(0.01f, 0.014f, 0.016f, 0.66f);
 
         Outline panelOutline = panel.GetComponent<Outline>();
         panelOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.42f);
         panelOutline.effectDistance = new Vector2(2f, -2f);
 
-        VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(32, 32, 28, 28);
-        layout.spacing = 9f;
-        layout.childAlignment = TextAnchor.UpperLeft;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
+        GridLayoutGroup layout = panel.GetComponent<GridLayoutGroup>();
+        layout.padding = new RectOffset(34, 34, 34, 34);
+        layout.cellSize = new Vector2(260f, 116f);
+        layout.spacing = new Vector2(26f, 22f);
+        layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        layout.constraintCount = 3;
 
         slotTexts.Clear();
+        slotMicIcons.Clear();
+        slotVoiceSliders.Clear();
         for (int i = 0; i < MaxPlayers; i++)
         {
-            TMP_Text slotText = CreateText(panel.transform, "Slot" + i, T("EMPTY").PadRight(12) + T("WAITING"), 22f, FontStyles.UpperCase);
-            slotText.alignment = TextAlignmentOptions.Left;
+            GameObject card = new GameObject("CrewSlotCard_" + i, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+            card.layer = panel.layer;
+            card.transform.SetParent(panel.transform, false);
+
+            Image cardImage = card.GetComponent<Image>();
+            cardImage.color = new Color(0.02f, 0.03f, 0.034f, 0.78f);
+            Outline cardOutline = card.GetComponent<Outline>();
+            cardOutline.effectColor = new Color(0.42f, 0.60f, 0.66f, 0.32f);
+            cardOutline.effectDistance = new Vector2(1.5f, -1.5f);
+
+            TMP_Text slotText = CreateText(card.transform, "SlotText", T("EMPTY") + "\n" + T("WAITING"), 24f, FontStyles.UpperCase);
+            RectTransform slotRect = slotText.GetComponent<RectTransform>();
+            slotRect.anchorMin = Vector2.zero;
+            slotRect.anchorMax = Vector2.one;
+            slotRect.offsetMin = new Vector2(22f, 44f);
+            slotRect.offsetMax = new Vector2(-54f, -18f);
+            slotText.alignment = TextAlignmentOptions.TopLeft;
+            slotText.color = new Color(0.78f, 0.86f, 0.88f, 1f);
             slotTexts.Add(slotText);
+
+            GameObject micObject = new GameObject("MicStatusIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            micObject.layer = card.layer;
+            micObject.transform.SetParent(card.transform, false);
+            RectTransform micRect = micObject.GetComponent<RectTransform>();
+            micRect.anchorMin = new Vector2(1f, 1f);
+            micRect.anchorMax = new Vector2(1f, 1f);
+            micRect.anchoredPosition = new Vector2(-26f, -24f);
+            micRect.sizeDelta = new Vector2(24f, 24f);
+            Image micImage = micObject.GetComponent<Image>();
+            micImage.sprite = GetMicOpenIconSprite();
+            micImage.color = new Color(0.70f, 0.82f, 0.86f, 0.88f);
+            micImage.enabled = false;
+            slotMicIcons.Add(micImage);
+
+            Slider voiceSlider = CreateSlider(card.transform, 0f, 2f, 1f);
+            voiceSlider.name = "PlayerVoiceVolumeSlider";
+            RectTransform sliderRect = voiceSlider.GetComponent<RectTransform>();
+            sliderRect.anchorMin = new Vector2(0f, 0f);
+            sliderRect.anchorMax = new Vector2(1f, 0f);
+            sliderRect.anchoredPosition = new Vector2(0f, 18f);
+            sliderRect.sizeDelta = new Vector2(-44f, 22f);
+            voiceSlider.gameObject.SetActive(false);
+
+            int slotIndex = i;
+            voiceSlider.onValueChanged.AddListener(value => ApplySlotVoiceVolume(slotIndex, value));
+            slotVoiceSliders.Add(voiceSlider);
         }
 
-        BuildRightInfoPanels(canvas.transform);
+        TMP_Text rosterTitle = CreateText(canvas.transform, "CrewRosterTitle", T("CREW ROSTER"), 24f, FontStyles.UpperCase);
+        RectTransform rosterTitleRect = rosterTitle.GetComponent<RectTransform>();
+        rosterTitleRect.anchorMin = new Vector2(0f, 0.5f);
+        rosterTitleRect.anchorMax = new Vector2(0f, 0.5f);
+        rosterTitleRect.anchoredPosition = new Vector2(314f, 280f);
+        rosterTitleRect.sizeDelta = new Vector2(420f, 34f);
+        rosterTitle.alignment = TextAlignmentOptions.Left;
+        rosterTitle.color = new Color(0.58f, 0.84f, 0.92f, 0.95f);
+
+        RefreshIntegratedVoiceControls();
 
         readyButton = CreateButton(canvas.transform, "ReadyButton", T("Ready"), 260f, 70f, 30f);
         RectTransform readyRect = readyButton.GetComponent<RectTransform>();
-        readyRect.anchorMin = new Vector2(0f, 0f);
-        readyRect.anchorMax = new Vector2(0f, 0f);
-        readyRect.anchoredPosition = new Vector2(206f, 92f);
+        readyRect.anchorMin = new Vector2(0.5f, 0f);
+        readyRect.anchorMax = new Vector2(0.5f, 0f);
+        readyRect.anchoredPosition = new Vector2(-300f, 76f);
         readyButton.onClick.AddListener(OnClickReady);
 
         startButton = CreateButton(canvas.transform, "StartGameButton", T("Start Game"), 260f, 70f, 30f);
         RectTransform startRect = startButton.GetComponent<RectTransform>();
-        startRect.anchorMin = new Vector2(0f, 0f);
-        startRect.anchorMax = new Vector2(0f, 0f);
-        startRect.anchoredPosition = new Vector2(478f, 92f);
+        startRect.anchorMin = new Vector2(0.5f, 0f);
+        startRect.anchorMax = new Vector2(0.5f, 0f);
+        startRect.anchoredPosition = new Vector2(0f, 76f);
         startButton.onClick.AddListener(OnClickStartGame);
 
         Button backButton = CreateButton(canvas.transform, "BackButton", T("Back"), 200f, 70f, 30f);
         RectTransform backRect = backButton.GetComponent<RectTransform>();
-        backRect.anchorMin = new Vector2(0f, 0f);
-        backRect.anchorMax = new Vector2(0f, 0f);
-        backRect.anchoredPosition = new Vector2(728f, 92f);
+        backRect.anchorMin = new Vector2(0.5f, 0f);
+        backRect.anchorMax = new Vector2(0.5f, 0f);
+        backRect.anchoredPosition = new Vector2(270f, 76f);
         backButton.onClick.AddListener(OnClickBack);
+
+        UpdateRoomTitleText();
+        UpdateRoomCodeText();
     }
 
     private Canvas CreateCanvas()
@@ -676,162 +816,6 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         sweepImage.color = new Color(0.44f, 0.86f, 1f, 0.18f);
     }
 
-    private void BuildRightInfoPanels(Transform parent)
-    {
-        Transform voicePanel = CreateInfoPanel(parent, "CrewVoicePanel", new Vector2(1318f, -515f), new Vector2(700f, 750f));
-        TMP_Text voiceTitle = CreateText(voicePanel, "VoiceTitle", T("CREW VOICE"), 36f, FontStyles.UpperCase);
-        ConfigurePanelTitle(voiceTitle);
-
-        TMP_Text hint = CreateText(voicePanel, "VoiceHint", T("ADJUST EACH PLAYER"), 20f, FontStyles.Normal);
-        RectTransform hintRect = hint.GetComponent<RectTransform>();
-        hintRect.anchorMin = new Vector2(0f, 1f);
-        hintRect.anchorMax = new Vector2(1f, 1f);
-        hintRect.anchoredPosition = new Vector2(0f, -88f);
-        hintRect.sizeDelta = new Vector2(-64f, 30f);
-        hint.alignment = TextAlignmentOptions.Left;
-        hint.color = new Color(0.62f, 0.72f, 0.76f, 1f);
-
-        GameObject listObject = new GameObject("VoicePlayerList", typeof(RectTransform));
-        listObject.layer = parent.gameObject.layer;
-        listObject.transform.SetParent(voicePanel, false);
-        voiceListRoot = listObject.transform;
-
-        RectTransform listRect = listObject.GetComponent<RectTransform>();
-        listRect.anchorMin = new Vector2(0f, 0f);
-        listRect.anchorMax = new Vector2(1f, 1f);
-        listRect.offsetMin = new Vector2(42f, 42f);
-        listRect.offsetMax = new Vector2(-42f, -126f);
-
-        RefreshVoicePanel();
-    }
-
-    private void RefreshVoicePanel()
-    {
-        if (voiceListRoot == null)
-        {
-            return;
-        }
-
-        for (int i = voiceListRoot.childCount - 1; i >= 0; i--)
-        {
-            Destroy(voiceListRoot.GetChild(i).gameObject);
-        }
-
-        if (!PhotonNetwork.InRoom || PhotonNetwork.PlayerList.Length <= 0)
-        {
-            CreateEmptyVoiceRow(voiceListRoot);
-            return;
-        }
-
-        Player[] players = PhotonNetwork.PlayerList;
-        for (int i = 0; i < players.Length; i++)
-        {
-            CreatePlayerVoiceRow(voiceListRoot, players[i], i);
-        }
-    }
-
-    private void CreateEmptyVoiceRow(Transform parent)
-    {
-        TMP_Text emptyText = CreateText(parent, "NoPlayersText", T("WAITING FOR CREW"), 26f, FontStyles.Normal);
-        RectTransform rect = emptyText.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -48f);
-        rect.sizeDelta = new Vector2(0f, 40f);
-        emptyText.alignment = TextAlignmentOptions.Left;
-        emptyText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
-    }
-
-    private void CreatePlayerVoiceRow(Transform parent, Player player, int index)
-    {
-        float y = -34f - index * 48f;
-        GameObject row = new GameObject("VoiceRow_" + player.ActorNumber, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        row.layer = parent.gameObject.layer;
-        row.transform.SetParent(parent, false);
-
-        RectTransform rowRect = row.GetComponent<RectTransform>();
-        rowRect.anchorMin = new Vector2(0f, 1f);
-        rowRect.anchorMax = new Vector2(1f, 1f);
-        rowRect.anchoredPosition = new Vector2(0f, y);
-        rowRect.sizeDelta = new Vector2(0f, 40f);
-
-        Image rowImage = row.GetComponent<Image>();
-        bool isSpeaking = PlayerVoiceChat.IsActorSpeaking(player.ActorNumber);
-        bool isLocalMuted = player.IsLocal && PlayerVoiceChat.IsLocalMuted();
-        rowImage.color = isSpeaking
-            ? new Color(0.10f, 0.22f, 0.18f, 0.68f)
-            : (index % 2 == 0 ? new Color(0.02f, 0.026f, 0.028f, 0.5f) : new Color(0.04f, 0.052f, 0.056f, 0.36f));
-
-        string stateLabel = isLocalMuted ? T("MIC MUTED") : (isSpeaking ? T("TALKING") : T("MIC OPEN"));
-        TMP_Text stateText = CreateText(row.transform, "VoiceStateText", stateLabel, 17f, FontStyles.UpperCase);
-        RectTransform stateRect = stateText.GetComponent<RectTransform>();
-        stateRect.anchorMin = new Vector2(1f, 0.5f);
-        stateRect.anchorMax = new Vector2(1f, 0.5f);
-        stateRect.anchoredPosition = new Vector2(-360f, 0f);
-        stateRect.sizeDelta = new Vector2(132f, 26f);
-        stateText.alignment = TextAlignmentOptions.Right;
-        stateText.color = isLocalMuted
-            ? new Color(1f, 0.34f, 0.28f, 1f)
-            : (isSpeaking ? new Color(0.48f, 1f, 0.68f, 1f) : new Color(0.46f, 0.56f, 0.58f, 0.78f));
-
-        string displayName = GetPlayerDisplayName(player);
-        TMP_Text nameText = CreateText(row.transform, "NameText", displayName, 20f, FontStyles.UpperCase);
-        RectTransform nameRect = nameText.GetComponent<RectTransform>();
-        nameRect.anchorMin = new Vector2(0f, 0.5f);
-        nameRect.anchorMax = new Vector2(0f, 0.5f);
-        nameRect.anchoredPosition = new Vector2(132f, 0f);
-        nameRect.sizeDelta = new Vector2(250f, 30f);
-        nameText.alignment = TextAlignmentOptions.Left;
-        nameText.color = player.IsLocal ? new Color(1f, 0.8f, 0.42f, 1f) : new Color(0.82f, 0.9f, 0.92f, 1f);
-
-        string volumeKey = GetPlayerVoiceVolumeKey(player);
-        float savedVolume = Mathf.Clamp(PlayerPrefs.GetFloat(volumeKey, 1f), 0f, 2f);
-        TMP_Text valueText = CreateText(row.transform, "ValueText", savedVolume.ToString("0.00"), 18f, FontStyles.Normal);
-        RectTransform valueRect = valueText.GetComponent<RectTransform>();
-        valueRect.anchorMin = new Vector2(1f, 0.5f);
-        valueRect.anchorMax = new Vector2(1f, 0.5f);
-        valueRect.anchoredPosition = new Vector2(-28f, 0f);
-        valueRect.sizeDelta = new Vector2(72f, 30f);
-        valueText.alignment = TextAlignmentOptions.Right;
-
-        Slider slider = CreateSlider(row.transform, 0f, 2f, savedVolume);
-        RectTransform sliderRect = slider.GetComponent<RectTransform>();
-        sliderRect.anchorMin = new Vector2(1f, 0.5f);
-        sliderRect.anchorMax = new Vector2(1f, 0.5f);
-        sliderRect.anchoredPosition = new Vector2(-198f, 0f);
-        sliderRect.sizeDelta = new Vector2(220f, 26f);
-
-        slider.onValueChanged.AddListener(value =>
-        {
-            PlayerPrefs.SetFloat(volumeKey, value);
-            PlayerPrefs.SetFloat("setting_voice_volume_client_" + Mathf.Max(0, player.ActorNumber - 1), value);
-            if (player.IsLocal)
-            {
-                PlayerPrefs.SetFloat("setting_voice_volume", value);
-            }
-
-            PlayerPrefs.Save();
-            valueText.text = value.ToString("0.00");
-            PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
-        });
-    }
-
-    private string GetPlayerDisplayName(Player player)
-    {
-        if (player == null)
-        {
-            return T("PLAYER");
-        }
-
-        string baseName = !string.IsNullOrWhiteSpace(player.NickName) ? player.NickName : T("PLAYER") + " " + player.ActorNumber;
-        if (player.IsLocal)
-        {
-            return T("YOU") + "  " + baseName;
-        }
-
-        return baseName;
-    }
-
     private string GetPlayerVoiceVolumeKey(Player player)
     {
         if (player == null)
@@ -842,9 +826,38 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         return "setting_voice_volume_actor_" + player.ActorNumber;
     }
 
+    private void ApplySlotVoiceVolume(int slotIndex, float value)
+    {
+        if (!PhotonNetwork.InRoom || slotIndex < 0 || slotIndex >= PhotonNetwork.PlayerList.Length)
+        {
+            PlayerPrefs.SetFloat("setting_voice_volume", value);
+            PlayerPrefs.Save();
+            PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
+            return;
+        }
+
+        Player player = PhotonNetwork.PlayerList[slotIndex];
+
+        if (player == null)
+        {
+            return;
+        }
+
+        PlayerPrefs.SetFloat(GetPlayerVoiceVolumeKey(player), value);
+        PlayerPrefs.SetFloat("setting_voice_volume_client_" + Mathf.Max(0, player.ActorNumber - 1), value);
+
+        if (player.IsLocal)
+        {
+            PlayerPrefs.SetFloat("setting_voice_volume", value);
+        }
+
+        PlayerPrefs.Save();
+        PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
+    }
+
     private Transform CreateInfoPanel(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size)
     {
-        GameObject panel = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+        GameObject panel = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(CanvasGroup));
         panel.layer = parent.gameObject.layer;
         panel.transform.SetParent(parent, false);
 
@@ -862,6 +875,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         outline.effectDistance = new Vector2(2f, -2f);
 
         animatedPanels.Add(rect);
+        animatedPanelBasePositions.Add(anchoredPosition);
+        animatedPanelGroups.Add(panel.GetComponent<CanvasGroup>());
         return panel.transform;
     }
 
@@ -939,6 +954,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         switch (key)
         {
             case "ROOM LOBBY": return "방 로비";
+            case "ROOM CODE": return "방 코드";
+            case "CREW ROSTER": return "대원 목록";
             case "Private Room": return "비공개 방";
             case "Public Room": return "공개 방";
             case "PHOTON READY": return "포톤 준비됨";
@@ -996,6 +1013,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         switch (key)
         {
             case "ROOM LOBBY": return "ルームロビー";
+            case "ROOM CODE": return "ルームコード";
+            case "CREW ROSTER": return "隊員リスト";
             case "Private Room": return "プライベートルーム";
             case "Public Room": return "公開ルーム";
             case "PHOTON READY": return "Photon準備完了";
@@ -1148,6 +1167,105 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         slider.handleRect = handleRect;
         slider.targetGraphic = handle;
         return slider;
+    }
+
+    private Sprite GetMicOpenIconSprite()
+    {
+        if (micOpenIconSprite == null)
+        {
+            micOpenIconSprite = CreateMicIconSprite(false);
+        }
+
+        return micOpenIconSprite;
+    }
+
+    private Sprite GetMicMutedIconSprite()
+    {
+        if (micMutedIconSprite == null)
+        {
+            micMutedIconSprite = CreateMicIconSprite(true);
+        }
+
+        return micMutedIconSprite;
+    }
+
+    private Sprite CreateMicIconSprite(bool muted)
+    {
+        const int size = 48;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color clear = new Color(0f, 0f, 0f, 0f);
+        Color color = Color.white;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                texture.SetPixel(x, y, clear);
+            }
+        }
+
+        FillRect(texture, 18, 7, 12, 24, color);
+        FillCircle(texture, 24, 8, 6, color);
+        FillCircle(texture, 24, 30, 6, color);
+        FillRect(texture, 14, 25, 4, 8, color);
+        FillRect(texture, 30, 25, 4, 8, color);
+        FillRect(texture, 21, 33, 6, 7, color);
+        FillRect(texture, 16, 40, 16, 4, color);
+
+        if (muted)
+        {
+            DrawThickLine(texture, new Vector2(10f, 8f), new Vector2(38f, 40f), 6f, clear);
+            DrawThickLine(texture, new Vector2(10f, 8f), new Vector2(38f, 40f), 3f, color);
+        }
+
+        texture.Apply();
+        texture.filterMode = FilterMode.Point;
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private void FillRect(Texture2D texture, int x, int y, int width, int height, Color color)
+    {
+        for (int yy = y; yy < y + height; yy++)
+        {
+            for (int xx = x; xx < x + width; xx++)
+            {
+                if (xx >= 0 && xx < texture.width && yy >= 0 && yy < texture.height)
+                {
+                    texture.SetPixel(xx, yy, color);
+                }
+            }
+        }
+    }
+
+    private void FillCircle(Texture2D texture, int cx, int cy, int radius, Color color)
+    {
+        int radiusSqr = radius * radius;
+
+        for (int y = cy - radius; y <= cy + radius; y++)
+        {
+            for (int x = cx - radius; x <= cx + radius; x++)
+            {
+                int dx = x - cx;
+                int dy = y - cy;
+
+                if (dx * dx + dy * dy <= radiusSqr && x >= 0 && x < texture.width && y >= 0 && y < texture.height)
+                {
+                    texture.SetPixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    private void DrawThickLine(Texture2D texture, Vector2 from, Vector2 to, float thickness, Color color)
+    {
+        int steps = Mathf.CeilToInt(Vector2.Distance(from, to) * 2f);
+        int radius = Mathf.CeilToInt(thickness * 0.5f);
+
+        for (int i = 0; i <= steps; i++)
+        {
+            Vector2 p = Vector2.Lerp(from, to, i / (float)steps);
+            FillCircle(texture, Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y), radius, color);
+        }
     }
 
     private Image CreateSliderImage(Transform parent, string objectName, Color color)
