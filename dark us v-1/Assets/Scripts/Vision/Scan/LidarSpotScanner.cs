@@ -17,6 +17,12 @@ public class LidarSpotScanner : MonoBehaviour
     // 스캔 사운드 소스이다.
     [SerializeField] private AudioSource scanPulseSource;
 
+    // 씬에 낮게 저장된 스캔음을 보정하는 배수이다.
+    [SerializeField] private float scanPulseVolumeMultiplier = 2.5f;
+
+    // 스캔음이 묻히지 않도록 보장할 최소 소스 볼륨이다.
+    [SerializeField] private float scanPulseMinimumSourceVolume = 0.16f;
+
     [Header("Pulse Settings")]
     // 우클릭 후 다음 사용까지의 쿨타임이다.
     [SerializeField] private float pulseCooldown = 0.42f;
@@ -135,6 +141,7 @@ public class LidarSpotScanner : MonoBehaviour
         {
             scanPulseSource.playOnAwake = false;
             scanPulseSource.loop = false;
+            scanPulseSource.volume = Mathf.Max(scanPulseSource.volume, scanPulseMinimumSourceVolume);
         }
     }
 
@@ -226,6 +233,7 @@ public class LidarSpotScanner : MonoBehaviour
 
         // 사운드를 재생한다.
         PlayPulseSound();
+        PunWorldAudioSync.RaiseScanPulse(transform.position, GetNetworkScanPulseVolume());
     }
 
     // 스캔 사운드를 재생하는 함수이다.
@@ -238,11 +246,26 @@ public class LidarSpotScanner : MonoBehaviour
 
         if (scanPulseSource.clip != null)
         {
-            scanPulseSource.PlayOneShot(scanPulseSource.clip);
+            scanPulseSource.PlayOneShot(scanPulseSource.clip, Mathf.Max(0.01f, scanPulseVolumeMultiplier));
             return;
         }
 
         scanPulseSource.Play();
+    }
+
+    public AudioClip GetNetworkScanPulseClip()
+    {
+        return scanPulseSource != null ? scanPulseSource.clip : null;
+    }
+
+    public float GetNetworkScanPulseVolume()
+    {
+        if (scanPulseSource == null)
+        {
+            return 1f;
+        }
+
+        return Mathf.Clamp(scanPulseSource.volume * Mathf.Max(0.01f, scanPulseVolumeMultiplier), 0.01f, 2.5f);
     }
 
     // 진행 중인 파동들을 갱신하는 함수이다.
@@ -560,7 +583,7 @@ public class LidarSpotScanner : MonoBehaviour
         ObjectiveComputer objectiveComputer = hit.collider.GetComponentInParent<ObjectiveComputer>();
         if (objectiveComputer != null)
         {
-            return SurfaceTypeToDotColorGroup(objectiveComputer.CurrentScanSurfaceType, hit.normal);
+            return SurfaceTypeToDotColorGroup(objectiveComputer.CurrentScanSurfaceType, hit.normal, hit.collider);
         }
 
         // 자기 자신에서 먼저 찾는다.
@@ -578,10 +601,10 @@ public class LidarSpotScanner : MonoBehaviour
             return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
-        return SurfaceTypeToDotColorGroup(surfaceInfo.surfaceType, hit.normal);
+        return SurfaceTypeToDotColorGroup(surfaceInfo.surfaceType, hit.normal, hit.collider);
     }
 
-    private ScanDotColorGroup SurfaceTypeToDotColorGroup(ScanSurfaceType surfaceType, Vector3 fallbackNormal)
+    private ScanDotColorGroup SurfaceTypeToDotColorGroup(ScanSurfaceType surfaceType, Vector3 fallbackNormal, Collider hitCollider)
     {
         switch (surfaceType)
         {
@@ -607,7 +630,10 @@ public class LidarSpotScanner : MonoBehaviour
                 return ScanDotColorGroup.EmergencyExit;
 
             case ScanSurfaceType.PlayerBody:
-                return ScanDotColorGroup.PlayerBody;
+                PlayerCombatTarget playerTarget = hitCollider != null ? hitCollider.GetComponentInParent<PlayerCombatTarget>() : null;
+                return playerTarget != null
+                    ? PlayerColorPalette.GetScanColorGroupForActor(playerTarget.GetActorNumber())
+                    : ScanDotColorGroup.PlayerBody;
 
             case ScanSurfaceType.Creature:
                 return ScanDotColorGroup.Creature;

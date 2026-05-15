@@ -26,7 +26,20 @@ public enum ScanDotColorGroup
     RestoredEscapeComputer = 17,
 
     // 아이템 공통용 점 색상 그룹이다.
-    Item = 18
+    Item = 18,
+
+    PlayerColor0 = 19,
+    PlayerColor1 = 20,
+    PlayerColor2 = 21,
+    PlayerColor3 = 22,
+    PlayerColor4 = 23,
+    PlayerColor5 = 24,
+    PlayerColor6 = 25,
+    PlayerColor7 = 26,
+    PlayerColor8 = 27,
+    PlayerColor9 = 28,
+    PlayerColor10 = 29,
+    PlayerColor11 = 30
 }
 
 // 점을 GameObject로 만들지 않고 GPU 인스턴싱으로 그리는 렌더러이다.
@@ -162,8 +175,8 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private float baseDotScale;
 
     // 색상 그룹 개수이다.
-    // Item이 18번까지 있으므로 총 19개가 필요하다.
-    private const int ColorGroupCount = 19;
+    // 플레이어 색상이 30번까지 있으므로 총 31개가 필요하다.
+    private const int ColorGroupCount = 31;
 
     private void Awake()
     {
@@ -359,9 +372,11 @@ public class InstancedScanDotRenderer : MonoBehaviour
                 continue;
             }
 
-            // 색상 그룹만 바꾼다. 위치/크기/셀 정보는 유지한다.
+            // 색상 그룹만 바꾸되, 실제 렌더링 그룹도 옮겨야 화면 색이 즉시 바뀐다.
+            RemoveDotFromRenderGroup(i);
             record.colorGroupIndex = targetGroupIndex;
             dots[i] = record;
+            AddDotToRenderGroup(i);
             recoloredCount++;
         }
 
@@ -397,8 +412,10 @@ public class InstancedScanDotRenderer : MonoBehaviour
                 continue;
             }
 
+            RemoveDotFromRenderGroup(i);
             record.colorGroupIndex = targetGroupIndex;
             dots[i] = record;
+            AddDotToRenderGroup(i);
             recoloredCount++;
         }
 
@@ -664,28 +681,31 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 그룹별 색상표를 반환하는 함수이다.
     private Color[] GetGroupColors()
     {
-        return new Color[]
+        Color[] colors = new Color[ColorGroupCount];
+        for (int i = 0; i < colors.Length; i++)
         {
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            defaultDotColor,
-            floorDotColor,
-            wallDotColor,
-            metalDotColor,
-            glassDotColor,
-            accessCoreDotColor,
-            securityTerminalDotColor,
-            emergencyExitDotColor,
-            playerBodyDotColor,
-            creatureDotColor,
-            wrongComputerDotColor,
-            restoredEscapeComputerDotColor,
-            itemDotColor
-        };
+            colors[i] = defaultDotColor;
+        }
+
+        colors[(int)ScanDotColorGroup.Floor] = floorDotColor;
+        colors[(int)ScanDotColorGroup.Wall] = wallDotColor;
+        colors[(int)ScanDotColorGroup.Metal] = metalDotColor;
+        colors[(int)ScanDotColorGroup.Glass] = glassDotColor;
+        colors[(int)ScanDotColorGroup.AccessCore] = accessCoreDotColor;
+        colors[(int)ScanDotColorGroup.SecurityTerminal] = securityTerminalDotColor;
+        colors[(int)ScanDotColorGroup.EmergencyExit] = emergencyExitDotColor;
+        colors[(int)ScanDotColorGroup.PlayerBody] = playerBodyDotColor;
+        colors[(int)ScanDotColorGroup.Creature] = creatureDotColor;
+        colors[(int)ScanDotColorGroup.WrongComputer] = wrongComputerDotColor;
+        colors[(int)ScanDotColorGroup.RestoredEscapeComputer] = restoredEscapeComputerDotColor;
+        colors[(int)ScanDotColorGroup.Item] = itemDotColor;
+
+        for (int i = 0; i < PlayerColorPalette.ColorCount; i++)
+        {
+            colors[PlayerColorPalette.FirstScanColorGroupIndex + i] = PlayerColorPalette.GetColor(i);
+        }
+
+        return colors;
     }
 
     // 머티리얼에 색을 적용하는 함수이다.

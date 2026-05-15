@@ -28,6 +28,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
     private readonly List<Image> slotMicIcons = new List<Image>();
     private readonly List<Slider> slotVoiceSliders = new List<Slider>();
+    private readonly List<Image> slotColorSwatches = new List<Image>();
+    private readonly List<Button> slotColorButtons = new List<Button>();
+    private readonly List<Button> colorButtons = new List<Button>();
+    private readonly List<Image> colorSwatches = new List<Image>();
+    private readonly List<TMP_Text> colorLabels = new List<TMP_Text>();
     private readonly List<RectTransform> animatedPanels = new List<RectTransform>();
     private readonly List<Vector2> animatedPanelBasePositions = new List<Vector2>();
     private readonly List<CanvasGroup> animatedPanelGroups = new List<CanvasGroup>();
@@ -35,8 +40,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private TMP_Text roomTitleText;
     private TMP_Text roomCodeText;
     private RectTransform backgroundSweepLine;
+    private GameObject colorPickerPanelObject;
+    private Button colorConfirmButton;
+    private Button colorCancelButton;
     private Sprite micOpenIconSprite;
     private Sprite micMutedIconSprite;
+    private Sprite settingSliderHandleSprite;
     private PlayerVoiceChat lobbyVoiceChat;
     private Button readyButton;
     private Button startButton;
@@ -44,6 +53,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private bool pendingCreateRoom;
     private int createRetryCount;
     private int languageIndex;
+    private int pendingColorSelection = -1;
     private bool isStartingGame;
     private float uiStartedAt;
     private float nextVoicePanelRefreshTime;
@@ -129,6 +139,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public void OnClickStartGame()
     {
+        SetColorPickerVisible(false);
+
         if (isStartingGame)
         {
             return;
@@ -146,6 +158,13 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             return;
         }
 
+        EnsureLocalColorSelection();
+        if (!ArePlayerColorsReadyAndUnique())
+        {
+            SetNetworkStatus("SELECT COLOR");
+            return;
+        }
+
         StartCoroutine(StartGameWithLoading());
     }
 
@@ -155,7 +174,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
         EnsureMapSeedProperty();
-        RoleAssignmentManager.EnsurePhotonImposterActor();
+        int imposterActor = RoleAssignmentManager.SelectNewPhotonImposterActor();
         PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
         {
             { StartSignalPropertyKey, true }
@@ -164,7 +183,15 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         SetNetworkStatus("STARTING");
 
         DarkScanLoadingScreen.ShowImmediate("MATCH LOCKED...");
-        yield return null;
+
+        float waitUntil = Time.time + 1.5f;
+        while (Time.time < waitUntil && RoleAssignmentManager.GetPhotonImposterActor() != imposterActor)
+        {
+            yield return null;
+        }
+
+        PhotonNetwork.SendAllOutgoingCommands();
+        yield return new WaitForSeconds(0.2f);
 
         PhotonNetwork.LoadLevel(gameSceneName);
     }
@@ -183,6 +210,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public void OnClickBack()
     {
+        SetColorPickerVisible(false);
+
         if (PhotonNetwork.InRoom)
         {
             PhotonNetwork.LeaveRoom();
@@ -233,6 +262,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         SaveJoinedRoomTitle();
         PlayerPrefs.Save();
         SetLocalReady(false);
+        EnsureLocalColorSelection();
         UpdateRoomCodeText();
         SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
         RefreshPlayerSlots();
@@ -240,11 +270,13 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
+        EnsureLocalColorSelection();
         RefreshPlayerSlots();
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
+        EnsureLocalColorSelection();
         RefreshPlayerSlots();
     }
 
@@ -255,8 +287,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
-        if (changedProps != null && changedProps.ContainsKey(ReadyPropertyKey))
+        if (changedProps != null &&
+            (changedProps.ContainsKey(ReadyPropertyKey) || changedProps.ContainsKey(PlayerColorPalette.PlayerColorPropertyKey)))
         {
+            EnsureLocalColorSelection();
             RefreshPlayerSlots();
         }
     }
@@ -290,6 +324,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             PlayerPrefs.Save();
             UpdateRoomCodeText();
             SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
+            EnsureLocalColorSelection();
             RefreshPlayerSlots();
             return;
         }
@@ -374,6 +409,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
             slotTexts[i].text = nameLabel + "\n<size=70%>" + stateLabel + "</size>";
             slotTexts[i].color = textColor;
+            PositionSlotMicIcon(i, nameLabel);
+            RefreshSlotColorSwatch(i);
 
             Image cardImage = slotTexts[i].transform.parent != null ? slotTexts[i].transform.parent.GetComponent<Image>() : null;
             if (cardImage != null)
@@ -385,7 +422,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         if (startButton != null)
         {
             startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient || pendingCreateRoom);
-            startButton.interactable = PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient && AreAllPlayersReady();
+            startButton.interactable = PhotonNetwork.InRoom &&
+                                       PhotonNetwork.IsMasterClient &&
+                                       AreAllPlayersReady() &&
+                                       ArePlayerColorsReadyAndUnique();
         }
 
         if (readyButton != null)
@@ -399,6 +439,80 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         RefreshIntegratedVoiceControls();
+        RefreshColorPicker();
+    }
+
+    private void RefreshSlotColorSwatch(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= slotColorSwatches.Count)
+        {
+            return;
+        }
+
+        Image swatch = slotColorSwatches[slotIndex];
+        if (swatch == null)
+        {
+            return;
+        }
+
+        Button swatchButton = slotIndex < slotColorButtons.Count ? slotColorButtons[slotIndex] : null;
+
+        if (!PhotonNetwork.InRoom || slotIndex >= PhotonNetwork.PlayerList.Length)
+        {
+            swatch.enabled = false;
+            if (swatchButton != null)
+            {
+                swatchButton.interactable = false;
+            }
+            return;
+        }
+
+        Player player = PhotonNetwork.PlayerList[slotIndex];
+        int colorIndex = PlayerColorPalette.GetPlayerColorIndex(player, -1);
+        if (colorIndex < 0)
+        {
+            swatch.enabled = false;
+            if (swatchButton != null)
+            {
+                swatchButton.interactable = player != null && player.IsLocal;
+            }
+            return;
+        }
+
+        swatch.enabled = true;
+        swatch.color = PlayerColorPalette.GetColor(colorIndex);
+        if (swatchButton != null)
+        {
+            swatchButton.interactable = player != null && player.IsLocal;
+        }
+    }
+
+    private void PositionSlotMicIcon(int slotIndex, string nameLabel)
+    {
+        if (slotIndex < 0 || slotIndex >= slotTexts.Count || slotIndex >= slotMicIcons.Count)
+        {
+            return;
+        }
+
+        TMP_Text slotText = slotTexts[slotIndex];
+        Image micIcon = slotMicIcons[slotIndex];
+        if (slotText == null || micIcon == null)
+        {
+            return;
+        }
+
+        RectTransform micRect = micIcon.GetComponent<RectTransform>();
+        RectTransform cardRect = slotText.transform.parent as RectTransform;
+        if (micRect == null || cardRect == null)
+        {
+            return;
+        }
+
+        float nameWidth = slotText.GetPreferredValues(nameLabel, 170f, 30f).x;
+        float cardWidth = cardRect.rect.width > 1f ? cardRect.rect.width : 260f;
+        float maxX = Mathf.Max(120f, cardWidth - 42f);
+        float iconX = Mathf.Clamp(22f + nameWidth + 10f, 82f, maxX);
+        micRect.anchoredPosition = new Vector2(iconX, -25f);
     }
 
     private void RefreshIntegratedVoiceControls()
@@ -495,6 +609,223 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         return true;
+    }
+
+    private void EnsureLocalColorSelection()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            RefreshColorPicker();
+            return;
+        }
+
+        int currentColor = PlayerColorPalette.GetPlayerColorIndex(PhotonNetwork.LocalPlayer, -1);
+        if (currentColor >= 0 && IsColorAvailableForLocal(currentColor))
+        {
+            RefreshColorPicker();
+            return;
+        }
+
+        int preferredColor = Mathf.Clamp(PlayerPrefs.GetInt("dark_us_player_color_index", 0), 0, PlayerColorPalette.ColorCount - 1);
+        if (IsColorAvailableForLocal(preferredColor))
+        {
+            SetLocalColor(preferredColor);
+            return;
+        }
+
+        for (int i = 0; i < PlayerColorPalette.ColorCount; i++)
+        {
+            if (IsColorAvailableForLocal(i))
+            {
+                SetLocalColor(i);
+                return;
+            }
+        }
+
+        RefreshColorPicker();
+    }
+
+    private void SetLocalColor(int colorIndex)
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return;
+        }
+
+        colorIndex = Mathf.Clamp(colorIndex, 0, PlayerColorPalette.ColorCount - 1);
+        if (!IsColorAvailableForLocal(colorIndex))
+        {
+            SetNetworkStatus("COLOR TAKEN");
+            RefreshColorPicker();
+            return;
+        }
+
+        PlayerPrefs.SetInt("dark_us_player_color_index", colorIndex);
+        PlayerPrefs.Save();
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        {
+            { PlayerColorPalette.PlayerColorPropertyKey, colorIndex }
+        });
+
+        RefreshColorPicker();
+        SetColorPickerVisible(false);
+    }
+
+    private bool ArePlayerColorsReadyAndUnique()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.PlayerList.Length <= 0)
+        {
+            return false;
+        }
+
+        HashSet<int> usedColors = new HashSet<int>();
+        for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
+        {
+            int colorIndex = PlayerColorPalette.GetPlayerColorIndex(PhotonNetwork.PlayerList[i], -1);
+            if (colorIndex < 0 || colorIndex >= PlayerColorPalette.ColorCount || !usedColors.Add(colorIndex))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsColorAvailableForLocal(int colorIndex)
+    {
+        return !IsColorTakenByOther(colorIndex);
+    }
+
+    private bool IsColorTakenByOther(int colorIndex)
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
+        {
+            Player player = PhotonNetwork.PlayerList[i];
+            if (player == null || player.IsLocal)
+            {
+                continue;
+            }
+
+            if (PlayerColorPalette.GetPlayerColorIndex(player, -1) == colorIndex)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void RefreshColorPicker()
+    {
+        int localColor = PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer != null
+            ? PlayerColorPalette.GetPlayerColorIndex(PhotonNetwork.LocalPlayer, -1)
+            : PlayerPrefs.GetInt("dark_us_player_color_index", 0);
+        bool pickerOpen = colorPickerPanelObject != null && colorPickerPanelObject.activeSelf;
+        int previewColor = pickerOpen && pendingColorSelection >= 0 ? pendingColorSelection : localColor;
+
+        for (int i = 0; i < colorButtons.Count; i++)
+        {
+            bool taken = IsColorTakenByOther(i);
+            bool selected = previewColor == i;
+            bool canClick = PhotonNetwork.InRoom && !taken;
+
+            Button button = colorButtons[i];
+            if (button != null)
+            {
+                button.interactable = canClick;
+            }
+
+            Image swatch = i < colorSwatches.Count ? colorSwatches[i] : null;
+            if (swatch != null)
+            {
+                Color color = PlayerColorPalette.GetColor(i);
+                color.a = taken ? 0.24f : 1f;
+                swatch.color = color;
+            }
+
+            TMP_Text label = i < colorLabels.Count ? colorLabels[i] : null;
+            if (label != null)
+            {
+                label.text = selected ? T("SELECTED") : (taken ? T("TAKEN") : string.Empty);
+                label.color = selected
+                    ? new Color(1f, 0.8f, 0.42f, 1f)
+                    : new Color(1f, 0.34f, 0.28f, 0.95f);
+            }
+        }
+
+        if (colorConfirmButton != null)
+        {
+            colorConfirmButton.interactable = PhotonNetwork.InRoom &&
+                                              pendingColorSelection >= 0 &&
+                                              !IsColorTakenByOther(pendingColorSelection);
+        }
+    }
+
+    private void SelectPendingColor(int colorIndex)
+    {
+        colorIndex = Mathf.Clamp(colorIndex, 0, PlayerColorPalette.ColorCount - 1);
+        if (IsColorTakenByOther(colorIndex))
+        {
+            SetNetworkStatus("COLOR TAKEN");
+            RefreshColorPicker();
+            return;
+        }
+
+        pendingColorSelection = colorIndex;
+        RefreshColorPicker();
+    }
+
+    private void ConfirmPendingColorSelection()
+    {
+        if (pendingColorSelection < 0)
+        {
+            return;
+        }
+
+        SetLocalColor(pendingColorSelection);
+    }
+
+    private void ToggleColorPickerFromSlot(int slotIndex)
+    {
+        if (!PhotonNetwork.InRoom || slotIndex < 0 || slotIndex >= PhotonNetwork.PlayerList.Length)
+        {
+            return;
+        }
+
+        Player player = PhotonNetwork.PlayerList[slotIndex];
+        if (player == null || !player.IsLocal)
+        {
+            return;
+        }
+
+        SetColorPickerVisible(colorPickerPanelObject == null || !colorPickerPanelObject.activeSelf);
+    }
+
+    private void SetColorPickerVisible(bool visible)
+    {
+        if (colorPickerPanelObject == null)
+        {
+            return;
+        }
+
+        colorPickerPanelObject.SetActive(visible);
+        if (visible)
+        {
+            pendingColorSelection = PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer != null
+                ? PlayerColorPalette.GetPlayerColorIndex(PhotonNetwork.LocalPlayer, PlayerPrefs.GetInt("dark_us_player_color_index", 0))
+                : PlayerPrefs.GetInt("dark_us_player_color_index", 0);
+            pendingColorSelection = Mathf.Clamp(pendingColorSelection, 0, PlayerColorPalette.ColorCount - 1);
+            RefreshColorPicker();
+            return;
+        }
+
+        pendingColorSelection = -1;
     }
 
     private string GetRoomCode()
@@ -675,6 +1006,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         slotTexts.Clear();
         slotMicIcons.Clear();
         slotVoiceSliders.Clear();
+        slotColorSwatches.Clear();
+        slotColorButtons.Clear();
         for (int i = 0; i < MaxPlayers; i++)
         {
             GameObject card = new GameObject("CrewSlotCard_" + i, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
@@ -691,8 +1024,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             RectTransform slotRect = slotText.GetComponent<RectTransform>();
             slotRect.anchorMin = Vector2.zero;
             slotRect.anchorMax = Vector2.one;
-            slotRect.offsetMin = new Vector2(22f, 44f);
-            slotRect.offsetMax = new Vector2(-54f, -18f);
+            slotRect.offsetMin = new Vector2(22f, 52f);
+            slotRect.offsetMax = new Vector2(-52f, -14f);
             slotText.alignment = TextAlignmentOptions.TopLeft;
             slotText.color = new Color(0.78f, 0.86f, 0.88f, 1f);
             slotTexts.Add(slotText);
@@ -701,23 +1034,53 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             micObject.layer = card.layer;
             micObject.transform.SetParent(card.transform, false);
             RectTransform micRect = micObject.GetComponent<RectTransform>();
-            micRect.anchorMin = new Vector2(1f, 1f);
-            micRect.anchorMax = new Vector2(1f, 1f);
-            micRect.anchoredPosition = new Vector2(-26f, -24f);
-            micRect.sizeDelta = new Vector2(24f, 24f);
+            micRect.anchorMin = new Vector2(0f, 1f);
+            micRect.anchorMax = new Vector2(0f, 1f);
+            micRect.pivot = new Vector2(0f, 0.5f);
+            micRect.anchoredPosition = new Vector2(116f, -25f);
+            micRect.sizeDelta = new Vector2(18f, 18f);
             Image micImage = micObject.GetComponent<Image>();
             micImage.sprite = GetMicOpenIconSprite();
             micImage.color = new Color(0.70f, 0.82f, 0.86f, 0.88f);
             micImage.enabled = false;
             slotMicIcons.Add(micImage);
 
+            GameObject colorObject = new GameObject("CrewColorSwatch", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(Button));
+            colorObject.layer = card.layer;
+            colorObject.transform.SetParent(card.transform, false);
+            RectTransform colorRect = colorObject.GetComponent<RectTransform>();
+            colorRect.anchorMin = new Vector2(1f, 1f);
+            colorRect.anchorMax = new Vector2(1f, 1f);
+            colorRect.anchoredPosition = new Vector2(-30f, -28f);
+            colorRect.sizeDelta = new Vector2(28f, 28f);
+            Image colorImage = colorObject.GetComponent<Image>();
+            colorImage.color = new Color(0.18f, 0.22f, 0.24f, 0.4f);
+            colorImage.enabled = false;
+            Outline colorOutline = colorObject.GetComponent<Outline>();
+            colorOutline.effectColor = new Color(0.86f, 0.96f, 0.98f, 0.5f);
+            colorOutline.effectDistance = new Vector2(1f, -1f);
+            slotColorSwatches.Add(colorImage);
+
+            Button colorButton = colorObject.GetComponent<Button>();
+            colorButton.targetGraphic = colorImage;
+            ColorBlock colorButtonColors = colorButton.colors;
+            colorButtonColors.normalColor = Color.white;
+            colorButtonColors.highlightedColor = new Color(1.2f, 1.2f, 1.2f, 1f);
+            colorButtonColors.pressedColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+            colorButtonColors.disabledColor = new Color(0.52f, 0.52f, 0.52f, 0.78f);
+            colorButton.colors = colorButtonColors;
+            int colorSlotIndex = i;
+            colorButton.onClick.AddListener(() => ToggleColorPickerFromSlot(colorSlotIndex));
+            colorButton.interactable = false;
+            slotColorButtons.Add(colorButton);
+
             Slider voiceSlider = CreateSlider(card.transform, 0f, 2f, 1f);
             voiceSlider.name = "PlayerVoiceVolumeSlider";
             RectTransform sliderRect = voiceSlider.GetComponent<RectTransform>();
-            sliderRect.anchorMin = new Vector2(0f, 0f);
-            sliderRect.anchorMax = new Vector2(1f, 0f);
-            sliderRect.anchoredPosition = new Vector2(0f, 18f);
-            sliderRect.sizeDelta = new Vector2(-44f, 22f);
+            sliderRect.anchorMin = new Vector2(0.5f, 0f);
+            sliderRect.anchorMax = new Vector2(0.5f, 0f);
+            sliderRect.anchoredPosition = new Vector2(0f, 24f);
+            sliderRect.sizeDelta = new Vector2(220f, 12f);
             voiceSlider.gameObject.SetActive(false);
 
             int slotIndex = i;
@@ -734,6 +1097,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rosterTitle.alignment = TextAlignmentOptions.Left;
         rosterTitle.color = new Color(0.58f, 0.84f, 0.92f, 0.95f);
 
+        BuildColorPicker(canvas.transform);
         RefreshIntegratedVoiceControls();
 
         readyButton = CreateButton(canvas.transform, "ReadyButton", T("Ready"), 260f, 70f, 30f);
@@ -759,6 +1123,91 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         UpdateRoomTitleText();
         UpdateRoomCodeText();
+    }
+
+    private void BuildColorPicker(Transform parent)
+    {
+        Transform colorPanel = CreateInfoPanel(parent, "CrewColorPanel", new Vector2(1140f, -300f), new Vector2(270f, 320f));
+        colorPickerPanelObject = colorPanel.gameObject;
+
+        colorButtons.Clear();
+        colorSwatches.Clear();
+        colorLabels.Clear();
+
+        for (int i = 0; i < PlayerColorPalette.ColorCount; i++)
+        {
+            int colorIndex = i;
+            int column = i % 4;
+            int row = i / 4;
+
+            GameObject buttonObject = new GameObject("ColorButton_" + i, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(Button));
+            buttonObject.layer = parent.gameObject.layer;
+            buttonObject.transform.SetParent(colorPanel, false);
+
+            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+            buttonRect.anchorMin = new Vector2(0f, 1f);
+            buttonRect.anchorMax = new Vector2(0f, 1f);
+            buttonRect.anchoredPosition = new Vector2(34f + column * 66f, -32f - row * 78f);
+            buttonRect.sizeDelta = new Vector2(50f, 50f);
+
+            Image buttonImage = buttonObject.GetComponent<Image>();
+            buttonImage.color = new Color(0.03f, 0.04f, 0.046f, 0.92f);
+
+            Outline buttonOutline = buttonObject.GetComponent<Outline>();
+            buttonOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.42f);
+            buttonOutline.effectDistance = new Vector2(1.4f, -1.4f);
+
+            Button button = buttonObject.GetComponent<Button>();
+            button.targetGraphic = buttonImage;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+            colors.pressedColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+            colors.disabledColor = new Color(0.35f, 0.35f, 0.35f, 0.62f);
+            button.colors = colors;
+            button.onClick.AddListener(() => SelectPendingColor(colorIndex));
+
+            GameObject swatchObject = new GameObject("Swatch", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            swatchObject.layer = buttonObject.layer;
+            swatchObject.transform.SetParent(buttonObject.transform, false);
+            RectTransform swatchRect = swatchObject.GetComponent<RectTransform>();
+            swatchRect.anchorMin = Vector2.zero;
+            swatchRect.anchorMax = Vector2.one;
+            swatchRect.offsetMin = new Vector2(7f, 7f);
+            swatchRect.offsetMax = new Vector2(-7f, -7f);
+            Image swatchImage = swatchObject.GetComponent<Image>();
+            swatchImage.color = PlayerColorPalette.GetColor(i);
+            swatchImage.raycastTarget = false;
+
+            TMP_Text label = CreateText(colorPanel, "ColorLabel_" + i, string.Empty, 13f, FontStyles.UpperCase);
+            RectTransform labelRect = label.GetComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0f, 1f);
+            labelRect.anchorMax = new Vector2(0f, 1f);
+            labelRect.anchoredPosition = new Vector2(34f + column * 66f, -65f - row * 78f);
+            labelRect.sizeDelta = new Vector2(54f, 18f);
+            label.alignment = TextAlignmentOptions.Center;
+
+            colorButtons.Add(button);
+            colorSwatches.Add(swatchImage);
+            colorLabels.Add(label);
+        }
+
+        colorConfirmButton = CreateButton(colorPanel, "ColorConfirmButton", T("Select"), 108f, 36f, 18f);
+        RectTransform confirmRect = colorConfirmButton.GetComponent<RectTransform>();
+        confirmRect.anchorMin = new Vector2(0f, 1f);
+        confirmRect.anchorMax = new Vector2(0f, 1f);
+        confirmRect.anchoredPosition = new Vector2(78f, -286f);
+        colorConfirmButton.onClick.AddListener(ConfirmPendingColorSelection);
+
+        colorCancelButton = CreateButton(colorPanel, "ColorCancelButton", T("Exit"), 108f, 36f, 18f);
+        RectTransform cancelRect = colorCancelButton.GetComponent<RectTransform>();
+        cancelRect.anchorMin = new Vector2(0f, 1f);
+        cancelRect.anchorMax = new Vector2(0f, 1f);
+        cancelRect.anchoredPosition = new Vector2(194f, -286f);
+        colorCancelButton.onClick.AddListener(() => SetColorPickerVisible(false));
+
+        RefreshColorPicker();
+        SetColorPickerVisible(false);
     }
 
     private Canvas CreateCanvas()
@@ -787,9 +1236,13 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         rect.offsetMax = Vector2.zero;
 
         Image image = background.GetComponent<Image>();
-        Sprite backgroundSprite = lobbyBackgroundSprite != null ? lobbyBackgroundSprite : Resources.Load<Sprite>("Lobby/lobby_waiting_room_bg");
+        Sprite backgroundSprite = lobbyBackgroundSprite != null ? lobbyBackgroundSprite : Resources.Load<Sprite>("Lobby/MainMenuBackground");
+        if (backgroundSprite == null)
+        {
+            backgroundSprite = Resources.Load<Sprite>("Lobby/lobby_waiting_room_bg");
+        }
         image.sprite = backgroundSprite;
-        image.color = backgroundSprite != null ? new Color(0.72f, 0.82f, 0.86f, 0.72f) : new Color(0.005f, 0.007f, 0.008f, 1f);
+        image.color = backgroundSprite != null ? Color.white : new Color(0.005f, 0.007f, 0.008f, 1f);
         image.preserveAspect = false;
 
         GameObject overlay = new GameObject("BackgroundDarkOverlay", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -802,7 +1255,13 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         overlayRect.offsetMax = Vector2.zero;
 
         Image overlayImage = overlay.GetComponent<Image>();
-        overlayImage.color = new Color(0f, 0f, 0f, 0.58f);
+        overlayImage.color = new Color(0f, 0f, 0f, 0.26f);
+
+        MainMenuBackgroundAnimator animator = background.AddComponent<MainMenuBackgroundAnimator>();
+        animator.backgroundRect = rect;
+        animator.darkOverlayImage = overlayImage;
+        animator.darkOverlayMinAlpha = 0.2f;
+        animator.darkOverlayMaxAlpha = 0.32f;
 
         GameObject sweep = new GameObject("BackgroundSweepLine", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         sweep.transform.SetParent(parent, false);
@@ -956,6 +1415,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "ROOM LOBBY": return "방 로비";
             case "ROOM CODE": return "방 코드";
             case "CREW ROSTER": return "대원 목록";
+            case "CREW COLOR": return "대원 색상";
+            case "SELECT COLOR": return "색상을 선택하세요";
+            case "SELECTED": return "선택됨";
+            case "TAKEN": return "사용 중";
+            case "COLOR TAKEN": return "이미 선택된 색상";
             case "Private Room": return "비공개 방";
             case "Public Room": return "공개 방";
             case "PHOTON READY": return "포톤 준비됨";
@@ -981,6 +1445,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "Cancel Ready": return "준비 취소";
             case "Start Game": return "게임 시작";
             case "Back": return "뒤로";
+            case "Select": return "선택";
+            case "Exit": return "나가기";
             case "MISSION BRIEFING": return "임무 브리핑";
             case "FACILITY": return "시설";
             case "OBJECTIVE": return "목표";
@@ -1015,6 +1481,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "ROOM LOBBY": return "ルームロビー";
             case "ROOM CODE": return "ルームコード";
             case "CREW ROSTER": return "隊員リスト";
+            case "CREW COLOR": return "隊員カラー";
+            case "SELECT COLOR": return "色を選択";
+            case "SELECTED": return "選択中";
+            case "TAKEN": return "使用中";
+            case "COLOR TAKEN": return "使用中の色";
             case "Private Room": return "プライベートルーム";
             case "Public Room": return "公開ルーム";
             case "PHOTON READY": return "Photon準備完了";
@@ -1040,6 +1511,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "Cancel Ready": return "準備取消";
             case "Start Game": return "ゲーム開始";
             case "Back": return "戻る";
+            case "Select": return "選択";
+            case "Exit": return "閉じる";
             case "MISSION BRIEFING": return "任務ブリーフィング";
             case "FACILITY": return "施設";
             case "OBJECTIVE": return "目標";
@@ -1129,7 +1602,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private Slider CreateSlider(Transform parent, float min, float max, float value)
     {
-        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider));
+        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider), typeof(Image));
         sliderObject.layer = parent.gameObject.layer;
         sliderObject.transform.SetParent(parent, false);
 
@@ -1137,36 +1610,66 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         slider.minValue = min;
         slider.maxValue = max;
         slider.value = Mathf.Clamp(value, min, max);
+        slider.direction = Slider.Direction.LeftToRight;
 
-        Image background = CreateSliderImage(sliderObject.transform, "Background", new Color(0.18f, 0.25f, 0.27f, 0.9f));
-        RectTransform backgroundRect = background.GetComponent<RectTransform>();
-        backgroundRect.anchorMin = new Vector2(0f, 0.5f);
-        backgroundRect.anchorMax = new Vector2(1f, 0.5f);
-        backgroundRect.sizeDelta = new Vector2(0f, 8f);
+        Image background = sliderObject.GetComponent<Image>();
+        background.color = new Color(0.62f, 0.78f, 0.86f, 0.28f);
+        slider.targetGraphic = background;
 
-        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
-        fillArea.layer = parent.gameObject.layer;
-        fillArea.transform.SetParent(sliderObject.transform, false);
-        RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
-        fillAreaRect.anchorMin = Vector2.zero;
-        fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.offsetMin = Vector2.zero;
-        fillAreaRect.offsetMax = Vector2.zero;
+        RectTransform sliderRect = sliderObject.GetComponent<RectTransform>();
+        sliderRect.sizeDelta = new Vector2(220f, 12f);
 
-        Image fill = CreateSliderImage(fillArea.transform, "Fill", new Color(0.86f, 0.66f, 0.34f, 1f));
+        Image fill = CreateSliderImage(sliderObject.transform, "Fill", new Color(1f, 0.8f, 0.42f, 0.82f));
         RectTransform fillRect = fill.GetComponent<RectTransform>();
-        fillRect.anchorMin = new Vector2(0f, 0.5f);
-        fillRect.anchorMax = new Vector2(1f, 0.5f);
-        fillRect.sizeDelta = new Vector2(0f, 8f);
+        fillRect.anchorMin = new Vector2(0f, 0f);
+        fillRect.anchorMax = new Vector2(1f, 1f);
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
 
-        Image handle = CreateSliderImage(sliderObject.transform, "Handle", new Color(0.78f, 0.86f, 0.88f, 1f));
+        Image handle = CreateSliderImage(sliderObject.transform, "Handle", new Color(0.76f, 0.82f, 0.84f, 1f));
+        handle.sprite = GetSettingSliderHandleSprite();
+        handle.type = Image.Type.Simple;
+        handle.preserveAspect = true;
         RectTransform handleRect = handle.GetComponent<RectTransform>();
-        handleRect.sizeDelta = new Vector2(24f, 24f);
+        handleRect.anchorMin = new Vector2(0f, 0.5f);
+        handleRect.anchorMax = new Vector2(0f, 0.5f);
+        handleRect.sizeDelta = new Vector2(20f, 20f);
 
         slider.fillRect = fillRect;
         slider.handleRect = handleRect;
-        slider.targetGraphic = handle;
         return slider;
+    }
+
+    private Sprite GetSettingSliderHandleSprite()
+    {
+        if (settingSliderHandleSprite != null)
+        {
+            return settingSliderHandleSprite;
+        }
+
+        const int size = 64;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = "Setting Slider Round Handle";
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.46f;
+        float softEdge = 2f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01((radius - distance) / softEdge);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply();
+        settingSliderHandleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        return settingSliderHandleSprite;
     }
 
     private Sprite GetMicOpenIconSprite()
@@ -1204,22 +1707,45 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             }
         }
 
-        FillRect(texture, 18, 7, 12, 24, color);
-        FillCircle(texture, 24, 8, 6, color);
-        FillCircle(texture, 24, 30, 6, color);
-        FillRect(texture, 14, 25, 4, 8, color);
-        FillRect(texture, 30, 25, 4, 8, color);
-        FillRect(texture, 21, 33, 6, 7, color);
-        FillRect(texture, 16, 40, 16, 4, color);
+        FillRect(texture, 18, 17, 12, 20, color);
+        FillCircle(texture, 24, 17, 6, color);
+        FillCircle(texture, 24, 37, 6, color);
+        FillRect(texture, 13, 16, 4, 9, color);
+        FillRect(texture, 31, 16, 4, 9, color);
+        FillRect(texture, 21, 8, 6, 9, color);
+        FillRect(texture, 16, 4, 16, 4, color);
 
         if (muted)
         {
-            DrawThickLine(texture, new Vector2(10f, 8f), new Vector2(38f, 40f), 6f, clear);
-            DrawThickLine(texture, new Vector2(10f, 8f), new Vector2(38f, 40f), 3f, color);
+            DrawThickLine(texture, new Vector2(10f, 40f), new Vector2(38f, 8f), 6f, clear);
+            DrawThickLine(texture, new Vector2(10f, 40f), new Vector2(38f, 8f), 3f, color);
         }
 
         texture.Apply();
         texture.filterMode = FilterMode.Point;
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private Sprite CreateCircleSprite(int size, float radius)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color clear = new Color(0f, 0f, 0f, 0f);
+        Color color = Color.white;
+        float center = (size - 1) * 0.5f;
+        float radiusSqr = radius * radius;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - center;
+                float dy = y - center;
+                texture.SetPixel(x, y, dx * dx + dy * dy <= radiusSqr ? color : clear);
+            }
+        }
+
+        texture.Apply();
+        texture.filterMode = FilterMode.Bilinear;
         return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
     }
 

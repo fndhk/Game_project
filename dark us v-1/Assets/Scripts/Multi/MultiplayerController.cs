@@ -49,20 +49,20 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
 
     private void ShowLobby()
     {
-        lobbyPanel?.SetActive(true);
-        roomPanel?.SetActive(false);
-        loadingPanel?.SetActive(false);
-        errorPanel?.SetActive(false);
-        backgroundPanel?.SetActive(true);
+        SetPanelActive(lobbyPanel, true);
+        SetPanelActive(roomPanel, false);
+        SetPanelActive(loadingPanel, false);
+        SetPanelActive(errorPanel, false);
+        SetPanelActive(backgroundPanel, true);
     }
 
     private void ShowRoom()
     {
-        lobbyPanel?.SetActive(false);
-        roomPanel?.SetActive(true);
-        loadingPanel?.SetActive(false);
-        errorPanel?.SetActive(false);
-        backgroundPanel?.SetActive(false);
+        SetPanelActive(lobbyPanel, false);
+        SetPanelActive(roomPanel, true);
+        SetPanelActive(loadingPanel, false);
+        SetPanelActive(errorPanel, false);
+        SetPanelActive(backgroundPanel, false);
 
         if (startButton != null)
         {
@@ -86,7 +86,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
             roomCodeText.text = "방 코드\n" + pendingRoomCode;
         }
 
-        loadingPanel?.SetActive(true);
+        SetPanelActive(loadingPanel, true);
         ExecuteOrConnect();
     }
 
@@ -108,7 +108,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
         pendingCreateRoom = false;
         pendingJoinRoom = true;
 
-        loadingPanel?.SetActive(true);
+        SetPanelActive(loadingPanel, true);
         ExecuteOrConnect();
     }
 
@@ -123,7 +123,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
             return;
         }
 
-        loadingPanel?.SetActive(false);
+        SetPanelActive(loadingPanel, false);
         ShowLobby();
     }
 
@@ -213,7 +213,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
 
     private void ShowErrorPopup(string message)
     {
-        loadingPanel?.SetActive(false);
+        SetPanelActive(loadingPanel, false);
 
         if (errorPanel != null)
         {
@@ -299,5 +299,13 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
         }
 
         return true;
+    }
+
+    private void SetPanelActive(GameObject panel, bool active)
+    {
+        if (panel != null)
+        {
+            panel.SetActive(active);
+        }
     }
 }

@@ -1,8 +1,9 @@
 using System.Collections;
+using Photon.Pun;
 using UnityEngine;
 
 // 이 스크립트는 킬러의 근접 공격을 처리한다.
-// 좌클릭으로 가까운 시민을 공격할 수 있고,
+// 킬타임에 Q로 가까운 시민을 즉사시킬 수 있고,
 // 시민은 이 스크립트가 있어도 공격하지 못하게 만든다.
 public class KillerAttack : MonoBehaviour
 {
@@ -14,7 +15,11 @@ public class KillerAttack : MonoBehaviour
     private PlayerCombatTarget selfTarget;
 
     [Header("공격 입력")]
-    // 좌클릭으로 공격하도록 기본값을 0으로 둔다.
+    // 킬타임 즉사 입력 키이다.
+    public KeyCode killKey = KeyCode.Q;
+
+    // 이전 테스트 호환용 마우스 입력이다. 아이템 사용과 겹치지 않도록 기본값은 꺼둔다.
+    public bool allowMouseAttackInput = false;
     public int attackMouseButton = 0;
 
     [Header("공격 범위")]
@@ -23,6 +28,13 @@ public class KillerAttack : MonoBehaviour
 
     // 공격 판정 반지름이다.
     public float attackRadius = 0.6f;
+
+    // 실제 멀티 프록시를 놓치지 않기 위한 최소 즉사 탐지 거리이다.
+    public float minimumKillReach = 2.4f;
+
+    // 카메라 정면으로 인정할 최소 각도 내적값이다.
+    [Range(-1f, 1f)]
+    public float forwardDotThreshold = 0.28f;
 
     [Header("공격 타이밍")]
     // 클릭 후 실제 판정이 나가기까지의 짧은 딜레이이다.
@@ -44,6 +56,9 @@ public class KillerAttack : MonoBehaviour
 
     // 현재 공격 중인지 저장한다.
     public bool isAttacking = false;
+
+    private int consumedKillTimeWindowIndex = -1;
+    private int lastSeenKillTimeWindowIndex = -2;
 
     // 시작할 때 필요한 참조를 가져온다.
     private void Start()
@@ -74,16 +89,47 @@ public class KillerAttack : MonoBehaviour
         }
 
         // 킬러가 아니면 공격하지 못한다.
-        if (selfTarget.role != PlayerRole.Killer)
+        if (!IsLocalKiller())
         {
             return;
         }
 
-        // 공격 가능한 상태에서 좌클릭을 누르면 공격을 시작한다.
-        if (canAttack && Input.GetMouseButtonDown(attackMouseButton))
+        int killTimeWindowIndex = RoundTimer.CurrentKillTimeWindowIndex;
+        if (killTimeWindowIndex != lastSeenKillTimeWindowIndex)
+        {
+            lastSeenKillTimeWindowIndex = killTimeWindowIndex;
+
+            if (killTimeWindowIndex >= 0)
+            {
+                canAttack = true;
+            }
+        }
+
+        if (killTimeWindowIndex < 0)
+        {
+            return;
+        }
+
+        if (consumedKillTimeWindowIndex == killTimeWindowIndex)
+        {
+            return;
+        }
+
+        // 공격 가능한 상태에서 킬 입력을 누르면 공격을 시작한다.
+        if (canAttack && IsKillInputPressed())
         {
             StartCoroutine(AttackRoutine());
         }
+    }
+
+    private bool IsKillInputPressed()
+    {
+        if (Input.GetKeyDown(killKey))
+        {
+            return true;
+        }
+
+        return allowMouseAttackInput && Input.GetMouseButtonDown(attackMouseButton);
     }
 
     // 공격 시작, 판정, 쿨타임을 처리하는 코루틴이다.
@@ -114,6 +160,12 @@ public class KillerAttack : MonoBehaviour
     // 실제로 주변에서 맞는 시민이 있는지 찾고, 있으면 피해를 주는 함수이다.
     private void TryAttack()
     {
+        int killTimeWindowIndex = RoundTimer.CurrentKillTimeWindowIndex;
+        if (killTimeWindowIndex < 0 || consumedKillTimeWindowIndex == killTimeWindowIndex)
+        {
+            return;
+        }
+
         // 카메라가 없으면 종료한다.
         if (playerCamera == null)
         {
@@ -123,13 +175,13 @@ public class KillerAttack : MonoBehaviour
         // 시작 위치를 카메라 바로 앞쪽으로 잡는다.
         Vector3 origin = playerCamera.position + playerCamera.forward * 0.05f;
 
-        // 공격 중심 위치를 카메라 앞쪽으로 만든다.
-        Vector3 attackCenter = origin + playerCamera.forward * attackDistance;
+        float effectiveReach = Mathf.Max(minimumKillReach, attackDistance + attackRadius);
+        float effectiveRadius = Mathf.Max(attackRadius, 0.85f);
 
         // 공격 범위 안에 있는 Collider들을 찾는다.
         Collider[] hits = Physics.OverlapSphere(
-            attackCenter,
-            attackRadius,
+            origin,
+            effectiveReach,
             targetMask,
             QueryTriggerInteraction.Ignore
         );
@@ -158,6 +210,11 @@ public class KillerAttack : MonoBehaviour
                 continue;
             }
 
+            if (candidate.GetActorNumber() == selfTarget.GetActorNumber())
+            {
+                continue;
+            }
+
             // 이미 죽은 대상이면 넘긴다.
             if (candidate.isDead)
             {
@@ -171,15 +228,28 @@ public class KillerAttack : MonoBehaviour
             }
 
             // 벽에 가려져 있으면 맞지 않게 한다.
+            Vector3 targetPoint = GetTargetPoint(hits[i], candidate);
+            Vector3 toTargetRaw = targetPoint - origin;
+            float distance = toTargetRaw.magnitude;
+
+            if (distance > effectiveReach + effectiveRadius)
+            {
+                continue;
+            }
+
+            Vector3 toTarget = distance > 0.001f ? toTargetRaw / distance : playerCamera.forward;
+            float dot = Vector3.Dot(playerCamera.forward, toTarget);
+            if (dot < forwardDotThreshold)
+            {
+                continue;
+            }
+
             if (!HasLineOfSight(hits[i], candidate, origin))
             {
                 continue;
             }
 
             // 카메라 정면에 더 가까운 대상을 우선하기 위해 점수를 계산한다.
-            Vector3 toTarget = (hits[i].bounds.center - origin).normalized;
-            float dot = Vector3.Dot(playerCamera.forward, toTarget);
-            float distance = Vector3.Distance(origin, hits[i].bounds.center);
             float score = dot * 10f - distance;
 
             // 더 좋은 타겟이면 갱신한다.
@@ -190,33 +260,37 @@ public class KillerAttack : MonoBehaviour
             }
         }
 
-        // 최종 타겟이 있으면 체력 50 피해를 준다.
+        // 킬타임에는 창마다 한 번만 시민을 즉사시킨다.
         if (bestTarget != null)
         {
-            // 맞은 대상의 PlayerStats를 가져온다.
-            PlayerStats targetStats = bestTarget.GetComponent<PlayerStats>();
-
-            // PlayerStats가 있으면 기본 피해량을 적용한다.
-            if (targetStats != null)
-            {
-                targetStats.TakeDefaultAttackDamage();
-            }
-            else
-            {
-                // 혹시 PlayerStats가 없으면 기존처럼 바로 죽게 처리한다.
-                bestTarget.Die();
-            }
+            bestTarget.Die();
+            consumedKillTimeWindowIndex = killTimeWindowIndex;
 
             // 콘솔에 공격 로그를 남긴다.
-            Debug.Log("Killer attacked: " + bestTarget.name);
+            Debug.Log("Killer kill time attack: " + bestTarget.name);
         }
+    }
+
+    private bool IsLocalKiller()
+    {
+        if (selfTarget != null && selfTarget.role == PlayerRole.Killer)
+        {
+            return true;
+        }
+
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return false;
+        }
+
+        return PhotonNetwork.LocalPlayer.ActorNumber == RoleAssignmentManager.GetPhotonImposterActor();
     }
 
     // 벽 너머의 대상을 맞지 않게 하기 위해 시야가 통하는지 검사하는 함수이다.
     private bool HasLineOfSight(Collider targetCollider, PlayerCombatTarget target, Vector3 origin)
     {
         // 목표 지점을 타겟 Collider 중심으로 잡는다.
-        Vector3 targetPoint = targetCollider.bounds.center;
+        Vector3 targetPoint = GetTargetPoint(targetCollider, target);
 
         // 방향 벡터를 구한다.
         Vector3 direction = targetPoint - origin;
@@ -233,10 +307,22 @@ public class KillerAttack : MonoBehaviour
         // 방향 벡터를 정규화한다.
         direction /= distance;
 
-        // Raycast로 중간에 벽이 있는지 검사한다.
-        if (Physics.Raycast(origin, direction, out RaycastHit hit, distance, obstacleMask, QueryTriggerInteraction.Ignore))
+        RaycastHit[] hits = Physics.RaycastAll(origin, direction, distance, obstacleMask, QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0)
         {
-            // 먼저 맞은 Collider가 같은 타겟이면 시야가 통한다고 본다.
+            return true;
+        }
+
+        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit hit = hits[i];
+            if (hit.collider == null)
+            {
+                continue;
+            }
+
             PlayerCombatTarget hitTarget = hit.collider.GetComponentInParent<PlayerCombatTarget>();
 
             if (hitTarget != null && hitTarget == target)
@@ -244,12 +330,25 @@ public class KillerAttack : MonoBehaviour
                 return true;
             }
 
-            // 다른 물체를 먼저 맞았으면 가려졌다고 본다.
+            if (hitTarget != null && hitTarget == selfTarget)
+            {
+                continue;
+            }
+
             return false;
         }
 
-        // 아무것도 막지 않았다면 시야가 통한다고 본다.
         return true;
+    }
+
+    private Vector3 GetTargetPoint(Collider targetCollider, PlayerCombatTarget target)
+    {
+        if (targetCollider != null)
+        {
+            return targetCollider.bounds.center;
+        }
+
+        return target != null ? target.transform.position + Vector3.up : transform.position;
     }
 
     // Scene 뷰에서 공격 범위를 보기 쉽게 그린다.
@@ -260,10 +359,10 @@ public class KillerAttack : MonoBehaviour
 
         // 공격 중심 위치를 계산한다.
         Vector3 origin = view.position + view.forward * 0.05f;
-        Vector3 attackCenter = origin + view.forward * attackDistance;
+        Vector3 attackCenter = origin + view.forward * Mathf.Max(minimumKillReach, attackDistance + attackRadius) * 0.5f;
 
         // 공격 범위를 빨간색 구로 그린다.
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(attackCenter, attackRadius);
+        Gizmos.DrawWireSphere(attackCenter, Mathf.Max(minimumKillReach, attackDistance + attackRadius) * 0.5f);
     }
 }

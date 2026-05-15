@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using ExitGames.Client.Photon;
+using Photon.Pun;
 using UnityEngine;
 
 // 맵 안에 존재하는 ObjectiveComputer 중 무작위로 일부를 목표 컴퓨터로 선택한다.
@@ -91,6 +93,8 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     [ContextMenu("Select Computer Objectives Now")]
     public void SelectObjectivesNow()
     {
+        GameLoopManager.EnsureExists();
+
         if (objectiveManager == null)
         {
             objectiveManager = LabObjectiveManager.Instance;
@@ -103,6 +107,8 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
         }
 
         List<ObjectiveComputer> candidates = CollectCandidates();
+        SortCandidatesByStablePath(candidates);
+        AssignNetworkObjectiveIds(candidates);
 
         if (candidates == null || candidates.Count <= 0)
         {
@@ -122,7 +128,8 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
         }
 
         List<Vector3> playerStartPositions = CollectPlayerStartPositions();
-        List<ObjectiveComputer> selectedComputers = SelectComputersWithRules(candidates, targetCount, playerStartPositions);
+        System.Random deterministicRandom = CreateDeterministicRandom();
+        List<ObjectiveComputer> selectedComputers = SelectComputersWithRules(candidates, targetCount, playerStartPositions, deterministicRandom);
 
         for (int i = 0; i < selectedComputers.Count; i++)
         {
@@ -133,6 +140,7 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
         }
 
         objectiveManager.SetupComputerObjectives(selectedComputers.ToArray(), targetCount);
+        GameLoopManager.EnsureExists().RebuildComputerIndex();
 
         Debug.Log(
             "[ComputerObjectiveRandomizer] Selected computers: " + selectedComputers.Count +
@@ -143,7 +151,7 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     }
 
     // 거리 규칙을 적용해 성공 컴퓨터를 고른다.
-    private List<ObjectiveComputer> SelectComputersWithRules(List<ObjectiveComputer> candidates, int targetCount, List<Vector3> playerStartPositions)
+    private List<ObjectiveComputer> SelectComputersWithRules(List<ObjectiveComputer> candidates, int targetCount, List<Vector3> playerStartPositions, System.Random random)
     {
         List<ObjectiveComputer> selected = new List<ObjectiveComputer>();
 
@@ -156,7 +164,7 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
         if (!useDistanceRules)
         {
             List<ObjectiveComputer> randomList = new List<ObjectiveComputer>(candidates);
-            Shuffle(randomList);
+            Shuffle(randomList, random);
 
             for (int i = 0; i < randomList.Count && selected.Count < targetCount; i++)
             {
@@ -176,7 +184,7 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
 
         while (true)
         {
-            selected = TrySelectWithCurrentDistance(candidates, targetCount, playerStartPositions, currentPlayerDistance, currentBetweenDistance);
+            selected = TrySelectWithCurrentDistance(candidates, targetCount, playerStartPositions, currentPlayerDistance, currentBetweenDistance, random);
 
             if (selected.Count >= targetCount)
             {
@@ -216,7 +224,7 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
         // 마지막 안전장치이다. 그래도 부족하면 랜덤으로 남은 후보를 채운다.
         if (selected.Count < targetCount)
         {
-            FillRemainingRandomly(candidates, selected, targetCount);
+            FillRemainingRandomly(candidates, selected, targetCount, random);
         }
 
         return selected;
@@ -228,11 +236,12 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
         int targetCount,
         List<Vector3> playerStartPositions,
         float playerDistance,
-        float betweenDistance)
+        float betweenDistance,
+        System.Random random)
     {
         List<ObjectiveComputer> selected = new List<ObjectiveComputer>();
         List<ObjectiveComputer> randomList = new List<ObjectiveComputer>(candidates);
-        Shuffle(randomList);
+        Shuffle(randomList, random);
 
         for (int i = 0; i < randomList.Count && selected.Count < targetCount; i++)
         {
@@ -299,10 +308,10 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     }
 
     // 부족한 개수를 랜덤으로 채운다.
-    private void FillRemainingRandomly(List<ObjectiveComputer> candidates, List<ObjectiveComputer> selected, int targetCount)
+    private void FillRemainingRandomly(List<ObjectiveComputer> candidates, List<ObjectiveComputer> selected, int targetCount, System.Random random)
     {
         List<ObjectiveComputer> randomList = new List<ObjectiveComputer>(candidates);
-        Shuffle(randomList);
+        Shuffle(randomList, random);
 
         for (int i = 0; i < randomList.Count && selected.Count < targetCount; i++)
         {
@@ -598,16 +607,109 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     }
 
     // 리스트를 무작위로 섞는다.
-    private void Shuffle(List<ObjectiveComputer> list)
+    private void SortCandidatesByStablePath(List<ObjectiveComputer> candidates)
+    {
+        if (candidates == null)
+        {
+            return;
+        }
+
+        candidates.Sort((left, right) => string.CompareOrdinal(GetStablePath(left != null ? left.transform : null), GetStablePath(right != null ? right.transform : null)));
+    }
+
+    private void AssignNetworkObjectiveIds(List<ObjectiveComputer> candidates)
+    {
+        if (candidates == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            if (candidates[i] != null)
+            {
+                candidates[i].SetNetworkObjectiveId(i);
+            }
+        }
+    }
+
+    private string GetStablePath(Transform target)
+    {
+        if (target == null)
+        {
+            return string.Empty;
+        }
+
+        string path = target.name;
+        Transform current = target.parent;
+
+        while (current != null)
+        {
+            path = current.name + "/" + path;
+            current = current.parent;
+        }
+
+        return path;
+    }
+
+    private System.Random CreateDeterministicRandom()
+    {
+        int seed = 1337;
+
+        if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties != null)
+        {
+            if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("mapSeed", out object seedValue))
+            {
+                seed = ToInt(seedValue, seed);
+            }
+            else if (PhotonNetwork.IsMasterClient)
+            {
+                seed = Random.Range(1, int.MaxValue);
+                PhotonNetwork.CurrentRoom.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+                {
+                    { "mapSeed", seed }
+                });
+            }
+        }
+
+        return new System.Random(seed ^ requiredComputerCount ^ 0x4C4142);
+    }
+
+    private int ToInt(object value, int fallback)
+    {
+        if (value is int intValue)
+        {
+            return intValue;
+        }
+
+        if (value is short shortValue)
+        {
+            return shortValue;
+        }
+
+        if (value is byte byteValue)
+        {
+            return byteValue;
+        }
+
+        return fallback;
+    }
+
+    private void Shuffle(List<ObjectiveComputer> list, System.Random random)
     {
         if (list == null)
         {
             return;
         }
 
+        if (random == null)
+        {
+            random = new System.Random();
+        }
+
         for (int i = list.Count - 1; i > 0; i--)
         {
-            int randomIndex = Random.Range(0, i + 1);
+            int randomIndex = random.Next(0, i + 1);
             ObjectiveComputer temp = list[i];
             list[i] = list[randomIndex];
             list[randomIndex] = temp;

@@ -77,6 +77,9 @@ public class PlayerFootstepAudio : MonoBehaviour
     // 이 오브젝트의 AudioSource이다.
     private AudioSource audioSource;
 
+    [Header("Network")]
+    public bool broadcastFootstepsToNetwork = true;
+
     // 이전 프레임의 플레이어 위치이다.
     private Vector3 lastRootPosition;
 
@@ -353,6 +356,24 @@ public class PlayerFootstepAudio : MonoBehaviour
         audioSource.pitch = Random.Range(minPitch, maxPitch);
 
         // 현재 상태에 맞는 볼륨으로 One Shot 재생한다.
-        audioSource.PlayOneShot(selectedClip, GetVolume(state));
+        float volume = GetVolume(state);
+        audioSource.PlayOneShot(selectedClip, volume);
+
+        if (broadcastFootstepsToNetwork && playerMotor != null && playerRoot != null)
+        {
+            PunWorldAudioSync.RaiseFootstep(playerRoot.position, volume);
+        }
+    }
+
+    public AudioClip GetNetworkFootstepClip()
+    {
+        AudioClip[] clips = GetClipArray(FootstepState.Walk);
+
+        if (clips == null || clips.Length == 0)
+        {
+            return null;
+        }
+
+        return clips[Random.Range(0, clips.Length)];
     }
 }

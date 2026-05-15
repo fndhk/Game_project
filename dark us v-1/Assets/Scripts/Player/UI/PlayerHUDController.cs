@@ -52,6 +52,7 @@ public class PlayerHUDController : MonoBehaviour
     private TMP_Text staminaLabelText;
     private TMP_Text dotMemoryLabelText;
     private TMP_Text roundTimerText;
+    private TMP_Text killTimeWarningText;
     private RectTransform micStatusRoot;
     private Image micStatusIcon;
     private TMP_Text micStatusText;
@@ -92,6 +93,8 @@ public class PlayerHUDController : MonoBehaviour
     private bool lastMicMutedState;
     private bool hasMicState;
     private float micStatusVisibleUntil;
+    private int lastKillTimeWindowIndex = -2;
+    private float killTimeMessageVisibleUntil;
 
     private void Awake()
     {
@@ -464,8 +467,12 @@ public class PlayerHUDController : MonoBehaviour
 
     private void BuildRoundTimerModule()
     {
-        roundTimerText = CreateLabel("20:00", hudRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), 24, new Color(0.95f, 0.76f, 0.30f, 0.96f), TextAlignmentOptions.Center);
+        roundTimerText = CreateLabel("20:00", hudRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), 24, new Color(0.96f, 0.96f, 0.92f, 0.98f), TextAlignmentOptions.Center);
         roundTimerText.rectTransform.sizeDelta = new Vector2(220f, 42f);
+
+        killTimeWarningText = CreateLabel("", hudRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -68f), 15, new Color(1f, 0.18f, 0.12f, 0.98f), TextAlignmentOptions.Center);
+        killTimeWarningText.rectTransform.sizeDelta = new Vector2(420f, 28f);
+        killTimeWarningText.gameObject.SetActive(false);
     }
 
     private void BuildVoiceStatusModule()
@@ -641,12 +648,51 @@ public class PlayerHUDController : MonoBehaviour
         }
 
         float remaining = RoundTimer.RemainingSeconds;
-        int minutes = Mathf.FloorToInt(remaining / 60f);
-        int seconds = Mathf.FloorToInt(remaining % 60f);
+        int displayRemaining = Mathf.CeilToInt(remaining);
+        int minutes = displayRemaining / 60;
+        int seconds = displayRemaining % 60;
         roundTimerText.text = minutes.ToString("00") + ":" + seconds.ToString("00");
-        roundTimerText.color = remaining <= 60f
-            ? new Color(1f, 0.28f, 0.20f, 0.98f)
-            : new Color(0.95f, 0.76f, 0.30f, 0.96f);
+
+        int killTimeWindowIndex = RoundTimer.CurrentKillTimeWindowIndex;
+        bool isKillTime = killTimeWindowIndex >= 0;
+
+        roundTimerText.color = isKillTime
+            ? new Color(1f, 0.18f, 0.12f, 0.98f)
+            : new Color(0.96f, 0.96f, 0.92f, 0.98f);
+
+        if (killTimeWindowIndex != lastKillTimeWindowIndex)
+        {
+            lastKillTimeWindowIndex = killTimeWindowIndex;
+
+            if (isKillTime)
+            {
+                killTimeMessageVisibleUntil = Time.unscaledTime + 4f;
+            }
+        }
+
+        UpdateKillTimeWarning(isKillTime);
+    }
+
+    private void UpdateKillTimeWarning(bool isKillTime)
+    {
+        if (killTimeWarningText == null)
+        {
+            return;
+        }
+
+        bool shouldShow = isKillTime && (!Application.isPlaying || Time.unscaledTime <= killTimeMessageVisibleUntil);
+        killTimeWarningText.gameObject.SetActive(shouldShow);
+
+        if (!shouldShow)
+        {
+            return;
+        }
+
+        bool isKiller = targetCombatTarget != null && targetCombatTarget.role == PlayerRole.Killer;
+        killTimeWarningText.text = isKiller
+            ? T("Kill Time") + " / " + T("Press Q to Kill")
+            : T("Kill Time") + " / " + T("Hide From Imposter");
+        killTimeWarningText.color = new Color(1f, 0.18f, 0.12f, 0.98f);
     }
 
     private void UpdateVoiceStatus()

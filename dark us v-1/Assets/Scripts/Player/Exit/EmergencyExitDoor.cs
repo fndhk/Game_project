@@ -75,6 +75,12 @@ public class EmergencyExitDoor : MonoBehaviour, IPlayerInteractable
 
         if (opened)
         {
+            PlayerCombatTarget target = interactor != null ? interactor.GetComponentInParent<PlayerCombatTarget>() : null;
+            if (target != null && target.role == PlayerRole.Citizen && !target.isDead)
+            {
+                return "[E] " + T("Escape");
+            }
+
             return T("Escape Route Open");
         }
 
@@ -90,8 +96,18 @@ public class EmergencyExitDoor : MonoBehaviour, IPlayerInteractable
     // 잠금 해제 후 E를 누르면 문을 연다.
     public void Interact(PlayerObjectiveInteractor interactor)
     {
-        if (locked || opened)
+        if (locked)
         {
+            return;
+        }
+
+        if (opened)
+        {
+            PlayerCombatTarget target = interactor != null ? interactor.GetComponentInParent<PlayerCombatTarget>() : null;
+            if (target != null && target.role == PlayerRole.Citizen && !target.isDead)
+            {
+                GameLoopManager.EnsureExists().ReportLocalEscape(target);
+            }
             return;
         }
 

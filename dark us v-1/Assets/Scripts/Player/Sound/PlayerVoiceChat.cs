@@ -7,8 +7,12 @@ using UnityEngine;
 public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
 {
     private const byte VoiceEventCode = 43;
+    private const int VoiceChannels = 1;
+    private const float RemoteBufferDelaySeconds = 0.20f;
+    private const float RemoteBufferMaxSeconds = 0.95f;
 
     private static readonly Dictionary<int, AudioSource> remotePlaybackSources = new Dictionary<int, AudioSource>();
+    private static readonly Dictionary<int, RemoteVoicePlayback> remotePlaybackStates = new Dictionary<int, RemoteVoicePlayback>();
     private static readonly Dictionary<int, float> lastVoiceReceivedTimeByActor = new Dictionary<int, float>();
     private static PlayerVoiceChat localVoiceChat;
     private static bool localVoiceMuted;
@@ -22,16 +26,17 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
 
     [Header("Capture")]
     public string microphoneDeviceName = "";
-    public int sampleRate = 16000;
+    public int sampleRate = 24000;
     public int microphoneBufferSeconds = 1;
-    public int chunkSampleCount = 1024;
-    public float silenceThreshold = 0.015f;
+    public int chunkSampleCount = 720;
+    public float silenceThreshold = 0.008f;
+    public float voiceHangoverSeconds = 0.22f;
 
     [Header("Playback")]
     public float remoteVoiceVolume = 1f;
     public float spatialBlend = 1f;
-    public float minDistance = 1.5f;
-    public float maxDistance = 18f;
+    public float minDistance = 1.2f;
+    public float maxDistance = 9f;
 
     [Header("Debug")]
     public bool showLocalMicHud = true;
@@ -45,6 +50,109 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
     private bool isTalking;
     private float inputLevel;
     private bool muteKeyWasDown;
+    private float lastAudibleInputTime = -100f;
+
+    private class RemoteVoicePlayback
+    {
+        private readonly Queue<float> queuedSamples = new Queue<float>();
+        private readonly object sampleLock = new object();
+
+        private AudioSource source;
+        private AudioClip streamClip;
+        private int streamSampleRate;
+        private int maxQueuedSamples;
+        private int bufferedStartSamples;
+        private float outputGain = 1f;
+        private float lastOutputSample;
+
+        public void Configure(AudioSource targetSource, int sampleRate, float gain)
+        {
+            source = targetSource;
+            streamSampleRate = Mathf.Max(8000, sampleRate);
+            maxQueuedSamples = Mathf.RoundToInt(streamSampleRate * RemoteBufferMaxSeconds);
+            bufferedStartSamples = Mathf.RoundToInt(streamSampleRate * RemoteBufferDelaySeconds);
+            outputGain = gain;
+
+            if (streamClip == null || streamClip.frequency != streamSampleRate)
+            {
+                if (source != null)
+                {
+                    source.Stop();
+                }
+
+                streamClip = AudioClip.Create("PhotonVoiceStream", streamSampleRate, VoiceChannels, streamSampleRate, true, OnAudioRead);
+
+                if (source != null)
+                {
+                    source.clip = streamClip;
+                    source.loop = true;
+                }
+
+                Clear();
+            }
+
+            if (source != null && source.clip != streamClip)
+            {
+                source.clip = streamClip;
+                source.loop = true;
+            }
+        }
+
+        public void Enqueue(float[] samples, int sampleCount)
+        {
+            if (samples == null || sampleCount <= 0)
+            {
+                return;
+            }
+
+            lock (sampleLock)
+            {
+                while (queuedSamples.Count + sampleCount > maxQueuedSamples && queuedSamples.Count > 0)
+                {
+                    queuedSamples.Dequeue();
+                }
+
+                int clampedCount = Mathf.Min(sampleCount, samples.Length);
+                for (int i = 0; i < clampedCount; i++)
+                {
+                    queuedSamples.Enqueue(samples[i]);
+                }
+
+                if (source != null && !source.isPlaying && queuedSamples.Count >= bufferedStartSamples)
+                {
+                    source.Play();
+                }
+            }
+        }
+
+        private void Clear()
+        {
+            lock (sampleLock)
+            {
+                queuedSamples.Clear();
+            }
+        }
+
+        private void OnAudioRead(float[] data)
+        {
+            lock (sampleLock)
+            {
+                for (int i = 0; i < data.Length; i++)
+                {
+                    if (queuedSamples.Count > 0)
+                    {
+                        lastOutputSample = queuedSamples.Dequeue() * outputGain;
+                    }
+                    else
+                    {
+                        lastOutputSample *= 0.94f;
+                    }
+
+                    data[i] = lastOutputSample;
+                }
+            }
+        }
+    }
 
     private void Awake()
     {
@@ -152,6 +260,7 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
         microphoneBuffer = new float[microphoneClip.samples];
         chunkBuffer = new float[chunkSampleCount];
         isCapturing = true;
+        lastAudibleInputTime = -100f;
     }
 
     private void StopMicrophone()
@@ -206,7 +315,12 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
             }
 
             inputLevel = sum / chunkSampleCount;
-            isTalking = inputLevel >= silenceThreshold;
+            if (inputLevel >= silenceThreshold)
+            {
+                lastAudibleInputTime = Time.unscaledTime;
+            }
+
+            isTalking = Time.unscaledTime - lastAudibleInputTime <= voiceHangoverSeconds;
 
             if (isTalking || enableLocalMonitor)
             {
@@ -270,9 +384,8 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
         }
 
         PlayerVoiceChat receiver = localVoiceChat != null ? localVoiceChat : this;
-        receiver.sampleRate = payloadSampleRate;
         lastVoiceReceivedTimeByActor[photonEvent.Sender] = Time.unscaledTime;
-        receiver.PlayVoiceChunk(DecodeSamples(encodedSamples), encodedSamples.Length / 2, photonEvent.Sender);
+        receiver.PlayVoiceChunk(DecodeSamples(encodedSamples), encodedSamples.Length / 2, photonEvent.Sender, payloadSampleRate);
     }
 
     public static bool IsActorSpeaking(int actorNumber)
@@ -334,6 +447,11 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
 
     private void PlayVoiceChunk(float[] samples, int sampleCount, int actorNumber)
     {
+        PlayVoiceChunk(samples, sampleCount, actorNumber, sampleRate);
+    }
+
+    private void PlayVoiceChunk(float[] samples, int sampleCount, int actorNumber, int playbackSampleRate)
+    {
         if (samples == null || sampleCount <= 0)
         {
             return;
@@ -345,23 +463,46 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
             return;
         }
 
-        AudioClip clip = AudioClip.Create("PhotonVoiceChunk", sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
-        targetSource.PlayOneShot(clip, GetSavedVoiceVolume(actorNumber));
-        Destroy(clip, Mathf.Max(0.5f, sampleCount / (float)sampleRate + 0.25f));
+        if (!remotePlaybackStates.TryGetValue(actorNumber, out RemoteVoicePlayback playbackState) || playbackState == null)
+        {
+            playbackState = new RemoteVoicePlayback();
+            remotePlaybackStates[actorNumber] = playbackState;
+        }
+
+        playbackState.Configure(targetSource, playbackSampleRate, GetSavedVoiceVolume(actorNumber));
+        playbackState.Enqueue(samples, sampleCount);
     }
 
     private AudioSource GetPlaybackSourceForActor(int actorNumber)
     {
-        if (actorNumber > 0 &&
-            remotePlaybackSources.TryGetValue(actorNumber, out AudioSource cachedSource) &&
-            cachedSource != null)
+        Transform remoteTransform = FindRemoteActorTransform(actorNumber);
+        if (actorNumber > 0 && remoteTransform == null && spatialBlend > 0.01f)
         {
+            return null;
+        }
+
+        AudioSource cachedSource = null;
+        if (actorNumber > 0)
+        {
+            remotePlaybackSources.TryGetValue(actorNumber, out cachedSource);
+        }
+
+        if (actorNumber > 0 && cachedSource != null && remoteTransform != null && !cachedSource.transform.IsChildOf(remoteTransform))
+        {
+            remotePlaybackSources.Remove(actorNumber);
+            remotePlaybackStates.Remove(actorNumber);
+            cachedSource = null;
+        }
+
+        if (cachedSource != null)
+        {
+            ConfigurePlaybackSource(cachedSource);
             return cachedSource;
         }
 
-        Transform remoteTransform = FindRemoteActorTransform(actorNumber);
-        GameObject sourceObject = remoteTransform != null ? remoteTransform.gameObject : gameObject;
+        GameObject sourceObject = remoteTransform != null
+            ? GetOrCreateVoicePlaybackObject(remoteTransform)
+            : GetOrCreateLobbyVoicePlaybackObject(actorNumber);
         AudioSource source = GetOrCreatePlaybackSource(sourceObject);
         ConfigurePlaybackSource(source);
 
@@ -371,6 +512,35 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
         }
 
         return source;
+    }
+
+    private GameObject GetOrCreateLobbyVoicePlaybackObject(int actorNumber)
+    {
+        string objectName = "LobbyVoicePlayback_" + Mathf.Max(0, actorNumber);
+        Transform existing = transform.Find(objectName);
+        if (existing != null)
+        {
+            return existing.gameObject;
+        }
+
+        GameObject voiceObject = new GameObject(objectName);
+        voiceObject.transform.SetParent(transform, false);
+        voiceObject.transform.localPosition = Vector3.zero;
+        return voiceObject;
+    }
+
+    private GameObject GetOrCreateVoicePlaybackObject(Transform actorTransform)
+    {
+        Transform existing = actorTransform.Find("VoicePlayback");
+        if (existing != null)
+        {
+            return existing.gameObject;
+        }
+
+        GameObject voiceObject = new GameObject("VoicePlayback");
+        voiceObject.transform.SetParent(actorTransform, false);
+        voiceObject.transform.localPosition = Vector3.up * 1.65f;
+        return voiceObject;
     }
 
     private Transform FindRemoteActorTransform(int actorNumber)
@@ -405,9 +575,16 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
         source.playOnAwake = false;
         source.loop = false;
         source.spatialBlend = spatialBlend;
+        source.dopplerLevel = 0f;
         source.minDistance = minDistance;
         source.maxDistance = maxDistance;
-        source.rolloffMode = AudioRolloffMode.Logarithmic;
+        source.rolloffMode = AudioRolloffMode.Custom;
+        AnimationCurve rolloff = new AnimationCurve(
+            new Keyframe(0f, 1f),
+            new Keyframe(Mathf.Max(0.01f, minDistance), 1f),
+            new Keyframe(Mathf.Max(minDistance + 0.01f, maxDistance), 0f)
+        );
+        source.SetCustomCurve(AudioSourceCurveType.CustomRolloff, rolloff);
     }
 
     public static void ApplySavedVoiceVolumeToAll()

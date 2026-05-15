@@ -20,9 +20,14 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
     // Start에서 자동으로 역할 배정을 할지 정한다.
     public bool assignRolesOnStart = true;
 
+    private bool hasAssignedPhotonRole;
+    private float nextPhotonRoleRetryTime;
+
     // 게임 시작 시 자동 배정을 실행한다.
     private void Start()
     {
+        GameLoopManager.EnsureExists();
+
         // 자동 시작이 켜져 있으면 역할 배정을 실행한다.
         if (assignRolesOnStart)
         {
@@ -76,6 +81,22 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
         }
     }
 
+    private void Update()
+    {
+        if (!usePhotonRoomRoles || !assignRolesOnStart || !PhotonNetwork.InRoom || hasAssignedPhotonRole)
+        {
+            return;
+        }
+
+        if (Time.time < nextPhotonRoleRetryTime)
+        {
+            return;
+        }
+
+        nextPhotonRoleRetryTime = Time.time + 0.25f;
+        AssignLocalPhotonRole();
+    }
+
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
         if (!usePhotonRoomRoles || propertiesThatChanged == null || !propertiesThatChanged.ContainsKey(ImposterActorRoomPropertyKey))
@@ -84,6 +105,29 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
         }
 
         AssignLocalPhotonRole();
+    }
+
+    public static int SelectNewPhotonImposterActor()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
+        {
+            return -1;
+        }
+
+        if (!PhotonNetwork.IsMasterClient || PhotonNetwork.PlayerList == null || PhotonNetwork.PlayerList.Length == 0)
+        {
+            return -1;
+        }
+
+        int index = Random.Range(0, PhotonNetwork.PlayerList.Length);
+        int imposterActor = PhotonNetwork.PlayerList[index].ActorNumber;
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { ImposterActorRoomPropertyKey, imposterActor }
+        });
+
+        Debug.Log("New Photon imposter actor = " + imposterActor);
+        return imposterActor;
     }
 
     public static int EnsurePhotonImposterActor()
@@ -165,6 +209,7 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
             : PlayerRole.Citizen;
 
         AssignRoleToListedPlayers(localRole);
+        hasAssignedPhotonRole = true;
         Debug.Log("Local Photon role = " + localRole);
     }
 

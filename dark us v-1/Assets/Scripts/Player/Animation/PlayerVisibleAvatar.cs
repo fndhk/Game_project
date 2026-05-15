@@ -4,15 +4,19 @@ using UnityEngine;
 // 스캔용 PlayerScanAvatar는 Collider만 담당하고, 이 스크립트는 렌더링만 담당한다.
 public class PlayerVisibleAvatar : MonoBehaviour
 {
+    private const string FallbackScanColliderRootName = "FallbackScanColliders";
+
     [Header("Model")]
     public string visualRootName = "VisibleCharacterAvatar";
-    public string resourcesModelPath = "My Robot Kyle -done-";
+    public string resourcesModelPath = "Characters/IthappyPlayer";
     public float targetHeight = 1.78f;
     public float yawOffset = 0f;
     public bool rebuildOnEnable = true;
 
     [Header("Local Player")]
     public bool hideWhenLocalScannerOwner = true;
+    public bool hideRenderers = false;
+    public bool hideCollidersWhenHidden = true;
 
     [Header("Scan Surface")]
     public bool addScanColliders = true;
@@ -92,7 +96,9 @@ public class PlayerVisibleAvatar : MonoBehaviour
             StripGameplayComponents(model);
             DisablePhysics(model);
             FitModelToHeight(model.transform);
+            AttachAnimationControllers(model);
             AddScanCollidersToRenderers();
+            AddFallbackScanColliders();
         }
         else
         {
@@ -274,7 +280,37 @@ public class PlayerVisibleAvatar : MonoBehaviour
                 continue;
             }
 
-            AddMeshScanCollider(skinnedRenderers[i].gameObject, skinnedRenderers[i].sharedMesh);
+            AddSkinnedScanCollider(skinnedRenderers[i].gameObject);
+        }
+    }
+
+    private void AttachAnimationControllers(GameObject model)
+    {
+        if (model == null)
+        {
+            return;
+        }
+
+        Animator[] animators = model.GetComponentsInChildren<Animator>(true);
+
+        for (int i = 0; i < animators.Length; i++)
+        {
+            Animator animator = animators[i];
+
+            if (animator == null || animator.runtimeAnimatorController == null)
+            {
+                continue;
+            }
+
+            PlayerAnimationController animationController = animator.GetComponent<PlayerAnimationController>();
+            if (animationController == null)
+            {
+                animationController = animator.gameObject.AddComponent<PlayerAnimationController>();
+            }
+
+            animationController.characterController = GetComponentInParent<CharacterController>();
+            animationController.playerMotor = GetComponentInParent<PlayerMotor>();
+            animationController.motionRoot = transform;
         }
     }
 
@@ -308,6 +344,97 @@ public class PlayerVisibleAvatar : MonoBehaviour
         surfaceInfo.surfaceType = surfaceType;
     }
 
+    private void AddSkinnedScanCollider(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.layer = scanLayer;
+
+        MeshCollider meshCollider = target.GetComponent<MeshCollider>();
+        if (meshCollider == null)
+        {
+            meshCollider = target.AddComponent<MeshCollider>();
+        }
+
+        meshCollider.convex = false;
+        meshCollider.enabled = true;
+
+        SkinnedScanCollider scanCollider = target.GetComponent<SkinnedScanCollider>();
+        if (scanCollider == null)
+        {
+            scanCollider = target.AddComponent<SkinnedScanCollider>();
+        }
+
+        scanCollider.surfaceType = surfaceType;
+
+        ScanSurfaceInfo surfaceInfo = target.GetComponent<ScanSurfaceInfo>();
+        if (surfaceInfo == null)
+        {
+            surfaceInfo = target.AddComponent<ScanSurfaceInfo>();
+        }
+
+        surfaceInfo.surfaceType = surfaceType;
+    }
+
+    private void AddFallbackScanColliders()
+    {
+        if (!addScanColliders || visualRoot == null || visualRoot.Find(FallbackScanColliderRootName) != null)
+        {
+            return;
+        }
+
+        GameObject root = new GameObject(FallbackScanColliderRootName);
+        root.layer = scanLayer;
+        root.transform.SetParent(visualRoot, false);
+        root.transform.localPosition = Vector3.zero;
+        root.transform.localRotation = Quaternion.identity;
+        root.transform.localScale = Vector3.one;
+
+        CreateCapsuleScanCollider(root.transform, "Body", new Vector3(0f, 0.94f, 0f), 0.28f, 1.25f);
+        CreateSphereScanCollider(root.transform, "Head", new Vector3(0f, 1.62f, 0f), 0.2f);
+        CreateCapsuleScanCollider(root.transform, "LeftArm", new Vector3(-0.34f, 0.95f, 0f), 0.08f, 0.72f);
+        CreateCapsuleScanCollider(root.transform, "RightArm", new Vector3(0.34f, 0.95f, 0f), 0.08f, 0.72f);
+        CreateCapsuleScanCollider(root.transform, "LeftLeg", new Vector3(-0.12f, 0.38f, 0f), 0.09f, 0.78f);
+        CreateCapsuleScanCollider(root.transform, "RightLeg", new Vector3(0.12f, 0.38f, 0f), 0.09f, 0.78f);
+    }
+
+    private void CreateCapsuleScanCollider(Transform parent, string objectName, Vector3 localCenter, float radius, float height)
+    {
+        GameObject colliderObject = CreateScanColliderObject(parent, objectName);
+        CapsuleCollider capsule = colliderObject.AddComponent<CapsuleCollider>();
+        capsule.center = localCenter;
+        capsule.radius = radius;
+        capsule.height = height;
+        capsule.direction = 1;
+        capsule.isTrigger = false;
+    }
+
+    private void CreateSphereScanCollider(Transform parent, string objectName, Vector3 localCenter, float radius)
+    {
+        GameObject colliderObject = CreateScanColliderObject(parent, objectName);
+        SphereCollider sphere = colliderObject.AddComponent<SphereCollider>();
+        sphere.center = localCenter;
+        sphere.radius = radius;
+        sphere.isTrigger = false;
+    }
+
+    private GameObject CreateScanColliderObject(Transform parent, string objectName)
+    {
+        GameObject colliderObject = new GameObject(objectName);
+        colliderObject.layer = scanLayer;
+        colliderObject.transform.SetParent(parent, false);
+        colliderObject.transform.localPosition = Vector3.zero;
+        colliderObject.transform.localRotation = Quaternion.identity;
+        colliderObject.transform.localScale = Vector3.one;
+
+        ScanSurfaceInfo surfaceInfo = colliderObject.AddComponent<ScanSurfaceInfo>();
+        surfaceInfo.surfaceType = surfaceType;
+        return colliderObject;
+    }
+
     private void ApplyLocalVisibility()
     {
         if (visualRoot == null)
@@ -315,16 +442,39 @@ public class PlayerVisibleAvatar : MonoBehaviour
             return;
         }
 
-        bool shouldHide = hideWhenLocalScannerOwner && GetComponent<LidarSpotScanner>() != null;
+        bool shouldHideForLocalScanner = hideWhenLocalScannerOwner && GetComponent<LidarSpotScanner>() != null;
+        bool shouldHideRenderers = hideRenderers || shouldHideForLocalScanner;
+        bool shouldHideColliders = shouldHideForLocalScanner && hideCollidersWhenHidden;
         Renderer[] renderers = visualRoot.GetComponentsInChildren<Renderer>(true);
 
         for (int i = 0; i < renderers.Length; i++)
         {
             if (renderers[i] != null)
             {
-                renderers[i].enabled = !shouldHide;
+                renderers[i].enabled = !shouldHideRenderers;
             }
         }
+
+        Collider[] colliders = visualRoot.GetComponentsInChildren<Collider>(true);
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+            {
+                colliders[i].enabled = !shouldHideColliders && IsScanCollider(colliders[i]);
+            }
+        }
+    }
+
+    private bool IsScanCollider(Collider targetCollider)
+    {
+        if (targetCollider == null)
+        {
+            return false;
+        }
+
+        return targetCollider.GetComponent<ScanSurfaceInfo>() != null ||
+               targetCollider.GetComponent<SkinnedScanCollider>() != null;
     }
 
     private void DestroyAvatarObject(Object target)

@@ -112,6 +112,10 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 외부에서 목표 선택 상태를 읽기 위한 프로퍼티이다.
     public bool IsSelectedObjective => isSelectedObjective;
 
+    [Header("Network")]
+    [SerializeField] private int networkObjectiveId = -1;
+    public int NetworkObjectiveId => networkObjectiveId;
+
     // 이 컴퓨터가 복구 완료된 가짜 컴퓨터인지 확인하는 프로퍼티이다.
     public bool IsFakeRestoredComputer => isRestored && !isSelectedObjective;
 
@@ -147,6 +151,11 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         }
 
         RefreshVisualState();
+    }
+
+    public void SetNetworkObjectiveId(int objectiveId)
+    {
+        networkObjectiveId = objectiveId;
     }
 
     // 현재 진행도를 0~1로 반환한다.
@@ -229,6 +238,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
 
         PlayStartAudio();
         PlayLoopAudio();
+        PunWorldAudioSync.RaiseComputerStart(transform.position, GetNetworkComputerStartVolume());
         return true;
     }
 
@@ -312,6 +322,37 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         RecolorExistingScanDots();
 
         // 진짜 탈출 시스템 컴퓨터만 목표 진행도에 반영한다.
+        if (LabObjectiveManager.Instance != null)
+        {
+            if (isSelectedObjective)
+            {
+                LabObjectiveManager.Instance.CompleteComputer(this);
+            }
+            else
+            {
+                LabObjectiveManager.Instance.RefreshHud();
+            }
+        }
+
+        GameLoopManager.EnsureExists().ReportComputerRestored(this);
+    }
+
+    public void ApplyRestoredFromNetwork()
+    {
+        if (isRestored)
+        {
+            return;
+        }
+
+        isRestored = true;
+        restoreProgress = 1f;
+        currentInteractor = null;
+
+        StopLoopAudio();
+        PlayResultAudio();
+        RefreshVisualState();
+        RecolorExistingScanDots();
+
         if (LabObjectiveManager.Instance != null)
         {
             if (isSelectedObjective)
@@ -496,6 +537,31 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         {
             startAudioSource.Play();
         }
+    }
+
+    public AudioClip GetNetworkComputerStartClip()
+    {
+        if (startAudioSource != null && startAudioSource.clip != null)
+        {
+            return startAudioSource.clip;
+        }
+
+        return loopAudioSource != null ? loopAudioSource.clip : null;
+    }
+
+    public float GetNetworkComputerStartVolume()
+    {
+        if (startAudioSource != null)
+        {
+            return Mathf.Clamp(startAudioSource.volume, 0.01f, 2.5f);
+        }
+
+        if (loopAudioSource != null)
+        {
+            return Mathf.Clamp(loopAudioSource.volume, 0.01f, 2.5f);
+        }
+
+        return 1f;
     }
 
     // 진행 중 소리를 재생한다.

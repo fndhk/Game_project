@@ -9,6 +9,10 @@ public class PlayerCombatTarget : MonoBehaviour
     // 기본값은 시민으로 시작한다.
     public PlayerRole role = PlayerRole.Citizen;
 
+    [Header("멀티플레이")]
+    public int photonActorNumber = -1;
+    public bool isRemoteProxy = false;
+
     [Header("상태")]
     // 현재 이 플레이어가 죽었는지 저장한다.
     public bool isDead = false;
@@ -47,6 +51,16 @@ public class PlayerCombatTarget : MonoBehaviour
 
     // 이 함수를 호출하면 플레이어를 죽은 상태로 만든다.
     public void Die()
+    {
+        Die(true);
+    }
+
+    public void ApplyDeathFromNetwork()
+    {
+        Die(false);
+    }
+
+    private void Die(bool broadcast)
     {
         // 이미 죽어 있으면 다시 처리하지 않는다.
         if (isDead)
@@ -91,5 +105,25 @@ public class PlayerCombatTarget : MonoBehaviour
 
         // 콘솔에 사망 로그를 남긴다.
         Debug.Log(name + " died.");
+
+        if (broadcast)
+        {
+            GameLoopManager.EnsureExists().ReportPlayerDeath(GetActorNumber());
+        }
+    }
+
+    public int GetActorNumber()
+    {
+        if (photonActorNumber > 0)
+        {
+            return photonActorNumber;
+        }
+
+        if (!isRemoteProxy && Photon.Pun.PhotonNetwork.LocalPlayer != null)
+        {
+            return Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber;
+        }
+
+        return -1;
     }
 }

@@ -166,7 +166,7 @@ MonoBehaviour:
   mainMenuSceneName: LobbyScene 1
   publicRoomListSceneName: PublicRoomListScene
   gameSceneName: labor
-  lobbyBackgroundSprite: {fileID: 1424822975, guid: 41e25f1237da9c247bd47c0294bfc0a7, type: 3}
+  lobbyBackgroundSprite: {fileID: 21300000, guid: 595228a9a75075a44bfe097daabc2911, type: 3}
 --- !u!1 &200000
 GameObject:
   m_ObjectHideFlags: 0

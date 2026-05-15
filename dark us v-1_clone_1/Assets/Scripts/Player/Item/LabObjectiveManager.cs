@@ -104,6 +104,7 @@ public class LabObjectiveManager : MonoBehaviour
         }
 
         Instance = this;
+        GameLoopManager.EnsureExists();
     }
 
     // 시작 시 HUD를 한 번 갱신한다.
