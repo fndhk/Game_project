@@ -24,27 +24,35 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private readonly List<TMP_Text> dynamicSettingLabels = new List<TMP_Text>();
     private readonly List<Slider> settingsSliders = new List<Slider>();
-    private readonly List<Toggle> settingsToggles = new List<Toggle>();
     private readonly List<LocalizedTextBinding> localizedTexts = new List<LocalizedTextBinding>();
+    private readonly List<KeyBindingTextBinding> keyBindingTexts = new List<KeyBindingTextBinding>();
 
     private FullScreenMode selectedScreenMode = FullScreenMode.FullScreenWindow;
-    private int selectedResolutionIndex;
-    private int selectedQualityIndex;
     private int selectedFpsLimitIndex = 2;
     private int selectedLanguageIndex;
-    private Resolution[] availableResolutions;
     private TMP_FontAsset localizedFontAsset;
     private Sprite settingSliderHandleSprite;
     private TMP_InputField findRoomCodeInput;
     private Transform publicRoomListContent;
     private TMP_Text publicRoomEmptyText;
     private TMP_Text publicRoomStatusText;
+    private ScrollRect settingsScrollRect;
     private readonly Dictionary<string, RoomInfo> publicRooms = new Dictionary<string, RoomInfo>();
+    private string pendingKeyBindingPrefsKey;
+    private TMP_Text pendingKeyBindingText;
+    private float pendingKeyBindingStartTime;
     private readonly int[] fpsLimits = { 30, 60, 120, 144, -1 };
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
     private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
     private const string RoomTitlePrefsKey = "dark_us_room_title";
+
+    private struct KeyBindingTextBinding
+    {
+        public TMP_Text Text;
+        public string PrefsKey;
+        public KeyCode DefaultKey;
+    }
 
     [Header("Scene Names")]
     // 방 만들기를 눌렀을 때 이동할 씬 이름이다.
@@ -86,6 +94,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
 
         PrepareSettingsState();
+        ApplyFixedLowGraphicsSettings();
         EnsureMainMenuBindings();
         EnsureQuitUi();
         EnsureMainMenuLayout();
@@ -118,6 +127,16 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
         ApplyLanguage();
         ClearSelectedUi();
+    }
+
+    private void Update()
+    {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        CapturePendingKeyBinding();
     }
 
 #if UNITY_EDITOR
@@ -401,6 +420,11 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
         panel.transform.SetAsLastSibling();
         panel.SetActive(true);
+
+        if (panel == settingsPanel)
+        {
+            ResetSettingsScroll();
+        }
     }
 
     private void EnsureMainMenuBindings()
@@ -1183,7 +1207,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private void PrepareExistingSettingsPanel(GameObject panelObject)
     {
-        if (panelObject == null || panelObject.transform.childCount > 0)
+        if (panelObject == null)
         {
             return;
         }
@@ -1200,6 +1224,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             panelObject.AddComponent<Image>();
         }
 
+        ClearChildren(panelObject.transform);
         BuildSettingsPanelContents(panelObject);
     }
 
@@ -1324,7 +1349,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         PrepareSettingsState();
         dynamicSettingLabels.Clear();
         settingsSliders.Clear();
-        settingsToggles.Clear();
+        keyBindingTexts.Clear();
 
         Image panelImage = panelObject.GetComponent<Image>();
         panelImage.color = new Color(0f, 0f, 0f, 0.72f);
@@ -1381,10 +1406,11 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         viewportRect.anchorMin = new Vector2(0f, 0f);
         viewportRect.anchorMax = new Vector2(1f, 1f);
         viewportRect.offsetMin = new Vector2(48f, 124f);
-        viewportRect.offsetMax = new Vector2(-48f, -178f);
+        viewportRect.offsetMax = new Vector2(-82f, -178f);
 
         Image viewportImage = viewportObject.GetComponent<Image>();
         viewportImage.color = new Color(0f, 0f, 0f, 0.08f);
+        viewportImage.raycastTarget = true;
 
         Mask viewportMask = viewportObject.GetComponent<Mask>();
         viewportMask.showMaskGraphic = false;
@@ -1412,30 +1438,32 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         ContentSizeFitter fitter = contentObject.GetComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        ScrollRect scrollRect = dialogObject.AddComponent<ScrollRect>();
-        scrollRect.viewport = viewportRect;
-        scrollRect.content = contentRect;
-        scrollRect.horizontal = false;
-        scrollRect.vertical = true;
-        scrollRect.movementType = ScrollRect.MovementType.Clamped;
-        scrollRect.scrollSensitivity = 36f;
+        settingsScrollRect = viewportObject.AddComponent<ScrollRect>();
+        settingsScrollRect.viewport = viewportRect;
+        settingsScrollRect.content = contentRect;
+        settingsScrollRect.horizontal = false;
+        settingsScrollRect.vertical = true;
+        settingsScrollRect.movementType = ScrollRect.MovementType.Clamped;
+        settingsScrollRect.inertia = true;
+        settingsScrollRect.scrollSensitivity = 48f;
+        settingsScrollRect.verticalScrollbar = CreateSettingsScrollbar(dialogObject.transform);
+        settingsScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        settingsScrollRect.verticalScrollbarSpacing = 10f;
 
         Transform[] settingsPages =
         {
-            BuildGraphicsSettings(contentObject.transform),
+            BuildDisplaySettings(contentObject.transform),
             BuildAudioSettings(contentObject.transform),
             BuildControlSettings(contentObject.transform),
-            BuildGameplaySettings(contentObject.transform),
-            BuildAccessibilitySettings(contentObject.transform)
+            BuildGameplaySettings(contentObject.transform)
         };
 
         Button[] tabButtons =
         {
-            CreateSettingsTabButton(tabBarObject.transform, "Graphics Display"),
+            CreateSettingsTabButton(tabBarObject.transform, "Display"),
             CreateSettingsTabButton(tabBarObject.transform, "Audio"),
             CreateSettingsTabButton(tabBarObject.transform, "Controls Keybindings"),
-            CreateSettingsTabButton(tabBarObject.transform, "Gameplay"),
-            CreateSettingsTabButton(tabBarObject.transform, "Accessibility")
+            CreateSettingsTabButton(tabBarObject.transform, "Gameplay")
         };
 
         for (int i = 0; i < tabButtons.Length; i++)
@@ -1471,58 +1499,51 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         ApplyLanguage();
     }
 
-    private Transform BuildGraphicsSettings(Transform parent)
+    private Transform BuildDisplaySettings(Transform parent)
     {
-        Transform section = CreateSettingsSection(parent, "Graphics & Display", 560f);
+        Transform section = CreateSettingsSection(parent, "Display", 340f);
         CreateCycleRow(section, "Screen Mode", () => GetScreenModeLabel(), CycleScreenMode);
-        CreateSliderRow(section, "Texture Detail", 0f, 3f, 3f, true, "setting_texture");
-        CreateSliderRow(section, "Shadow Detail", 0f, 3f, 2f, true, "setting_shadow");
-        CreateSliderRow(section, "Anti-aliasing", 0f, 8f, 2f, true, "setting_aa");
-        CreateToggleRow(section, "V-Sync", QualitySettings.vSyncCount > 0, "setting_vsync");
         CreateCycleRow(section, "FPS Limit", () => GetFpsLimitLabel(), CycleFpsLimit);
-        CreateToggleRow(section, "Motion Blur", false, "setting_motion_blur");
-        CreateToggleRow(section, "Camera Shake", true, "setting_camera_shake");
+        CreateCycleRow(section, "Language", () => GetLanguageLabel(), CycleLanguage);
         return section;
     }
 
     private Transform BuildAudioSettings(Transform parent)
     {
-        Transform section = CreateSettingsSection(parent, "Audio", 340f);
+        Transform section = CreateSettingsSection(parent, "Audio", 240f);
         CreateSliderRow(section, "Master Volume", 0f, 1f, AudioListener.volume, false, "setting_master_volume");
-        CreateSliderRow(section, "BGM Volume", 0f, 1f, PlayerPrefs.GetFloat("setting_bgm_volume", 0.8f), false, "setting_bgm_volume");
-        CreateSliderRow(section, "SFX Volume", 0f, 1f, PlayerPrefs.GetFloat("setting_sfx_volume", 0.8f), false, "setting_sfx_volume");
         CreateSliderRow(section, "Voice Volume", 0f, 1f, PlayerPrefs.GetFloat("setting_voice_volume", 1f), false, "setting_voice_volume");
         return section;
     }
 
     private Transform BuildControlSettings(Transform parent)
     {
-        Transform section = CreateSettingsSection(parent, "Controls & Keybindings", 540f);
-        CreateDisplayRow(section, "Move", "W A S D");
-        CreateDisplayRow(section, "Interact", "E");
-        CreateDisplayRow(section, "Mic Mute", "B");
+        Transform section = CreateSettingsSection(parent, "Controls & Keybindings", 1360f);
         CreateSliderRow(section, "Mouse Sensitivity X", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_x", 1f), false, "setting_mouse_x");
         CreateSliderRow(section, "Mouse Sensitivity Y", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_y", 1f), false, "setting_mouse_y");
-        CreateToggleRow(section, "Invert Mouse Y", false, "setting_invert_y");
-        CreateToggleRow(section, "Gamepad Vibration", true, "setting_gamepad_vibration");
+        CreateKeyBindRow(section, "Move Forward", GameInputBindings.MoveForwardKey, KeyCode.W);
+        CreateKeyBindRow(section, "Move Back", GameInputBindings.MoveBackwardKey, KeyCode.S);
+        CreateKeyBindRow(section, "Move Left", GameInputBindings.MoveLeftKey, KeyCode.A);
+        CreateKeyBindRow(section, "Move Right", GameInputBindings.MoveRightKey, KeyCode.D);
+        CreateKeyBindRow(section, "Sprint", GameInputBindings.SprintKey, KeyCode.LeftShift);
+        CreateKeyBindRow(section, "Crouch", GameInputBindings.CrouchKey, KeyCode.LeftControl);
+        CreateKeyBindRow(section, "Interact", GameInputBindings.InteractKey, KeyCode.E);
+        CreateKeyBindRow(section, "Pick Up", GameInputBindings.PickupKey, KeyCode.F);
+        CreateKeyBindRow(section, "Scan", GameInputBindings.ScanKey, KeyCode.Mouse1);
+        CreateKeyBindRow(section, "Use Item", GameInputBindings.UseItemKey, KeyCode.Mouse0);
+        CreateKeyBindRow(section, "Drop Item", GameInputBindings.DropItemKey, KeyCode.G);
+        CreateKeyBindRow(section, "Slot 1", GameInputBindings.Slot1Key, KeyCode.Alpha1);
+        CreateKeyBindRow(section, "Slot 2", GameInputBindings.Slot2Key, KeyCode.Alpha2);
+        CreateKeyBindRow(section, "Mic Mute", GameInputBindings.MicMuteKey, KeyCode.B);
+        CreateKeyBindRow(section, "Kill", GameInputBindings.KillKey, KeyCode.Q);
+        CreateKeyBindRow(section, "Pause", GameInputBindings.PauseKey, KeyCode.Escape);
         return section;
     }
 
     private Transform BuildGameplaySettings(Transform parent)
     {
-        Transform section = CreateSettingsSection(parent, "Gameplay", 340f);
+        Transform section = CreateSettingsSection(parent, "Gameplay", 160f);
         CreateSliderRow(section, "HUD Opacity", 0.45f, 1f, PlayerPrefs.GetFloat("setting_hud_opacity", 1f), false, "setting_hud_opacity");
-        CreateSliderRow(section, "Scan Density", 0.35f, 1.5f, PlayerPrefs.GetFloat("setting_scan_density", 1f), false, "setting_scan_density");
-        CreateSliderRow(section, "Scan Dot Size", 0.6f, 1.4f, PlayerPrefs.GetFloat("setting_scan_dot_size", 1f), false, "setting_scan_dot_size");
-        CreateCycleRow(section, "Language", () => GetLanguageLabel(), CycleLanguage);
-        return section;
-    }
-
-    private Transform BuildAccessibilitySettings(Transform parent)
-    {
-        Transform section = CreateSettingsSection(parent, "Accessibility", 230f);
-        CreateToggleRow(section, "Color Blind Mode", false, "setting_color_blind");
-        CreateToggleRow(section, "Tutorial", true, "setting_tutorial");
         return section;
     }
 
@@ -1534,6 +1555,58 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         layoutElement.preferredWidth = 220f;
         layoutElement.preferredHeight = 52f;
         return button;
+    }
+
+    private Scrollbar CreateSettingsScrollbar(Transform parent)
+    {
+        GameObject scrollbarObject = new GameObject("SettingsScrollbar", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Scrollbar), typeof(Outline));
+        scrollbarObject.layer = parent.gameObject.layer;
+        scrollbarObject.transform.SetParent(parent, false);
+
+        RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
+        scrollbarRect.anchorMin = new Vector2(1f, 0f);
+        scrollbarRect.anchorMax = new Vector2(1f, 1f);
+        scrollbarRect.pivot = new Vector2(1f, 0.5f);
+        scrollbarRect.offsetMin = new Vector2(-62f, 124f);
+        scrollbarRect.offsetMax = new Vector2(-46f, -178f);
+
+        Image background = scrollbarObject.GetComponent<Image>();
+        background.color = new Color(0.015f, 0.018f, 0.02f, 0.72f);
+
+        Outline outline = scrollbarObject.GetComponent<Outline>();
+        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.24f);
+        outline.effectDistance = new Vector2(1f, -1f);
+
+        GameObject slidingAreaObject = new GameObject("Sliding Area", typeof(RectTransform));
+        slidingAreaObject.layer = parent.gameObject.layer;
+        slidingAreaObject.transform.SetParent(scrollbarObject.transform, false);
+
+        RectTransform slidingAreaRect = slidingAreaObject.GetComponent<RectTransform>();
+        slidingAreaRect.anchorMin = Vector2.zero;
+        slidingAreaRect.anchorMax = Vector2.one;
+        slidingAreaRect.offsetMin = new Vector2(2f, 2f);
+        slidingAreaRect.offsetMax = new Vector2(-2f, -2f);
+
+        GameObject handleObject = new GameObject("Handle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        handleObject.layer = parent.gameObject.layer;
+        handleObject.transform.SetParent(slidingAreaObject.transform, false);
+
+        Image handleImage = handleObject.GetComponent<Image>();
+        handleImage.color = new Color(1f, 0.8f, 0.42f, 0.86f);
+
+        RectTransform handleRect = handleObject.GetComponent<RectTransform>();
+        handleRect.anchorMin = Vector2.zero;
+        handleRect.anchorMax = Vector2.one;
+        handleRect.offsetMin = Vector2.zero;
+        handleRect.offsetMax = Vector2.zero;
+
+        Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
+        scrollbar.direction = Scrollbar.Direction.BottomToTop;
+        scrollbar.targetGraphic = handleImage;
+        scrollbar.handleRect = handleRect;
+        scrollbar.size = 0.18f;
+        scrollbar.value = 1f;
+        return scrollbar;
     }
 
     private void ShowSettingsPage(Transform[] pages, Button[] tabButtons, int selectedIndex)
@@ -1562,6 +1635,30 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             {
                 text.color = selected ? new Color(1f, 0.8f, 0.42f, 1f) : new Color(0.76f, 0.82f, 0.84f, 1f);
             }
+        }
+
+        if (settingsScrollRect != null)
+        {
+            ResetSettingsScroll();
+        }
+    }
+
+    private void ResetSettingsScroll()
+    {
+        if (settingsScrollRect == null)
+        {
+            return;
+        }
+
+        Canvas.ForceUpdateCanvases();
+        settingsScrollRect.StopMovement();
+        settingsScrollRect.verticalNormalizedPosition = 1f;
+
+        if (settingsScrollRect.content != null)
+        {
+            Vector2 position = settingsScrollRect.content.anchoredPosition;
+            position.y = 0f;
+            settingsScrollRect.content.anchoredPosition = position;
         }
     }
 
@@ -1606,13 +1703,113 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
         Button button = CreateMenuButton(row, "ChangeButton", "Change", 150f, 44f, 20f);
         button.onClick.AddListener(cycleAction);
-        button.onClick.AddListener(ApplySettings);
+        button.onClick.AddListener(RefreshDynamicSettingLabels);
     }
 
-    private void CreateDisplayRow(Transform parent, string label, string value)
+    private void CreateKeyBindRow(Transform parent, string label, string prefsKey, KeyCode defaultKey)
     {
         Transform row = CreateSettingsRow(parent, label);
-        CreateValueText(row, value);
+        TMP_Text valueText = CreateValueText(row, GameInputBindings.GetLabel(prefsKey, defaultKey));
+        keyBindingTexts.Add(new KeyBindingTextBinding
+        {
+            Text = valueText,
+            PrefsKey = prefsKey,
+            DefaultKey = defaultKey
+        });
+
+        Button button = CreateKeyBindButton(row, "BindButton", "Bind", 132f, 44f, 18f);
+        button.onClick.AddListener(() => StartKeyBindingCapture(prefsKey, defaultKey, valueText));
+    }
+
+    private Button CreateKeyBindButton(Transform parent, string objectName, string label, float preferredWidth, float preferredHeight, float fontSize)
+    {
+        GameObject buttonObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement), typeof(Outline), typeof(MenuButtonHoverEffect));
+        buttonObject.layer = parent.gameObject.layer;
+        buttonObject.transform.SetParent(parent, false);
+
+        RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
+        rectTransform.sizeDelta = new Vector2(preferredWidth, preferredHeight);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0.015f, 0.018f, 0.02f, 0.62f);
+
+        LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
+        layoutElement.preferredWidth = preferredWidth;
+        layoutElement.preferredHeight = preferredHeight;
+
+        Outline outline = buttonObject.GetComponent<Outline>();
+        outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.34f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        TMP_Text labelText = CreateLabel(buttonObject.transform, "Text (TMP)", label, fontSize, FontStyles.UpperCase);
+
+        MenuButtonHoverEffect hoverEffect = buttonObject.GetComponent<MenuButtonHoverEffect>();
+        hoverEffect.buttonImage = image;
+        hoverEffect.labelText = labelText;
+        hoverEffect.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.52f);
+        hoverEffect.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.76f);
+        hoverEffect.pressedBackgroundColor = new Color(0.16f, 0.18f, 0.17f, 0.86f);
+        hoverEffect.normalTextColor = new Color(0.76f, 0.82f, 0.84f, 1f);
+        hoverEffect.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+        return button;
+    }
+
+    private void StartKeyBindingCapture(string prefsKey, KeyCode defaultKey, TMP_Text valueText)
+    {
+        pendingKeyBindingPrefsKey = prefsKey;
+        pendingKeyBindingText = valueText;
+        pendingKeyBindingStartTime = Time.unscaledTime;
+
+        if (pendingKeyBindingText != null)
+        {
+            pendingKeyBindingText.text = Translate("Press a key");
+            pendingKeyBindingText.color = new Color(1f, 0.8f, 0.42f, 1f);
+        }
+    }
+
+    private void CapturePendingKeyBinding()
+    {
+        if (string.IsNullOrEmpty(pendingKeyBindingPrefsKey))
+        {
+            return;
+        }
+
+        if (Time.unscaledTime - pendingKeyBindingStartTime < 0.12f)
+        {
+            return;
+        }
+
+        if (!GameInputBindings.TryGetPressedBindableKey(out KeyCode key))
+        {
+            return;
+        }
+
+        GameInputBindings.SetKey(pendingKeyBindingPrefsKey, key);
+        pendingKeyBindingPrefsKey = null;
+        pendingKeyBindingText = null;
+        RefreshKeyBindingTexts();
+    }
+
+    private void RefreshKeyBindingTexts()
+    {
+        for (int i = keyBindingTexts.Count - 1; i >= 0; i--)
+        {
+            KeyBindingTextBinding binding = keyBindingTexts[i];
+            TMP_Text text = binding.Text;
+
+            if (text == null)
+            {
+                keyBindingTexts.RemoveAt(i);
+                continue;
+            }
+
+            ApplyFontForLanguage(text);
+            text.text = GameInputBindings.GetLabel(binding.PrefsKey, binding.DefaultKey);
+            text.color = new Color(0.76f, 0.82f, 0.84f, 1f);
+        }
     }
 
     private void CreateSliderRow(Transform parent, string label, float min, float max, float value, bool wholeNumbers, string playerPrefsKey)
@@ -1644,37 +1841,11 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         slider.onValueChanged.AddListener(v =>
         {
             PlayerPrefs.SetFloat(playerPrefsKey, v);
-            ApplySettings();
         });
         settingsSliders.Add(slider);
 
         TMP_Text valueText = CreateValueText(row, FormatSettingValue(slider.value, wholeNumbers));
         slider.onValueChanged.AddListener(v => valueText.text = FormatSettingValue(v, wholeNumbers));
-    }
-
-    private void CreateToggleRow(Transform parent, string label, bool defaultValue, string playerPrefsKey)
-    {
-        Transform row = CreateSettingsRow(parent, label);
-
-        Toggle toggle = new GameObject(label + "Toggle", typeof(RectTransform), typeof(Toggle), typeof(Image)).GetComponent<Toggle>();
-        toggle.gameObject.layer = parent.gameObject.layer;
-        toggle.transform.SetParent(row, false);
-        toggle.isOn = PlayerPrefs.GetInt(playerPrefsKey, defaultValue ? 1 : 0) == 1;
-        toggle.targetGraphic = toggle.GetComponent<Image>();
-        toggle.GetComponent<Image>().color = new Color(0.015f, 0.018f, 0.02f, 0.68f);
-        toggle.GetComponent<RectTransform>().sizeDelta = new Vector2(44f, 32f);
-        Image checkImage = CreateSettingGraphic(toggle.transform, "Checkmark", new Color(1f, 0.8f, 0.42f, 0.95f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-        checkImage.rectTransform.sizeDelta = new Vector2(24f, 16f);
-        toggle.graphic = checkImage;
-        toggle.onValueChanged.AddListener(v =>
-        {
-            PlayerPrefs.SetInt(playerPrefsKey, v ? 1 : 0);
-            ApplySettings();
-        });
-        settingsToggles.Add(toggle);
-
-        TMP_Text valueText = CreateValueText(row, toggle.isOn ? "ON" : "OFF");
-        toggle.onValueChanged.AddListener(v => valueText.text = v ? "ON" : "OFF");
     }
 
     private Image CreateSettingGraphic(Transform parent, string objectName, Color color, Vector2 anchorMin, Vector2 anchorMax)
@@ -1761,16 +1932,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private void PrepareSettingsState()
     {
-        availableResolutions = Screen.resolutions;
-        if (availableResolutions == null || availableResolutions.Length == 0)
-        {
-            availableResolutions = new[] { Screen.currentResolution };
-        }
-
-        selectedResolutionIndex = PlayerPrefs.GetInt("setting_resolution", availableResolutions.Length - 1);
-        selectedResolutionIndex = Mathf.Clamp(selectedResolutionIndex, 0, availableResolutions.Length - 1);
-        selectedQualityIndex = PlayerPrefs.GetInt("setting_quality", QualitySettings.GetQualityLevel());
-        selectedQualityIndex = Mathf.Clamp(selectedQualityIndex, 0, Mathf.Max(0, QualitySettings.names.Length - 1));
         selectedFpsLimitIndex = Mathf.Clamp(PlayerPrefs.GetInt("setting_fps_limit", selectedFpsLimitIndex), 0, fpsLimits.Length - 1);
         selectedLanguageIndex = Mathf.Clamp(PlayerPrefs.GetInt("setting_language", 0), 0, 2);
 
@@ -1794,18 +1955,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
 
         PlayerPrefs.SetInt("setting_screen_mode", (int)selectedScreenMode);
-    }
-
-    private void CycleResolution()
-    {
-        selectedResolutionIndex = (selectedResolutionIndex + 1) % availableResolutions.Length;
-        PlayerPrefs.SetInt("setting_resolution", selectedResolutionIndex);
-    }
-
-    private void CycleQuality()
-    {
-        selectedQualityIndex = (selectedQualityIndex + 1) % QualitySettings.names.Length;
-        PlayerPrefs.SetInt("setting_quality", selectedQualityIndex);
     }
 
     private void CycleFpsLimit()
@@ -1860,12 +2009,6 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
     }
 
-    private string GetResolutionLabel()
-    {
-        Resolution resolution = availableResolutions[selectedResolutionIndex];
-        return resolution.width + "x" + resolution.height + " " + resolution.refreshRate + "Hz";
-    }
-
     private string GetFpsLimitLabel()
     {
         int fpsLimit = fpsLimits[selectedFpsLimitIndex];
@@ -1892,26 +2035,27 @@ public class MainMenuController : MonoBehaviourPunCallbacks
 
     private void ApplySettings()
     {
-        Resolution resolution = availableResolutions[selectedResolutionIndex];
+        Resolution resolution = Screen.currentResolution;
         Screen.SetResolution(resolution.width, resolution.height, selectedScreenMode, resolution.refreshRate);
-        QualitySettings.SetQualityLevel(selectedQualityIndex, true);
-        QualitySettings.globalTextureMipmapLimit = Mathf.Clamp(3 - Mathf.RoundToInt(PlayerPrefs.GetFloat("setting_texture", 3f)), 0, 3);
-
-        int shadowDetail = Mathf.RoundToInt(PlayerPrefs.GetFloat("setting_shadow", 2f));
-        QualitySettings.shadows = shadowDetail <= 0 ? ShadowQuality.Disable : shadowDetail == 1 ? ShadowQuality.HardOnly : ShadowQuality.All;
-        QualitySettings.shadowResolution = shadowDetail <= 1 ? ShadowResolution.Low : shadowDetail == 2 ? ShadowResolution.Medium : ShadowResolution.High;
-
-        int antiAliasing = Mathf.RoundToInt(PlayerPrefs.GetFloat("setting_aa", 2f));
-        QualitySettings.antiAliasing = antiAliasing < 2 ? 0 : antiAliasing < 4 ? 2 : antiAliasing < 8 ? 4 : 8;
-        QualitySettings.vSyncCount = PlayerPrefs.GetInt("setting_vsync", QualitySettings.vSyncCount > 0 ? 1 : 0);
+        ApplyFixedLowGraphicsSettings();
 
         int fpsLimit = fpsLimits[selectedFpsLimitIndex];
         Application.targetFrameRate = fpsLimit;
         AudioListener.volume = PlayerPrefs.GetFloat("setting_master_volume", 1f);
+        PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
 
         PlayerPrefs.Save();
         RefreshDynamicSettingLabels();
         ApplyLanguage();
+    }
+
+    private void ApplyFixedLowGraphicsSettings()
+    {
+        QualitySettings.globalTextureMipmapLimit = 3;
+        QualitySettings.shadows = ShadowQuality.Disable;
+        QualitySettings.shadowResolution = ShadowResolution.Low;
+        QualitySettings.antiAliasing = 0;
+        QualitySettings.vSyncCount = 0;
     }
 
     private void ResetSettingsToDefault()
@@ -1940,10 +2084,12 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         PlayerPrefs.DeleteKey("setting_language");
         PlayerPrefs.DeleteKey("setting_color_blind");
         PlayerPrefs.DeleteKey("setting_tutorial");
+        GameInputBindings.ResetAll();
         PlayerPrefs.Save();
 
         PrepareSettingsState();
         RefreshDynamicSettingLabels();
+        RefreshKeyBindingTexts();
         ApplySettings();
     }
 
@@ -1983,6 +2129,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
         }
 
         RefreshDynamicSettingLabels();
+        RefreshKeyBindingTexts();
     }
 
     private void ApplyLanguageToSceneButton(string objectName, string key)
@@ -2113,6 +2260,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "NETWORK STANDBY": return "네트워크 대기";
             case "VOICE LINK READY": return "음성 링크 준비";
             case "CREW AUTH REQUIRED": return "대원 인증 필요";
+            case "Display": return "화면";
             case "Graphics Display": return "그래픽 표시";
             case "Graphics & Display": return "그래픽 및 화면";
             case "Audio": return "오디오";
@@ -2133,9 +2281,24 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "SFX Volume": return "효과음 볼륨";
             case "Voice Volume": return "음성 볼륨";
             case "Move": return "이동";
+            case "Move Forward": return "앞으로 이동";
+            case "Move Back": return "뒤로 이동";
+            case "Move Left": return "왼쪽 이동";
+            case "Move Right": return "오른쪽 이동";
+            case "Sprint": return "달리기";
+            case "Crouch": return "웅크리기";
             case "Interact": return "상호작용";
+            case "Pick Up": return "줍기";
+            case "Scan": return "스캔";
+            case "Use Item": return "아이템 사용";
+            case "Drop Item": return "아이템 버리기";
+            case "Slot 1": return "슬롯 1";
+            case "Slot 2": return "슬롯 2";
             case "Push To Talk": return "눌러서 말하기";
             case "Mic Mute": return "마이크 음소거";
+            case "Kill": return "킬";
+            case "Pause": return "일시정지";
+            case "Press a key": return "키를 누르세요";
             case "Mouse Sensitivity X": return "마우스 감도 X";
             case "Mouse Sensitivity Y": return "마우스 감도 Y";
             case "Invert Mouse Y": return "마우스 Y축 반전";
@@ -2191,6 +2354,7 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "NETWORK STANDBY": return "ネットワーク待機";
             case "VOICE LINK READY": return "ボイスリンク準備";
             case "CREW AUTH REQUIRED": return "クルー認証が必要";
+            case "Display": return "画面";
             case "Graphics Display": return "グラフィック表示";
             case "Graphics & Display": return "グラフィックと画面";
             case "Audio": return "オーディオ";
@@ -2211,9 +2375,24 @@ public class MainMenuController : MonoBehaviourPunCallbacks
             case "SFX Volume": return "効果音音量";
             case "Voice Volume": return "ボイス音量";
             case "Move": return "移動";
+            case "Move Forward": return "前進";
+            case "Move Back": return "後退";
+            case "Move Left": return "左移動";
+            case "Move Right": return "右移動";
+            case "Sprint": return "走る";
+            case "Crouch": return "しゃがむ";
             case "Interact": return "インタラクト";
+            case "Pick Up": return "拾う";
+            case "Scan": return "スキャン";
+            case "Use Item": return "アイテム使用";
+            case "Drop Item": return "アイテムを捨てる";
+            case "Slot 1": return "スロット 1";
+            case "Slot 2": return "スロット 2";
             case "Push To Talk": return "プッシュトゥトーク";
             case "Mic Mute": return "マイクミュート";
+            case "Kill": return "キル";
+            case "Pause": return "一時停止";
+            case "Press a key": return "キーを押してください";
             case "Mouse Sensitivity X": return "マウス感度 X";
             case "Mouse Sensitivity Y": return "マウス感度 Y";
             case "Invert Mouse Y": return "マウスY反転";

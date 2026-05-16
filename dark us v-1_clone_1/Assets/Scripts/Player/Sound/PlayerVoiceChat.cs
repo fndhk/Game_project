@@ -214,7 +214,7 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
 
     private void HandleMuteToggle()
     {
-        bool isMuteKeyDown = Input.GetKey(muteToggleKey);
+        bool isMuteKeyDown = Input.GetKey(GameInputBindings.MicMute);
         if (isMuteKeyDown && !muteKeyWasDown)
         {
             localVoiceMuted = !localVoiceMuted;

@@ -86,13 +86,14 @@ public class InGamePauseMenu : MonoBehaviour
 
         instance = this;
         EnsureEventSystem();
+        ApplyFixedLowGraphicsSettings();
         BuildUi();
         SetOpen(false);
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(toggleKey))
+        if (Input.GetKeyDown(GameInputBindings.Pause))
         {
             SetOpen(!isOpen);
         }
@@ -198,17 +199,22 @@ public class InGamePauseMenu : MonoBehaviour
         currentPanelKey = "CONTROLS";
         titleText.text = T("CONTROLS");
         SetBody(
-            T("WASD        MOVE") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.MoveForwardKey, KeyCode.W) + "/" +
+            GameInputBindings.GetLabel(GameInputBindings.MoveLeftKey, KeyCode.A) + "/" +
+            GameInputBindings.GetLabel(GameInputBindings.MoveBackwardKey, KeyCode.S) + "/" +
+            GameInputBindings.GetLabel(GameInputBindings.MoveRightKey, KeyCode.D) + "        " + T("MOVE") + "\n" +
             T("MOUSE       LOOK") + "\n" +
-            T("SHIFT       SPRINT") + "\n" +
-            T("CTRL        CROUCH") + "\n" +
-            T("E           INTERACT") + "\n" +
-            T("F           PICK UP") + "\n" +
-            T("1 / 2       SELECT ITEM") + "\n" +
-            T("LMB         USE ITEM") + "\n" +
-            T("G           DROP ITEM") + "\n" +
-            T("V           VOICE") + "\n" +
-            T("ESC         PAUSE")
+            GameInputBindings.GetLabel(GameInputBindings.SprintKey, KeyCode.LeftShift) + "       " + T("SPRINT") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.CrouchKey, KeyCode.LeftControl) + "       " + T("CROUCH") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.InteractKey, KeyCode.E) + "           " + T("INTERACT") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.PickupKey, KeyCode.F) + "           " + T("PICK UP") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.Slot1Key, KeyCode.Alpha1) + " / " +
+            GameInputBindings.GetLabel(GameInputBindings.Slot2Key, KeyCode.Alpha2) + "       " + T("SELECT ITEM") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.UseItemKey, KeyCode.Mouse0) + "         " + T("USE ITEM") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.DropItemKey, KeyCode.G) + "           " + T("DROP ITEM") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.MicMuteKey, KeyCode.B) + "           " + T("MIC MUTE") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.KillKey, KeyCode.Q) + "           " + T("KILL") + "\n" +
+            GameInputBindings.GetLabel(GameInputBindings.PauseKey, KeyCode.Escape) + "         " + T("PAUSE")
         );
     }
 
@@ -643,33 +649,10 @@ public class InGamePauseMenu : MonoBehaviour
             float finalValue = wholeNumbers ? Mathf.Round(value) : value;
             PlayerPrefs.SetFloat(prefsKey, finalValue);
             valueText.text = wholeNumbers ? finalValue.ToString("0") : finalValue.ToString("0.00");
-            ApplyInGameSettings();
         };
 
         slider.onValueChanged.AddListener(refresh);
         refresh(slider.value);
-    }
-
-    private void CreateSettingsToggleRow(Transform parent, string label, string prefsKey, bool defaultValue)
-    {
-        GameObject row = CreateSettingsRow(parent, label);
-
-        Button toggleButton = null;
-        toggleButton = CreateButton(row.transform, "ToggleButton", string.Empty, () =>
-        {
-            bool current = PlayerPrefs.GetInt(prefsKey, defaultValue ? 1 : 0) == 1;
-            PlayerPrefs.SetInt(prefsKey, current ? 0 : 1);
-            ApplyInGameSettings();
-            RefreshToggleLabel(toggleButton, prefsKey, defaultValue);
-        });
-
-        RectTransform buttonRect = toggleButton.GetComponent<RectTransform>();
-        buttonRect.anchorMin = new Vector2(1f, 0.5f);
-        buttonRect.anchorMax = new Vector2(1f, 0.5f);
-        buttonRect.pivot = new Vector2(1f, 0.5f);
-        buttonRect.anchoredPosition = Vector2.zero;
-        buttonRect.sizeDelta = new Vector2(180f, 46f);
-        RefreshToggleLabel(toggleButton, prefsKey, defaultValue);
     }
 
     private GameObject CreateSettingsRow(Transform parent, string label)
@@ -769,19 +752,11 @@ public class InGamePauseMenu : MonoBehaviour
         return roundSliderHandleSprite;
     }
 
-    private void RefreshToggleLabel(Button button, string prefsKey, bool defaultValue)
-    {
-        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
-        if (label != null)
-        {
-            label.text = PlayerPrefs.GetInt(prefsKey, defaultValue ? 1 : 0) == 1 ? T("ON") : T("OFF");
-        }
-    }
-
     private void ApplyInGameSettings()
     {
         AudioListener.volume = PlayerPrefs.GetFloat("setting_master_volume", 1f);
         PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
+        ApplyFixedLowGraphicsSettings();
 
         float mouseX = PlayerPrefs.GetFloat("setting_mouse_x", 1f);
         float mouseY = PlayerPrefs.GetFloat("setting_mouse_y", 1f);
@@ -793,6 +768,15 @@ public class InGamePauseMenu : MonoBehaviour
         }
 
         PlayerPrefs.Save();
+    }
+
+    private void ApplyFixedLowGraphicsSettings()
+    {
+        QualitySettings.globalTextureMipmapLimit = 3;
+        QualitySettings.shadows = ShadowQuality.Disable;
+        QualitySettings.shadowResolution = ShadowResolution.Low;
+        QualitySettings.antiAliasing = 0;
+        QualitySettings.vSyncCount = 0;
     }
 
     private void ResetInGameSettings()

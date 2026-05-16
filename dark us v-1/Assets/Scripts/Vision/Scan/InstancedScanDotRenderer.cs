@@ -218,8 +218,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
     private void ApplySavedDotSettings()
     {
-        float dotSize = Mathf.Clamp(PlayerPrefs.GetFloat("setting_scan_dot_size", 1f), 0.6f, 1.4f);
-        dotScale = Mathf.Max(0.001f, baseDotScale * dotSize);
+        dotScale = Mathf.Max(0.001f, baseDotScale);
     }
 
     private void OnDestroy()

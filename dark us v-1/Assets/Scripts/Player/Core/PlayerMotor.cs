@@ -198,8 +198,8 @@ public class PlayerMotor : MonoBehaviour
     // Ctrl 입력을 확인해서 웅크리기 상태를 바꾸는 함수이다.
     private void HandleCrouchInput()
     {
-        // 좌/우 Ctrl 중 하나라도 누르고 있으면 웅크린다.
-        if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+        // 설정된 웅크리기 키를 누르고 있으면 웅크린다.
+        if (Input.GetKey(GameInputBindings.Crouch))
         {
             isCrouching = true;
         }
@@ -298,7 +298,7 @@ public class PlayerMotor : MonoBehaviour
     private bool IsTryingToSprint()
     {
         // 앞쪽 입력을 받는지 확인한다.
-        float z = Input.GetAxisRaw("Vertical");
+        float z = GameInputBindings.GetMoveInput().y;
 
         // PlayerStats가 없으면 기본적으로 달리기 가능으로 본다.
         // PlayerStats가 있으면 스태미나가 남아 있고 탈진 상태가 아닐 때만 달리기 가능하다.
@@ -309,17 +309,16 @@ public class PlayerMotor : MonoBehaviour
             !isCrouching &&
             z > 0f &&
             hasSprintResource &&
-            (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+            Input.GetKey(GameInputBindings.Sprint);
     }
 
     // WASD 이동, Shift 달리기, 스테미나 소모/회복을 처리하는 함수이다.
     private void HandleHorizontalMovement()
     {
-        // 좌우 이동 입력을 받는다.
-        float x = Input.GetAxisRaw("Horizontal");
-
-        // 앞뒤 이동 입력을 받는다.
-        float z = Input.GetAxisRaw("Vertical");
+        // 설정된 이동 키 입력을 받는다.
+        Vector2 moveInput = GameInputBindings.GetMoveInput();
+        float x = moveInput.x;
+        float z = moveInput.y;
 
         // 플레이어 기준의 이동 방향을 만든다.
         Vector3 inputDirection = transform.right * x + transform.forward * z;

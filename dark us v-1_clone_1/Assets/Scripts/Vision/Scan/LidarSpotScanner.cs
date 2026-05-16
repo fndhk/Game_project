@@ -173,8 +173,7 @@ public class LidarSpotScanner : MonoBehaviour
 
     private void ApplySavedScanSettings()
     {
-        float scanDensity = Mathf.Clamp(PlayerPrefs.GetFloat("setting_scan_density", 1f), 0.35f, 1.5f);
-        pointsPerPulse = Mathf.Max(1, Mathf.RoundToInt(basePointsPerPulse * scanDensity));
+        pointsPerPulse = Mathf.Max(1, basePointsPerPulse);
     }
 
     // 스캐너를 사용할 수 있는지 확인하는 함수이다.
@@ -206,8 +205,8 @@ public class LidarSpotScanner : MonoBehaviour
     // 우클릭 입력을 처리하는 함수이다.
     private void HandlePulseInput()
     {
-        // 우클릭을 누르고 있는 동안 계속 처리한다.
-        if (!Input.GetMouseButton(1))
+        // 설정된 스캔 키를 누르고 있는 동안 계속 처리한다.
+        if (!Input.GetKey(GameInputBindings.Scan))
         {
             return;
         }

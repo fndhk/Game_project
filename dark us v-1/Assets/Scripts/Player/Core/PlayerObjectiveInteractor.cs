@@ -250,10 +250,10 @@ public class PlayerObjectiveInteractor : MonoBehaviour
     {
         if (target is WorldItemPickup)
         {
-            return itemPickupKey;
+            return GameInputBindings.Pickup;
         }
 
-        return interactKey;
+        return GameInputBindings.Interact;
     }
 
     // 길게 누르기 상호작용 입력을 처리한다.
@@ -265,7 +265,9 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         }
 
         // E키를 처음 누르면 길게 누르기 상호작용을 시작한다.
-        if (Input.GetKeyDown(interactKey))
+        KeyCode currentInteractKey = GameInputBindings.Interact;
+
+        if (Input.GetKeyDown(currentInteractKey))
         {
             if (holdTarget.CanInteract(this) && holdTarget.BeginHold(this))
             {
@@ -275,7 +277,7 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         }
 
         // E키를 누르고 있는 동안 진행도를 갱신한다.
-        if (isHoldingInteraction && currentHoldTarget != null && Input.GetKey(interactKey))
+        if (isHoldingInteraction && currentHoldTarget != null && Input.GetKey(currentInteractKey))
         {
             bool shouldContinue = currentHoldTarget.UpdateHold(this, Time.deltaTime);
 
@@ -287,7 +289,7 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         }
 
         // E키를 떼면 진행 중인 상호작용을 취소한다.
-        if (isHoldingInteraction && Input.GetKeyUp(interactKey))
+        if (isHoldingInteraction && Input.GetKeyUp(currentInteractKey))
         {
             CancelActiveHold();
             UpdateCurrentTarget();

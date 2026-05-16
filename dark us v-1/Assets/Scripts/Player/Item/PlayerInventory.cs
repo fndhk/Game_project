@@ -91,13 +91,13 @@ public class PlayerInventory : MonoBehaviour
     // 1번, 2번 입력으로 선택 슬롯을 바꾼다.
     private void HandleSlotInput()
     {
-        if (Input.GetKeyDown(slot1Key))
+        if (Input.GetKeyDown(GameInputBindings.Slot1))
         {
             SelectSlot(0);
             return;
         }
 
-        if (Input.GetKeyDown(slot2Key))
+        if (Input.GetKeyDown(GameInputBindings.Slot2))
         {
             SelectSlot(1);
             return;

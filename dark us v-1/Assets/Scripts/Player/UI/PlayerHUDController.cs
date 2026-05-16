@@ -548,6 +548,9 @@ public class PlayerHUDController : MonoBehaviour
             slotIcons[i].sprite = GetIconSprite(itemType);
             slotIcons[i].color = itemType == ItemType.None ? new Color(0.45f, 0.48f, 0.46f, 0.22f) : new Color(0.88f, 0.90f, 0.84f, 0.92f);
             slotCountTexts[i].text = amount > 0 ? "x" + amount : "";
+            slotKeyTexts[i].text = "[" + (i == 0
+                ? GameInputBindings.GetLabel(GameInputBindings.Slot1Key, KeyCode.Alpha1)
+                : GameInputBindings.GetLabel(GameInputBindings.Slot2Key, KeyCode.Alpha2)) + "]";
             slotHighlights[i].gameObject.SetActive(i == selected);
             slotFrames[i].color = i == selected ? new Color(0f, 0f, 0f, 0.92f) : panelColor;
             slotKeyTexts[i].color = i == selected ? amberColor : new Color(0.76f, 0.75f, 0.66f, 0.52f);
@@ -690,7 +693,7 @@ public class PlayerHUDController : MonoBehaviour
 
         bool isKiller = targetCombatTarget != null && targetCombatTarget.role == PlayerRole.Killer;
         killTimeWarningText.text = isKiller
-            ? T("Kill Time") + " / " + T("Press Q to Kill")
+            ? T("Kill Time") + " / " + T("Press") + " " + GameInputBindings.GetLabel(GameInputBindings.KillKey, KeyCode.Q) + " " + T("to Kill")
             : T("Kill Time") + " / " + T("Hide From Imposter");
         killTimeWarningText.color = new Color(1f, 0.18f, 0.12f, 0.98f);
     }
@@ -710,7 +713,7 @@ public class PlayerHUDController : MonoBehaviour
             micStatusVisibleUntil = Time.unscaledTime + 2.2f;
         }
 
-        if (Input.GetKeyDown(KeyCode.B))
+        if (Input.GetKeyDown(GameInputBindings.MicMute))
         {
             micStatusVisibleUntil = Time.unscaledTime + 2.2f;
         }

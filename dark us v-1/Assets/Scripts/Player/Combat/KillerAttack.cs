@@ -124,7 +124,7 @@ public class KillerAttack : MonoBehaviour
 
     private bool IsKillInputPressed()
     {
-        if (Input.GetKeyDown(killKey))
+        if (Input.GetKeyDown(GameInputBindings.Kill))
         {
             return true;
         }

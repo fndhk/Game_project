@@ -129,12 +129,12 @@ public class PlayerItemUser : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetMouseButtonDown(useItemMouseButton))
+        if (Input.GetKeyDown(GameInputBindings.UseItem))
         {
             UseSelectedItem();
         }
 
-        if (Input.GetKeyDown(dropItemKey))
+        if (Input.GetKeyDown(GameInputBindings.DropItem))
         {
             DropSelectedItem();
         }
