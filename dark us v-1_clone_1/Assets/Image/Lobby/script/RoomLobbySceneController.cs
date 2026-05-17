@@ -8,12 +8,14 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+[ExecuteAlways]
 public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 {
     public string mainMenuSceneName = "LobbyScene 1";
     public string publicRoomListSceneName = "PublicRoomListScene";
     public string gameSceneName = "labor";
     public Sprite lobbyBackgroundSprite;
+    public bool buildInEditMode = true;
 
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
@@ -58,20 +60,68 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private float uiStartedAt;
     private float nextVoicePanelRefreshTime;
 
+    public override void OnEnable()
+    {
+        base.OnEnable();
+
+        if (Application.isPlaying || !buildInEditMode)
+        {
+            return;
+        }
+
+        if (FindUiTransform("Canvas") == null)
+        {
+            languageIndex = PlayerPrefs.GetInt("setting_language", 0);
+            BuildRoomLobbyUi();
+#if UNITY_EDITOR
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+#endif
+        }
+    }
+
     private void Start()
     {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
         PhotonConnectionDefaults.Apply();
         MenuCursorState.UnlockCursor();
         languageIndex = PlayerPrefs.GetInt("setting_language", 0);
+        AudioListener.volume = PlayerPrefs.GetFloat("setting_master_volume", 1f);
         uiStartedAt = Time.unscaledTime;
         EnsureEventSystem();
         EnsureLobbyVoiceChat();
-        BuildRoomLobbyUi();
+        EnsureRoomLobbyUi();
         StartPhotonRoomFlow();
     }
 
     private void Update()
     {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        if (!SettingsPanelLauncher.IsCapturingKey &&
+            (Input.GetKeyDown(KeyCode.Escape) || GameInputBindings.GetKeyDown(GameInputBindings.PauseKey, KeyCode.Escape)))
+        {
+            if (SettingsPanelLauncher.ClosedByEscapeThisFrame)
+            {
+                return;
+            }
+
+            if (SettingsPanelLauncher.IsOpen)
+            {
+                SettingsPanelLauncher.MarkEscapeCloseFrame();
+                SettingsPanelLauncher.Hide();
+                return;
+            }
+
+            OpenSettingsPanel();
+        }
+
         AnimateLobbyUi();
         RefreshVoicePanelOnInterval();
     }
@@ -828,6 +878,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         pendingColorSelection = -1;
     }
 
+    private void OpenSettingsPanel()
+    {
+        MenuCursorState.UnlockCursor();
+        SettingsPanelLauncher.Show();
+    }
+
     private string GetRoomCode()
     {
         string roomCode = PlayerPrefs.GetString(RoomCodePrefsKey, string.Empty);
@@ -936,6 +992,129 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+    }
+
+    private void EnsureRoomLobbyUi()
+    {
+        if (FindUiTransform("Canvas") != null && FindUiTransform("ReadyButton") != null)
+        {
+            BindExistingRoomLobbyUi();
+            return;
+        }
+
+        BuildRoomLobbyUi();
+    }
+
+    private void BindExistingRoomLobbyUi()
+    {
+        slotTexts.Clear();
+        slotMicIcons.Clear();
+        slotVoiceSliders.Clear();
+        slotColorSwatches.Clear();
+        slotColorButtons.Clear();
+        colorButtons.Clear();
+        colorSwatches.Clear();
+        colorLabels.Clear();
+        animatedPanels.Clear();
+        animatedPanelBasePositions.Clear();
+        animatedPanelGroups.Clear();
+
+        roomTitleText = FindText("RoomTitleText");
+        roomCodeText = FindText("RoomCodeText");
+        networkStatusText = FindText("NetworkStatusText");
+        backgroundSweepLine = FindRectTransform("BackgroundSweepLine");
+
+        AddAnimatedPanelIfFound("LobbyHeaderPanel");
+        AddAnimatedPanelIfFound("CrewColorPanel");
+
+        for (int i = 0; i < MaxPlayers; i++)
+        {
+            Transform card = FindUiTransform("CrewSlotCard_" + i);
+            if (card == null)
+            {
+                continue;
+            }
+
+            TMP_Text slotText = FindText(card, "SlotText");
+            if (slotText != null)
+            {
+                slotTexts.Add(slotText);
+            }
+
+            Image micIcon = FindImage(card, "MicStatusIcon");
+            if (micIcon != null)
+            {
+                slotMicIcons.Add(micIcon);
+            }
+
+            Image colorSwatch = FindImage(card, "CrewColorSwatch");
+            Button colorButton = FindButton(card, "CrewColorSwatch");
+            if (colorSwatch != null)
+            {
+                slotColorSwatches.Add(colorSwatch);
+            }
+
+            if (colorButton != null)
+            {
+                int slotIndex = i;
+                colorButton.onClick.RemoveAllListeners();
+                colorButton.onClick.AddListener(() => ToggleColorPickerFromSlot(slotIndex));
+                slotColorButtons.Add(colorButton);
+            }
+
+            Slider voiceSlider = FindSlider(card, "PlayerVoiceVolumeSlider");
+            if (voiceSlider != null)
+            {
+                int slotIndex = i;
+                voiceSlider.onValueChanged.RemoveAllListeners();
+                voiceSlider.onValueChanged.AddListener(value => ApplySlotVoiceVolume(slotIndex, value));
+                slotVoiceSliders.Add(voiceSlider);
+            }
+        }
+
+        colorPickerPanelObject = FindUiTransform("CrewColorPanel")?.gameObject;
+        for (int i = 0; i < PlayerColorPalette.ColorCount; i++)
+        {
+            Transform buttonTransform = FindUiTransform("ColorButton_" + i);
+            if (buttonTransform == null)
+            {
+                continue;
+            }
+
+            Button button = buttonTransform.GetComponent<Button>();
+            Image swatch = FindImage(buttonTransform, "Swatch");
+            TMP_Text label = FindText("ColorLabel_" + i);
+
+            if (button != null)
+            {
+                int colorIndex = i;
+                button.onClick.RemoveAllListeners();
+                button.onClick.AddListener(() => SelectPendingColor(colorIndex));
+                colorButtons.Add(button);
+            }
+
+            if (swatch != null)
+            {
+                colorSwatches.Add(swatch);
+            }
+
+            if (label != null)
+            {
+                colorLabels.Add(label);
+            }
+        }
+
+        colorConfirmButton = BindButton("ColorConfirmButton", ConfirmPendingColorSelection);
+        colorCancelButton = BindButton("ColorCancelButton", () => SetColorPickerVisible(false));
+        readyButton = BindButton("ReadyButton", OnClickReady);
+        startButton = BindButton("StartGameButton", OnClickStartGame);
+        BindButton("BackButton", OnClickBack);
+
+        RefreshIntegratedVoiceControls();
+        RefreshColorPicker();
+        SetColorPickerVisible(false);
+        UpdateRoomTitleText();
+        UpdateRoomCodeText();
     }
 
     private void BuildRoomLobbyUi()
@@ -1467,6 +1646,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "IDLE": return "대기";
             case "MIC MUTED": return "마이크 꺼짐";
             case "MIC OPEN": return "마이크 켜짐";
+            case "SETTINGS": return "설정";
+            case "Master Volume": return "전체 볼륨";
+            case "Mouse Sensitivity X": return "마우스 감도 X";
+            case "Mouse Sensitivity Y": return "마우스 감도 Y";
+            case "Close": return "닫기";
             case "Room initialized": return "방 초기화됨";
             case "Voice channel standby": return "음성 채널 대기";
             case "Waiting for players": return "플레이어 대기 중";
@@ -1533,6 +1717,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "IDLE": return "待機";
             case "MIC MUTED": return "マイクOFF";
             case "MIC OPEN": return "マイクON";
+            case "SETTINGS": return "設定";
+            case "Master Volume": return "全体音量";
+            case "Mouse Sensitivity X": return "マウス感度 X";
+            case "Mouse Sensitivity Y": return "マウス感度 Y";
+            case "Close": return "閉じる";
             case "Room initialized": return "ルーム初期化";
             case "Voice channel standby": return "ボイスチャンネル待機";
             case "Waiting for players": return "プレイヤー待機中";
@@ -1802,5 +1991,105 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         Image image = imageObject.GetComponent<Image>();
         image.color = color;
         return image;
+    }
+
+    private void AddAnimatedPanelIfFound(string objectName)
+    {
+        Transform target = FindUiTransform(objectName);
+        if (target == null)
+        {
+            return;
+        }
+
+        RectTransform rect = target.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        animatedPanels.Add(rect);
+        animatedPanelBasePositions.Add(rect.anchoredPosition);
+        animatedPanelGroups.Add(target.GetComponent<CanvasGroup>());
+    }
+
+    private Button BindButton(string objectName, UnityEngine.Events.UnityAction action)
+    {
+        Button button = FindButton(objectName);
+        if (button == null)
+        {
+            return null;
+        }
+
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(action);
+        return button;
+    }
+
+    private Transform FindUiTransform(string objectName)
+    {
+        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        foreach (Transform target in transforms)
+        {
+            if (target.name == objectName && target.gameObject.scene == gameObject.scene)
+            {
+                return target;
+            }
+        }
+
+        return null;
+    }
+
+    private Transform FindDescendant(Transform root, string objectName)
+    {
+        if (root.name == objectName)
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindDescendant(root.GetChild(i), objectName);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private TMP_Text FindText(string objectName)
+    {
+        return FindUiTransform(objectName)?.GetComponent<TMP_Text>();
+    }
+
+    private TMP_Text FindText(Transform root, string objectName)
+    {
+        return FindDescendant(root, objectName)?.GetComponent<TMP_Text>();
+    }
+
+    private Image FindImage(Transform root, string objectName)
+    {
+        return FindDescendant(root, objectName)?.GetComponent<Image>();
+    }
+
+    private Button FindButton(string objectName)
+    {
+        return FindUiTransform(objectName)?.GetComponent<Button>();
+    }
+
+    private Button FindButton(Transform root, string objectName)
+    {
+        return FindDescendant(root, objectName)?.GetComponent<Button>();
+    }
+
+    private Slider FindSlider(Transform root, string objectName)
+    {
+        return FindDescendant(root, objectName)?.GetComponent<Slider>();
+    }
+
+    private RectTransform FindRectTransform(string objectName)
+    {
+        return FindUiTransform(objectName)?.GetComponent<RectTransform>();
     }
 }

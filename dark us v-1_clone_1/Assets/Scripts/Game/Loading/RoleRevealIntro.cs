@@ -27,6 +27,11 @@ public class RoleRevealIntro : MonoBehaviour
 
     public static void ShowWhenReady()
     {
+        if (IsMenuScene(SceneManager.GetActiveScene().name))
+        {
+            return;
+        }
+
         if (activeInstance != null || hasShownForScene)
         {
             return;
@@ -46,7 +51,27 @@ public class RoleRevealIntro : MonoBehaviour
 
     private static void ResetForScene(Scene scene, LoadSceneMode mode)
     {
+        if (IsMenuScene(scene.name))
+        {
+            hasShownForScene = false;
+
+            if (activeInstance != null)
+            {
+                Destroy(activeInstance.gameObject);
+            }
+
+            return;
+        }
+
         hasShownForScene = false;
+    }
+
+    private static bool IsMenuScene(string sceneName)
+    {
+        return sceneName == "LobbyScene" ||
+               sceneName == "LobbyScene 1" ||
+               sceneName == "CreateRoomLobbyScene" ||
+               sceneName == "PublicRoomListScene";
     }
 
     private void Awake()

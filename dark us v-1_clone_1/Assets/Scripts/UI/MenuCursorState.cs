@@ -8,6 +8,7 @@ public class MenuCursorState : MonoBehaviour
     {
         "LobbyScene",
         "LobbyScene 1",
+        "SettingsScene",
         "CreateRoomLobbyScene",
         "PublicRoomListScene"
     };

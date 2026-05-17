@@ -17,8 +17,6 @@ public class InGamePauseMenu : MonoBehaviour
 
     private Canvas canvas;
     private GameObject root;
-    private GameObject settingsRoot;
-    private GameObject settingsActionRoot;
     private GameObject confirmDialog;
     private TMP_Text titleText;
     private TMP_Text bodyText;
@@ -29,7 +27,6 @@ public class InGamePauseMenu : MonoBehaviour
     private bool isOpen;
     private string currentPanelKey;
     private System.Action pendingConfirmAction;
-    private Sprite roundSliderHandleSprite;
 
     public static bool IsOpen
     {
@@ -93,8 +90,21 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(GameInputBindings.Pause))
+        if (!SettingsPanelLauncher.IsCapturingKey &&
+            (Input.GetKeyDown(KeyCode.Escape) || GameInputBindings.GetKeyDown(GameInputBindings.PauseKey, KeyCode.Escape)))
         {
+            if (SettingsPanelLauncher.ClosedByEscapeThisFrame)
+            {
+                return;
+            }
+
+            if (SettingsPanelLauncher.IsOpen)
+            {
+                SettingsPanelLauncher.MarkEscapeCloseFrame();
+                SettingsPanelLauncher.Hide();
+                return;
+            }
+
             SetOpen(!isOpen);
         }
 
@@ -111,6 +121,11 @@ public class InGamePauseMenu : MonoBehaviour
         if (root != null)
         {
             root.SetActive(open);
+        }
+
+        if (!open)
+        {
+            SettingsPanelLauncher.Hide();
         }
 
         if (open)
@@ -172,10 +187,10 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void ShowHomePanel()
     {
-        SetSettingsVisible(false);
         currentPanelKey = "PAUSED";
         titleText.text = T("PAUSED");
         roomCodeText.text = GetRoomCodeLine();
+        bodyText.gameObject.SetActive(true);
         SetBody(
             T("SESSION") + "\n" +
             GetRoomCodeLine() + "\n\n" +
@@ -187,17 +202,18 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void ShowSettingsPanel()
     {
-        SetSettingsVisible(true);
+        SettingsPanelLauncher.Show();
         currentPanelKey = "SETTINGS";
         titleText.text = T("SETTINGS");
         roomCodeText.text = T("IN-GAME SETTINGS");
+        bodyText.gameObject.SetActive(true);
     }
 
     private void ShowControlsPanel()
     {
-        SetSettingsVisible(false);
         currentPanelKey = "CONTROLS";
         titleText.text = T("CONTROLS");
+        bodyText.gameObject.SetActive(true);
         SetBody(
             GameInputBindings.GetLabel(GameInputBindings.MoveForwardKey, KeyCode.W) + "/" +
             GameInputBindings.GetLabel(GameInputBindings.MoveLeftKey, KeyCode.A) + "/" +
@@ -220,9 +236,9 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void ShowPlayersPanel()
     {
-        SetSettingsVisible(false);
         currentPanelKey = "PLAYERS";
         titleText.text = T("PLAYERS");
+        bodyText.gameObject.SetActive(true);
         RefreshPlayersPanel();
     }
 
@@ -341,24 +357,6 @@ public class InGamePauseMenu : MonoBehaviour
         }
     }
 
-    private void SetSettingsVisible(bool visible)
-    {
-        if (settingsRoot != null)
-        {
-            settingsRoot.SetActive(visible);
-        }
-
-        if (settingsActionRoot != null)
-        {
-            settingsActionRoot.SetActive(visible);
-        }
-
-        if (bodyText != null)
-        {
-            bodyText.gameObject.SetActive(!visible);
-        }
-    }
-
     private void ShowConfirm(string title, string message, System.Action confirmAction)
     {
         pendingConfirmAction = confirmAction;
@@ -455,7 +453,6 @@ public class InGamePauseMenu : MonoBehaviour
         bodyText.alignment = TextAlignmentOptions.TopLeft;
         bodyText.lineSpacing = 18f;
 
-        settingsRoot = CreateSettingsContent(infoPanel.transform);
         confirmDialog = CreateConfirmDialog(root.transform);
     }
 
@@ -574,202 +571,6 @@ public class InGamePauseMenu : MonoBehaviour
         layout.preferredHeight = height;
     }
 
-    private GameObject CreateSettingsContent(Transform parent)
-    {
-        GameObject content = new GameObject("SettingsContent", typeof(RectTransform), typeof(VerticalLayoutGroup));
-        content.transform.SetParent(parent, false);
-
-        RectTransform rect = content.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.offsetMin = new Vector2(48f, 154f);
-        rect.offsetMax = new Vector2(-48f, -190f);
-
-        VerticalLayoutGroup layout = content.GetComponent<VerticalLayoutGroup>();
-        layout.spacing = 8f;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-
-        CreateSettingsSliderRow(content.transform, "Master Volume", "setting_master_volume", 0f, 1f, AudioListener.volume, false);
-        CreateSettingsSliderRow(content.transform, "Voice Volume", "setting_voice_volume", 0f, 1f, PlayerPrefs.GetFloat("setting_voice_volume", 1f), false);
-        CreateSettingsSliderRow(content.transform, "Mouse Sens X", "setting_mouse_x", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_x", 1f), false);
-        CreateSettingsSliderRow(content.transform, "Mouse Sens Y", "setting_mouse_y", 0.1f, 5f, PlayerPrefs.GetFloat("setting_mouse_y", 1f), false);
-        CreateSettingsSliderRow(content.transform, "HUD Opacity", "setting_hud_opacity", 0.45f, 1f, PlayerPrefs.GetFloat("setting_hud_opacity", 1f), false);
-
-        if (settingsActionRoot != null)
-        {
-            Destroy(settingsActionRoot);
-        }
-
-        GameObject buttonRow = new GameObject("SettingsButtonRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
-        buttonRow.transform.SetParent(parent, false);
-        settingsActionRoot = buttonRow;
-
-        RectTransform buttonRowRect = buttonRow.GetComponent<RectTransform>();
-        buttonRowRect.anchorMin = new Vector2(0f, 0f);
-        buttonRowRect.anchorMax = new Vector2(1f, 0f);
-        buttonRowRect.pivot = new Vector2(0.5f, 0f);
-        buttonRowRect.anchoredPosition = new Vector2(0f, 54f);
-        buttonRowRect.sizeDelta = new Vector2(-140f, 56f);
-
-        HorizontalLayoutGroup buttonLayout = buttonRow.GetComponent<HorizontalLayoutGroup>();
-        buttonLayout.spacing = 16f;
-        buttonLayout.childControlWidth = true;
-        buttonLayout.childControlHeight = true;
-        buttonLayout.childForceExpandWidth = true;
-        buttonLayout.childForceExpandHeight = true;
-
-        CreateButton(buttonRow.transform, "ApplySettingsButton", T("Apply"), ApplyInGameSettings);
-        CreateButton(buttonRow.transform, "ResetSettingsButton", T("Reset"), ResetInGameSettings);
-        CreateButton(buttonRow.transform, "BackSettingsButton", T("Back"), ShowHomePanel);
-
-        content.SetActive(false);
-        buttonRow.SetActive(false);
-        return content;
-    }
-
-    private void CreateSettingsSliderRow(Transform parent, string label, string prefsKey, float min, float max, float defaultValue, bool wholeNumbers)
-    {
-        GameObject row = CreateSettingsRow(parent, label);
-
-        TMP_Text valueText = CreateText(row.transform, "ValueText", string.Empty, 22f, FontStyles.Normal);
-        RectTransform valueRect = valueText.GetComponent<RectTransform>();
-        valueRect.sizeDelta = new Vector2(210f, 36f);
-        valueText.alignment = TextAlignmentOptions.Center;
-
-        Slider slider = CreateSlider(row.transform, min, max, PlayerPrefs.GetFloat(prefsKey, defaultValue), wholeNumbers);
-        RectTransform sliderRect = slider.GetComponent<RectTransform>();
-        sliderRect.sizeDelta = new Vector2(220f, 12f);
-        slider.transform.SetSiblingIndex(1);
-
-        UnityEngine.Events.UnityAction<float> refresh = value =>
-        {
-            float finalValue = wholeNumbers ? Mathf.Round(value) : value;
-            PlayerPrefs.SetFloat(prefsKey, finalValue);
-            valueText.text = wholeNumbers ? finalValue.ToString("0") : finalValue.ToString("0.00");
-        };
-
-        slider.onValueChanged.AddListener(refresh);
-        refresh(slider.value);
-    }
-
-    private GameObject CreateSettingsRow(Transform parent, string label)
-    {
-        GameObject row = new GameObject(label + "Row", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
-        row.transform.SetParent(parent, false);
-        SetLayoutSize(row, 0f, 54f);
-
-        HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
-        layout.spacing = 14f;
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
-
-        TMP_Text labelText = CreateText(row.transform, "LabelText", T(label), 22f, FontStyles.Normal);
-        RectTransform labelRect = labelText.GetComponent<RectTransform>();
-        labelRect.sizeDelta = new Vector2(360f, 40f);
-        labelText.alignment = TextAlignmentOptions.MidlineLeft;
-
-        return row;
-    }
-
-    private Slider CreateSlider(Transform parent, float min, float max, float value, bool wholeNumbers)
-    {
-        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider), typeof(Image));
-        sliderObject.transform.SetParent(parent, false);
-        Slider slider = sliderObject.GetComponent<Slider>();
-        slider.minValue = min;
-        slider.maxValue = max;
-        slider.value = Mathf.Clamp(value, min, max);
-        slider.wholeNumbers = wholeNumbers;
-        slider.targetGraphic = slider.GetComponent<Image>();
-        slider.GetComponent<Image>().color = new Color(0.62f, 0.78f, 0.86f, 0.28f);
-
-        Image fill = CreateSliderImage(sliderObject.transform, "Fill", new Color(1f, 0.8f, 0.42f, 0.82f));
-        RectTransform fillRect = fill.rectTransform;
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = Vector2.zero;
-        fillRect.offsetMax = Vector2.zero;
-
-        Image handle = CreateSliderImage(sliderObject.transform, "Handle", new Color(0.78f, 0.86f, 0.88f, 1f));
-        RectTransform handleRect = handle.rectTransform;
-        handleRect.anchorMin = new Vector2(0f, 0.5f);
-        handleRect.anchorMax = new Vector2(0f, 0.5f);
-        handle.sprite = GetRoundSliderHandleSprite();
-        handle.type = Image.Type.Simple;
-        handle.preserveAspect = true;
-        handleRect.sizeDelta = new Vector2(20f, 20f);
-
-        slider.fillRect = fillRect;
-        slider.handleRect = handleRect;
-        slider.targetGraphic = handle;
-        return slider;
-    }
-
-    private Image CreateSliderImage(Transform parent, string objectName, Color color)
-    {
-        GameObject imageObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        imageObject.transform.SetParent(parent, false);
-        Image image = imageObject.GetComponent<Image>();
-        image.color = color;
-        return image;
-    }
-
-    private Sprite GetRoundSliderHandleSprite()
-    {
-        if (roundSliderHandleSprite != null)
-        {
-            return roundSliderHandleSprite;
-        }
-
-        const int size = 64;
-        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        texture.name = "In Game Slider Round Handle";
-        texture.wrapMode = TextureWrapMode.Clamp;
-        texture.filterMode = FilterMode.Bilinear;
-
-        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
-        float radius = size * 0.43f;
-        float softEdge = 2f;
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x, y), center);
-                float alpha = Mathf.Clamp01((radius - distance) / softEdge);
-                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
-            }
-        }
-
-        texture.Apply();
-        roundSliderHandleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
-        return roundSliderHandleSprite;
-    }
-
-    private void ApplyInGameSettings()
-    {
-        AudioListener.volume = PlayerPrefs.GetFloat("setting_master_volume", 1f);
-        PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
-        ApplyFixedLowGraphicsSettings();
-
-        float mouseX = PlayerPrefs.GetFloat("setting_mouse_x", 1f);
-        float mouseY = PlayerPrefs.GetFloat("setting_mouse_y", 1f);
-        MouseLook[] mouseLooks = FindObjectsOfType<MouseLook>(true);
-        for (int i = 0; i < mouseLooks.Length; i++)
-        {
-            mouseLooks[i].mouseSensitivityX = 100f * mouseX;
-            mouseLooks[i].mouseSensitivityY = 95f * mouseY;
-        }
-
-        PlayerPrefs.Save();
-    }
-
     private void ApplyFixedLowGraphicsSettings()
     {
         QualitySettings.globalTextureMipmapLimit = 3;
@@ -777,29 +578,6 @@ public class InGamePauseMenu : MonoBehaviour
         QualitySettings.shadowResolution = ShadowResolution.Low;
         QualitySettings.antiAliasing = 0;
         QualitySettings.vSyncCount = 0;
-    }
-
-    private void ResetInGameSettings()
-    {
-        PlayerPrefs.SetFloat("setting_master_volume", 1f);
-        PlayerPrefs.SetFloat("setting_voice_volume", 1f);
-        PlayerPrefs.SetFloat("setting_mouse_x", 1f);
-        PlayerPrefs.SetFloat("setting_mouse_y", 1f);
-        PlayerPrefs.SetFloat("setting_hud_opacity", 1f);
-        ApplyInGameSettings();
-
-        if (settingsRoot != null)
-        {
-            Destroy(settingsRoot);
-            if (settingsActionRoot != null)
-            {
-                Destroy(settingsActionRoot);
-                settingsActionRoot = null;
-            }
-
-            settingsRoot = CreateSettingsContent(bodyText.transform.parent);
-            ShowSettingsPanel();
-        }
     }
 
     private GameObject CreateConfirmDialog(Transform parent)

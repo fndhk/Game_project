@@ -7,10 +7,12 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+[ExecuteAlways]
 public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
 {
     public string mainMenuSceneName = "LobbyScene 1";
     public string roomLobbySceneName = "CreateRoomLobbyScene";
+    public bool buildInEditMode = true;
 
     private const string RoomCodePrefsKey = "dark_us_room_code";
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
@@ -26,13 +28,37 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
     private TMP_InputField roomTitleInput;
     private int languageIndex;
 
+    public override void OnEnable()
+    {
+        base.OnEnable();
+
+        if (Application.isPlaying || !buildInEditMode)
+        {
+            return;
+        }
+
+        if (FindUiTransform("Canvas") == null)
+        {
+            languageIndex = PlayerPrefs.GetInt("setting_language", 0);
+            BuildUi();
+#if UNITY_EDITOR
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+#endif
+        }
+    }
+
     private void Start()
     {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
         PhotonConnectionDefaults.Apply();
         MenuCursorState.UnlockCursor();
         languageIndex = PlayerPrefs.GetInt("setting_language", 0);
         EnsureEventSystem();
-        BuildUi();
+        EnsurePublicRoomListUi();
         ConnectToPhotonLobby();
     }
 
@@ -329,6 +355,36 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
 
         createRoomDialog = CreateCreateRoomDialog(canvas.transform);
         createRoomDialog.SetActive(false);
+    }
+
+    private void EnsurePublicRoomListUi()
+    {
+        if (FindUiTransform("Canvas") != null && FindUiTransform("RoomListPanel") != null)
+        {
+            BindExistingPublicRoomListUi();
+            return;
+        }
+
+        BuildUi();
+    }
+
+    private void BindExistingPublicRoomListUi()
+    {
+        roomListContent = FindUiTransform("RoomListPanel");
+        emptyText = FindUiTransform("EmptyText")?.GetComponent<TMP_Text>();
+        statusText = FindUiTransform("StatusText")?.GetComponent<TMP_Text>();
+        createRoomDialog = FindUiTransform("CreateRoomDialog")?.gameObject;
+        roomTitleInput = FindUiTransform("RoomTitleInput")?.GetComponent<TMP_InputField>();
+
+        BindButton("BackButton", OnClickBack);
+        BindButton("CreateRoomButton", OnClickCreateRoom);
+        BindButton("ConfirmCreateRoomButton", OnClickConfirmCreateRoom);
+        BindButton("CancelCreateRoomButton", OnClickCancelCreateRoom);
+
+        if (createRoomDialog != null)
+        {
+            createRoomDialog.SetActive(false);
+        }
     }
 
     private GameObject CreateCreateRoomDialog(Transform parent)
@@ -643,5 +699,32 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         }
 
         new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+    }
+
+    private Button BindButton(string objectName, UnityEngine.Events.UnityAction action)
+    {
+        Button button = FindUiTransform(objectName)?.GetComponent<Button>();
+        if (button == null)
+        {
+            return null;
+        }
+
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(action);
+        return button;
+    }
+
+    private Transform FindUiTransform(string objectName)
+    {
+        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        foreach (Transform target in transforms)
+        {
+            if (target.name == objectName && target.gameObject.scene == gameObject.scene)
+            {
+                return target;
+            }
+        }
+
+        return null;
     }
 }

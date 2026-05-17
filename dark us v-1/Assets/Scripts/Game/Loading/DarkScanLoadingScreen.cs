@@ -292,8 +292,19 @@ public class DarkScanLoadingScreen : MonoBehaviour
         destroyRequested = true;
         ReleaseInputBlocking();
         DisableGraphicsBeforeDestroy();
-        RoleRevealIntro.ShowWhenReady();
+
+        if (ShouldShowRoleRevealForScene(SceneManager.GetActiveScene()))
+        {
+            RoleRevealIntro.ShowWhenReady();
+        }
+
         Destroy(gameObject);
+    }
+
+    private static bool ShouldShowRoleRevealForScene(Scene scene)
+    {
+        string sceneName = scene.name;
+        return sceneName == "labor" || sceneName == "GameScene";
     }
 
     private void AppendLog(string message)

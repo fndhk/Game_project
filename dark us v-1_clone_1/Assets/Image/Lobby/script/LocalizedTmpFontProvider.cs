@@ -6,6 +6,7 @@ using UnityEngine.TextCore.LowLevel;
 public static class LocalizedTmpFontProvider
 {
     private static TMP_FontAsset localizedFontAsset;
+    private static bool fontLookupFailed;
     private static bool globalFallbackApplied;
 
     public static void Apply(TMP_Text text)
@@ -29,6 +30,11 @@ public static class LocalizedTmpFontProvider
         if (localizedFontAsset != null)
         {
             return localizedFontAsset;
+        }
+
+        if (fontLookupFailed)
+        {
+            return null;
         }
 
         string[] osFontNames =
@@ -71,6 +77,7 @@ public static class LocalizedTmpFontProvider
             }
         }
 
+        fontLookupFailed = true;
         Debug.LogWarning("Korean/Japanese TMP font was not found. Install Malgun Gothic or add a TMP font fallback asset.");
         return null;
     }
