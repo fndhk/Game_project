@@ -11,7 +11,7 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 {
-    public string mainMenuSceneName = "LobbyScene 1";
+    public string mainMenuSceneName = "LobbyScene";
     public string publicRoomListSceneName = "PublicRoomListScene";
     public string gameSceneName = "labor";
     public Sprite lobbyBackgroundSprite;

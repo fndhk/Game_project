@@ -4,7 +4,11 @@ using UnityEngine.SceneManagement;
 
 public class SettingsSceneController : MonoBehaviour
 {
-    public string mainMenuSceneName = "LobbyScene 1";
+    private const string LegacyMainMenuSceneName = "LobbyScene 1";
+    private const string MainMenuSceneFallback = "LobbyScene";
+    private const string MainMenuScenePath = "Assets/Scenes/LobbyScene.unity";
+
+    public string mainMenuSceneName = "LobbyScene";
     public SettingsUIController settingsPanel;
 
     private bool returningToMainMenu;
@@ -14,6 +18,7 @@ public class SettingsSceneController : MonoBehaviour
         MenuCursorState.UnlockCursor();
         SettingsPanelLauncher.DestroyInstance();
         EnsureEventSystem();
+        NormalizeSceneNames();
 
         if (settingsPanel == null)
         {
@@ -48,7 +53,23 @@ public class SettingsSceneController : MonoBehaviour
         }
 
         returningToMainMenu = true;
-        SceneManager.LoadScene(mainMenuSceneName);
+        SceneManager.LoadScene(GetMainMenuSceneName());
+    }
+
+    private void NormalizeSceneNames()
+    {
+        if (mainMenuSceneName == LegacyMainMenuSceneName)
+        {
+            mainMenuSceneName = MainMenuSceneFallback;
+        }
+    }
+
+    private string GetMainMenuSceneName()
+    {
+        NormalizeSceneNames();
+        return SceneUtility.GetBuildIndexByScenePath(MainMenuScenePath) >= 0
+            ? MainMenuSceneFallback
+            : mainMenuSceneName;
     }
 
     private void EnsureEventSystem()

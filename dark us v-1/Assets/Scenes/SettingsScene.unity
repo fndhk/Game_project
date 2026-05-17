@@ -163,7 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f1b9979a38e44888fbf1ccf857b5d5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SettingsSceneController
-  mainMenuSceneName: LobbyScene 1
+  mainMenuSceneName: LobbyScene
   settingsPanel: {fileID: 300204}
 --- !u!1 &200000
 GameObject:

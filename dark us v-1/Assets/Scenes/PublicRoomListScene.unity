@@ -163,7 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f55b9e807d94dd29d1c64bd50167d0a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PublicRoomListSceneController
-  mainMenuSceneName: LobbyScene 1
+  mainMenuSceneName: LobbyScene
   roomLobbySceneName: CreateRoomLobbyScene
   buildInEditMode: 1
 --- !u!1 &200000

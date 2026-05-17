@@ -10,7 +10,7 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
 {
-    public string mainMenuSceneName = "LobbyScene 1";
+    public string mainMenuSceneName = "LobbyScene";
     public string roomLobbySceneName = "CreateRoomLobbyScene";
     public bool buildInEditMode = true;
 

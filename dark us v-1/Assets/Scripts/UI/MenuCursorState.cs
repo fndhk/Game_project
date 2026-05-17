@@ -7,7 +7,6 @@ public class MenuCursorState : MonoBehaviour
     private static readonly string[] MenuSceneNames =
     {
         "LobbyScene",
-        "LobbyScene 1",
         "SettingsScene",
         "CreateRoomLobbyScene",
         "PublicRoomListScene"
