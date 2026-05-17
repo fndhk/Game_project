@@ -207,6 +207,7 @@ public class PlayerItemUser : MonoBehaviour
         }
 
         SpawnDroppedItem(droppedItemType, droppedAmount);
+        GameAudioManager.PlayItemDrop();
     }
 
     // 버린 아이템을 다시 주울 수 있는 월드 아이템으로 만든다.
@@ -453,7 +454,10 @@ public class PlayerItemUser : MonoBehaviour
             }
         }
 
-        PlayAudio(cameraUseAudio, cameraUseClip);
+        if (!PlayAudio(cameraUseAudio, cameraUseClip))
+        {
+            GameAudioManager.PlayItemUse(ItemType.Camera);
+        }
 
         Debug.Log("Camera scan dots: " + createdCount);
 
@@ -508,7 +512,10 @@ public class PlayerItemUser : MonoBehaviour
 
         PlayerCombatTarget target = FindBestKnifeTarget();
 
-        PlayAudio(knifeUseAudio, knifeUseClip);
+        if (!PlayAudio(knifeUseAudio, knifeUseClip))
+        {
+            GameAudioManager.PlayItemUse(ItemType.Knife);
+        }
 
         if (target == null)
         {
@@ -660,7 +667,10 @@ public class PlayerItemUser : MonoBehaviour
 
         playerStats.currentStamina = Mathf.Clamp(playerStats.currentStamina, 0f, playerStats.currentHealth);
 
-        PlayAudio(medkitUseAudio, medkitUseClip);
+        if (!PlayAudio(medkitUseAudio, medkitUseClip))
+        {
+            GameAudioManager.PlayItemUse(ItemType.Medkit);
+        }
 
         Debug.Log("Medkit used. Health: " + beforeHealth + " -> " + playerStats.currentHealth);
 
@@ -742,28 +752,34 @@ public class PlayerItemUser : MonoBehaviour
     }
 
     // 오디오가 있으면 한 번 재생한다.
-    private void PlayAudio(AudioSource source, AudioClip fallbackClip)
+    private bool PlayAudio(AudioSource source, AudioClip fallbackClip)
     {
         AudioSource targetSource = source != null ? source : itemAudioSource;
 
         if (targetSource == null)
         {
-            return;
+            return false;
         }
 
         if (source != null && source.clip != null)
         {
             targetSource.PlayOneShot(source.clip);
-            return;
+            return true;
         }
 
         if (fallbackClip != null)
         {
             targetSource.PlayOneShot(fallbackClip);
-            return;
+            return true;
         }
 
-        targetSource.Play();
+        if (targetSource.clip != null)
+        {
+            targetSource.Play();
+            return true;
+        }
+
+        return false;
     }
 
     // Scene View에서 칼 공격 범위를 확인하기 위한 기즈모이다.

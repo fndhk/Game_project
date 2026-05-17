@@ -8,6 +8,7 @@ public class SettingsUIController : MonoBehaviour
 {
     private readonly List<TextBinding> localizedTexts = new List<TextBinding>();
     private readonly List<KeyBindingRow> keyRows = new List<KeyBindingRow>();
+    private readonly List<SliderBinding> sliderRows = new List<SliderBinding>();
     private TMP_Text screenModeValueText;
     private TMP_Text fpsValueText;
     private TMP_Text languageValueText;
@@ -16,8 +17,25 @@ public class SettingsUIController : MonoBehaviour
     private KeyCode pendingDefaultKey;
     private float pendingKeyStartedAt;
     private bool built;
+    private Sprite sliderTrackSprite;
+    private Sprite sliderHandleSprite;
+
+    private const float DialogWidth = 1040f;
+    private const float DialogHeight = 820f;
+    private const float FooterButtonWidth = 160f;
+    private const float FooterButtonHeight = 52f;
+    private const float RowHeight = 46f;
+    private const float RowSpacing = 10f;
+    private const float RowLabelWidth = 300f;
+    private const float RowSliderWidth = 238f;
+    private const float SliderTrackHeight = 12f;
+    private const float SliderHandleSize = 14f;
+    private const float RowValueWidth = 150f;
+    private const float RowButtonWidth = 126f;
+    private const float RowButtonHeight = 38f;
 
     [SerializeField] private bool buildInEditMode;
+    [SerializeField] private bool embeddedMode;
 
     public bool IsOpen => gameObject.activeSelf;
     public bool IsCapturingKey => !string.IsNullOrEmpty(pendingKeyPrefsKey);
@@ -28,6 +46,15 @@ public class SettingsUIController : MonoBehaviour
         public TMP_Text Text;
         public string PrefsKey;
         public KeyCode DefaultKey;
+    }
+
+    private struct SliderBinding
+    {
+        public Slider Slider;
+        public TMP_Text ValueText;
+        public string PrefsKey;
+        public float Min;
+        public float Max;
     }
 
     private struct TextBinding
@@ -67,7 +94,7 @@ public class SettingsUIController : MonoBehaviour
 
         SettingsPanelLauncher.TickEscapeCloseFrame();
 
-        if (IsOpen && !IsCapturingKey && Input.GetKeyDown(KeyCode.Escape))
+        if (!embeddedMode && IsOpen && !IsCapturingKey && Input.GetKeyDown(KeyCode.Escape))
         {
             SettingsPanelLauncher.MarkEscapeCloseFrame();
             Hide();
@@ -82,7 +109,12 @@ public class SettingsUIController : MonoBehaviour
         BuildIfNeeded();
         gameObject.SetActive(true);
         transform.SetAsLastSibling();
-        MenuCursorState.UnlockCursor();
+        NormalizeLayout();
+        if (!embeddedMode)
+        {
+            MenuCursorState.UnlockCursor();
+        }
+
         pendingKeyPrefsKey = null;
         pendingKeyText = null;
         RefreshAll();
@@ -116,10 +148,20 @@ public class SettingsUIController : MonoBehaviour
             return;
         }
 
+        if (embeddedMode)
+        {
+            built = true;
+            BuildEmbeddedLayout();
+            NormalizeEmbeddedLayout();
+            RefreshAll();
+            return;
+        }
+
         if (transform.Find("SettingsDialog") != null)
         {
             built = true;
             BindExistingHierarchy();
+            NormalizeLayout();
             RefreshAll();
             return;
         }
@@ -151,7 +193,7 @@ public class SettingsUIController : MonoBehaviour
         dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
         dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
         dialogRect.anchoredPosition = Vector2.zero;
-        dialogRect.sizeDelta = new Vector2(1040f, 820f);
+        dialogRect.sizeDelta = new Vector2(DialogWidth, DialogHeight);
         dialog.GetComponent<Image>().color = new Color(0.01f, 0.014f, 0.016f, 0.94f);
         dialog.GetComponent<Outline>().effectColor = new Color(0.62f, 0.78f, 0.86f, 0.38f);
         dialog.GetComponent<Outline>().effectDistance = new Vector2(2f, -2f);
@@ -165,7 +207,7 @@ public class SettingsUIController : MonoBehaviour
         title.alignment = TextAlignmentOptions.Left;
         title.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        Button closeTop = CreateButton(dialog.transform, "TopCloseButton", "Close", 160f, 48f, 22f);
+        Button closeTop = CreateButton(dialog.transform, "TopCloseButton", "Close", 150f, 46f, 22f);
         RectTransform closeTopRect = closeTop.GetComponent<RectTransform>();
         closeTopRect.anchorMin = new Vector2(1f, 1f);
         closeTopRect.anchorMax = new Vector2(1f, 1f);
@@ -209,24 +251,25 @@ public class SettingsUIController : MonoBehaviour
 
         BuildContent(content.transform);
 
-        Button apply = CreateButton(dialog.transform, "ApplyButton", "Apply", 180f, 54f, 22f);
+        Button apply = CreateButton(dialog.transform, "ApplyButton", "Apply", FooterButtonWidth, FooterButtonHeight, 22f);
         RectTransform applyRect = apply.GetComponent<RectTransform>();
         applyRect.anchorMin = new Vector2(1f, 0f);
         applyRect.anchorMax = new Vector2(1f, 0f);
-        applyRect.anchoredPosition = new Vector2(-264f, 48f);
+        applyRect.anchoredPosition = new Vector2(-310f, 48f);
         apply.onClick.AddListener(SettingsManager.Apply);
 
-        Button reset = CreateButton(dialog.transform, "ResetButton", "Reset", 180f, 54f, 22f);
+        Button reset = CreateButton(dialog.transform, "ResetButton", "Reset", FooterButtonWidth, FooterButtonHeight, 22f);
         RectTransform resetRect = reset.GetComponent<RectTransform>();
         resetRect.anchorMin = new Vector2(1f, 0f);
         resetRect.anchorMax = new Vector2(1f, 0f);
-        resetRect.anchoredPosition = new Vector2(-72f, 48f);
+        resetRect.anchoredPosition = new Vector2(-132f, 48f);
         reset.onClick.AddListener(() =>
         {
             SettingsManager.ResetAll();
             RefreshAll();
         });
 
+        NormalizeLayout();
         RefreshAll();
     }
 
@@ -236,10 +279,100 @@ public class SettingsUIController : MonoBehaviour
         BuildIfNeeded();
     }
 
+    public void SetEmbeddedMode(bool value)
+    {
+        if (built && embeddedMode != value)
+        {
+            Debug.LogWarning("SettingsUIController embedded mode must be set before building.");
+            return;
+        }
+
+        embeddedMode = value;
+    }
+
+    private void BuildEmbeddedLayout()
+    {
+        RectTransform rootRect = GetComponent<RectTransform>();
+        if (rootRect == null)
+        {
+            rootRect = gameObject.AddComponent<RectTransform>();
+        }
+
+        ScrollRect scrollRect = GetComponent<ScrollRect>();
+        if (scrollRect == null)
+        {
+            scrollRect = gameObject.AddComponent<ScrollRect>();
+        }
+
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.scrollSensitivity = 34f;
+
+        GameObject viewport = new GameObject("EmbeddedViewport", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Mask));
+        viewport.transform.SetParent(transform, false);
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        viewportRect.anchorMin = Vector2.zero;
+        viewportRect.anchorMax = Vector2.one;
+        viewportRect.offsetMin = Vector2.zero;
+        viewportRect.offsetMax = Vector2.zero;
+        viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.03f);
+        viewport.GetComponent<Mask>().showMaskGraphic = false;
+
+        GameObject content = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+        content.transform.SetParent(viewport.transform, false);
+        RectTransform contentRect = content.GetComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0f, 1f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
+        contentRect.pivot = new Vector2(0.5f, 1f);
+        contentRect.anchoredPosition = Vector2.zero;
+        contentRect.sizeDelta = Vector2.zero;
+
+        VerticalLayoutGroup layout = content.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 8f;
+        layout.childControlWidth = true;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        content.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scrollRect.content = contentRect;
+        scrollRect.viewport = viewportRect;
+
+        BuildContent(content.transform);
+        CreateEmbeddedActionRow(content.transform);
+    }
+
+    private void CreateEmbeddedActionRow(Transform parent)
+    {
+        GameObject row = new GameObject("ActionRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+        row.transform.SetParent(parent, false);
+        SetLayoutSize(row, 0f, 56f);
+
+        HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+        layout.spacing = 12f;
+        layout.childAlignment = TextAnchor.MiddleRight;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        Button apply = CreateButton(row.transform, "ApplyButton", "Apply", 140f, 42f, 18f);
+        apply.onClick.AddListener(SettingsManager.Apply);
+
+        Button reset = CreateButton(row.transform, "ResetButton", "Reset", 140f, 42f, 18f);
+        reset.onClick.AddListener(() =>
+        {
+            SettingsManager.ResetAll();
+            RefreshAll();
+        });
+    }
+
     private void BindExistingHierarchy()
     {
         localizedTexts.Clear();
         keyRows.Clear();
+        sliderRows.Clear();
 
         BindButton("TopCloseButton", Hide);
         BindButton("ApplyButton", SettingsManager.Apply);
@@ -253,7 +386,10 @@ public class SettingsUIController : MonoBehaviour
         fpsValueText = BindCycleRow("FPS Limit", CycleFps);
         languageValueText = BindCycleRow("Language", CycleLanguage);
 
+        EnsureAudioRowsExist();
         BindSliderRow("Master Volume", SettingsManager.MasterVolumeKey, 0f, 1f, SettingsManager.MasterVolume);
+        BindSliderRow("BGM Volume", SettingsManager.BgmVolumeKey, 0f, 1f, SettingsManager.BgmVolume);
+        BindSliderRow("SFX Volume", SettingsManager.SfxVolumeKey, 0f, 1f, SettingsManager.SfxVolume);
         BindSliderRow("Voice Volume", SettingsManager.VoiceVolumeKey, 0f, 1f, SettingsManager.VoiceVolume);
         BindSliderRow("Mouse Sensitivity X", SettingsManager.MouseXKey, 0.1f, 5f, SettingsManager.MouseSensitivityX);
         BindSliderRow("Mouse Sensitivity Y", SettingsManager.MouseYKey, 0.1f, 5f, SettingsManager.MouseSensitivityY);
@@ -277,6 +413,37 @@ public class SettingsUIController : MonoBehaviour
         BindKeyBindRow("Pause", GameInputBindings.PauseKey, KeyCode.Escape);
     }
 
+    private void EnsureAudioRowsExist()
+    {
+        Transform content = FindDescendant(transform, "Content");
+        if (content == null)
+        {
+            return;
+        }
+
+        bool changed = false;
+        changed |= EnsureSliderRowExists(content, "BGM Volume", SettingsManager.BgmVolumeKey, 0f, 1f, SettingsManager.BgmVolume);
+        changed |= EnsureSliderRowExists(content, "SFX Volume", SettingsManager.SfxVolumeKey, 0f, 1f, SettingsManager.SfxVolume);
+
+#if UNITY_EDITOR
+        if (changed && !Application.isPlaying)
+        {
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+        }
+#endif
+    }
+
+    private bool EnsureSliderRowExists(Transform content, string label, string prefsKey, float min, float max, float value)
+    {
+        if (FindDescendant(transform, label + "Row") != null)
+        {
+            return false;
+        }
+
+        CreateSliderRow(content, label, prefsKey, min, max, value);
+        return true;
+    }
+
     private TMP_Text BindCycleRow(string label, UnityEngine.Events.UnityAction action)
     {
         Transform row = FindDescendant(transform, label + "Row");
@@ -290,6 +457,7 @@ public class SettingsUIController : MonoBehaviour
         {
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(action);
+            MenuButtonHoverEffect.EnsureOn(button);
         }
 
         return FindDescendant(row, "ValueText")?.GetComponent<TMP_Text>();
@@ -318,8 +486,10 @@ public class SettingsUIController : MonoBehaviour
         {
             PlayerPrefs.SetFloat(prefsKey, v);
             valueText.text = v.ToString("0.00");
+            ApplyAudioSettingIfNeeded(prefsKey);
         });
         valueText.text = slider.value.ToString("0.00");
+        sliderRows.Add(new SliderBinding { Slider = slider, ValueText = valueText, PrefsKey = prefsKey, Min = min, Max = max });
     }
 
     private void BindKeyBindRow(string label, string prefsKey, KeyCode defaultKey)
@@ -339,6 +509,7 @@ public class SettingsUIController : MonoBehaviour
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => StartKeyBinding(prefsKey, defaultKey, valueText));
+        MenuButtonHoverEffect.EnsureOn(button);
         keyRows.Add(new KeyBindingRow { Text = valueText, PrefsKey = prefsKey, DefaultKey = defaultKey });
     }
 
@@ -352,6 +523,7 @@ public class SettingsUIController : MonoBehaviour
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(action);
+        MenuButtonHoverEffect.EnsureOn(button);
     }
 
     private Transform FindDescendant(Transform root, string objectName)
@@ -382,6 +554,8 @@ public class SettingsUIController : MonoBehaviour
 
         CreateSection(parent, "Audio");
         CreateSliderRow(parent, "Master Volume", SettingsManager.MasterVolumeKey, 0f, 1f, SettingsManager.MasterVolume);
+        CreateSliderRow(parent, "BGM Volume", SettingsManager.BgmVolumeKey, 0f, 1f, SettingsManager.BgmVolume);
+        CreateSliderRow(parent, "SFX Volume", SettingsManager.SfxVolumeKey, 0f, 1f, SettingsManager.SfxVolume);
         CreateSliderRow(parent, "Voice Volume", SettingsManager.VoiceVolumeKey, 0f, 1f, SettingsManager.VoiceVolume);
 
         CreateSection(parent, "Controls & Keybindings");
@@ -420,7 +594,7 @@ public class SettingsUIController : MonoBehaviour
     {
         GameObject row = CreateRow(parent, label);
         TMP_Text valueText = CreateValueText(row.transform);
-        Button button = CreateButton(row.transform, "ChangeButton", "Change", 140f, 42f, 19f);
+        Button button = CreateButton(row.transform, "ChangeButton", "Change", RowButtonWidth, RowButtonHeight, 18f);
         button.onClick.AddListener(action);
         return valueText;
     }
@@ -435,15 +609,28 @@ public class SettingsUIController : MonoBehaviour
         {
             PlayerPrefs.SetFloat(prefsKey, v);
             valueText.text = v.ToString("0.00");
+            ApplyAudioSettingIfNeeded(prefsKey);
         });
         valueText.text = slider.value.ToString("0.00");
+        sliderRows.Add(new SliderBinding { Slider = slider, ValueText = valueText, PrefsKey = prefsKey, Min = min, Max = max });
+    }
+
+    private void ApplyAudioSettingIfNeeded(string prefsKey)
+    {
+        if (prefsKey == SettingsManager.MasterVolumeKey ||
+            prefsKey == SettingsManager.BgmVolumeKey ||
+            prefsKey == SettingsManager.SfxVolumeKey ||
+            prefsKey == SettingsManager.VoiceVolumeKey)
+        {
+            SettingsManager.ApplyAudio();
+        }
     }
 
     private void CreateKeyBindRow(Transform parent, string label, string prefsKey, KeyCode defaultKey)
     {
         GameObject row = CreateRow(parent, label);
         TMP_Text valueText = CreateValueText(row.transform);
-        Button button = CreateButton(row.transform, "BindButton", "Bind", 140f, 42f, 19f);
+        Button button = CreateButton(row.transform, "BindButton", "Bind", RowButtonWidth, RowButtonHeight, 18f);
         button.onClick.AddListener(() => StartKeyBinding(prefsKey, defaultKey, valueText));
         keyRows.Add(new KeyBindingRow { Text = valueText, PrefsKey = prefsKey, DefaultKey = defaultKey });
     }
@@ -452,15 +639,15 @@ public class SettingsUIController : MonoBehaviour
     {
         GameObject row = new GameObject(label + "Row", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
         row.transform.SetParent(parent, false);
-        SetLayoutSize(row, 0f, 50f);
+        SetLayoutSize(row, 0f, RowHeight);
         HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
-        layout.spacing = 14f;
+        layout.spacing = RowSpacing;
         layout.childAlignment = TextAnchor.MiddleLeft;
         layout.childControlWidth = false;
         layout.childControlHeight = false;
-        TMP_Text labelText = CreateText(row.transform, "LabelText", label, 20f, FontStyles.Normal);
+        TMP_Text labelText = CreateText(row.transform, "LabelText", label, 18f, FontStyles.Normal);
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
-        SetLayoutSize(labelText.gameObject, 390f, 42f);
+        SetLayoutSize(labelText.gameObject, RowLabelWidth, 40f);
         return row;
     }
 
@@ -469,13 +656,13 @@ public class SettingsUIController : MonoBehaviour
         GameObject textObject = new GameObject("ValueText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         textObject.transform.SetParent(parent, false);
         TMP_Text text = textObject.GetComponent<TMP_Text>();
-        text.fontSize = 20f;
+        text.fontSize = 18f;
         text.fontStyle = FontStyles.Normal;
         text.alignment = TextAlignmentOptions.Center;
         text.color = new Color(0.76f, 0.82f, 0.84f, 1f);
         text.raycastTarget = false;
         LocalizedTmpFontProvider.Apply(text);
-        SetLayoutSize(text.gameObject, 220f, 42f);
+        SetLayoutSize(text.gameObject, RowValueWidth, 40f);
         return text;
     }
 
@@ -562,31 +749,122 @@ public class SettingsUIController : MonoBehaviour
             keyRows[i].Text.text = GameInputBindings.GetLabel(keyRows[i].PrefsKey, keyRows[i].DefaultKey);
             keyRows[i].Text.color = new Color(0.76f, 0.82f, 0.84f, 1f);
         }
+
+        RefreshSliderRows();
+    }
+
+    private void RefreshSliderRows()
+    {
+        for (int i = 0; i < sliderRows.Count; i++)
+        {
+            SliderBinding row = sliderRows[i];
+            if (row.Slider == null || row.ValueText == null)
+            {
+                continue;
+            }
+
+            float value = Mathf.Clamp(GetSliderValue(row.PrefsKey), row.Min, row.Max);
+            row.Slider.SetValueWithoutNotify(value);
+            row.ValueText.text = value.ToString("0.00");
+        }
+    }
+
+    private float GetSliderValue(string prefsKey)
+    {
+        if (prefsKey == SettingsManager.MasterVolumeKey)
+        {
+            return SettingsManager.MasterVolume;
+        }
+
+        if (prefsKey == SettingsManager.BgmVolumeKey)
+        {
+            return SettingsManager.BgmVolume;
+        }
+
+        if (prefsKey == SettingsManager.SfxVolumeKey)
+        {
+            return SettingsManager.SfxVolume;
+        }
+
+        if (prefsKey == SettingsManager.VoiceVolumeKey)
+        {
+            return SettingsManager.VoiceVolume;
+        }
+
+        if (prefsKey == SettingsManager.MouseXKey)
+        {
+            return SettingsManager.MouseSensitivityX;
+        }
+
+        if (prefsKey == SettingsManager.MouseYKey)
+        {
+            return SettingsManager.MouseSensitivityY;
+        }
+
+        if (prefsKey == SettingsManager.HudOpacityKey)
+        {
+            return SettingsManager.HudOpacity;
+        }
+
+        return PlayerPrefs.GetFloat(prefsKey, 0f);
     }
 
     private Slider CreateSlider(Transform parent, float min, float max, float value)
     {
-        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider), typeof(Image));
+        GameObject sliderObject = new GameObject("Slider", typeof(RectTransform), typeof(Slider), typeof(Image), typeof(Outline));
         sliderObject.transform.SetParent(parent, false);
-        SetLayoutSize(sliderObject, 250f, 14f);
+        SetLayoutSize(sliderObject, RowSliderWidth, SliderTrackHeight);
         Slider slider = sliderObject.GetComponent<Slider>();
         slider.minValue = min;
         slider.maxValue = max;
         slider.value = Mathf.Clamp(value, min, max);
-        slider.targetGraphic = slider.GetComponent<Image>();
-        slider.GetComponent<Image>().color = new Color(0.62f, 0.78f, 0.86f, 0.28f);
-        Image fill = CreateSliderImage(sliderObject.transform, "Fill", new Color(1f, 0.8f, 0.42f, 0.82f));
+        slider.direction = Slider.Direction.LeftToRight;
+
+        Image track = slider.GetComponent<Image>();
+        track.sprite = GetSliderTrackSprite();
+        track.type = Image.Type.Sliced;
+        track.color = new Color(0.055f, 0.075f, 0.078f, 0.92f);
+
+        Outline trackOutline = slider.GetComponent<Outline>();
+        trackOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.14f);
+        trackOutline.effectDistance = new Vector2(1f, -1f);
+
+        GameObject fillArea = new GameObject("FillArea", typeof(RectTransform));
+        fillArea.transform.SetParent(sliderObject.transform, false);
+        RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
+        fillAreaRect.anchorMin = Vector2.zero;
+        fillAreaRect.anchorMax = Vector2.one;
+        fillAreaRect.offsetMin = new Vector2(3f, 3f);
+        fillAreaRect.offsetMax = new Vector2(-3f, -3f);
+
+        Image fill = CreateSliderImage(fillArea.transform, "Fill", new Color(0.93f, 0.68f, 0.30f, 0.88f));
+        fill.sprite = GetSliderTrackSprite();
+        fill.type = Image.Type.Sliced;
         fill.rectTransform.anchorMin = Vector2.zero;
         fill.rectTransform.anchorMax = Vector2.one;
         fill.rectTransform.offsetMin = Vector2.zero;
         fill.rectTransform.offsetMax = Vector2.zero;
-        Image handle = CreateSliderImage(sliderObject.transform, "Handle", new Color(0.78f, 0.86f, 0.88f, 1f));
+
+        GameObject handleArea = new GameObject("HandleArea", typeof(RectTransform));
+        handleArea.transform.SetParent(sliderObject.transform, false);
+        RectTransform handleAreaRect = handleArea.GetComponent<RectTransform>();
+        handleAreaRect.anchorMin = new Vector2(0f, 0.5f);
+        handleAreaRect.anchorMax = new Vector2(1f, 0.5f);
+        handleAreaRect.pivot = new Vector2(0.5f, 0.5f);
+        handleAreaRect.anchoredPosition = Vector2.zero;
+        handleAreaRect.sizeDelta = Vector2.zero;
+
+        Image handle = CreateSliderImage(handleArea.transform, "Handle", new Color(0.80f, 0.85f, 0.84f, 1f));
+        handle.sprite = GetSliderHandleSprite();
         handle.rectTransform.anchorMin = new Vector2(0f, 0.5f);
         handle.rectTransform.anchorMax = new Vector2(0f, 0.5f);
-        handle.rectTransform.sizeDelta = new Vector2(20f, 22f);
+        handle.rectTransform.sizeDelta = new Vector2(SliderHandleSize, SliderHandleSize);
+        handle.rectTransform.anchoredPosition = Vector2.zero;
+
         slider.fillRect = fill.rectTransform;
         slider.handleRect = handle.rectTransform;
         slider.targetGraphic = handle;
+        NormalizeSliderVisuals(slider);
         return slider;
     }
 
@@ -596,7 +874,187 @@ public class SettingsUIController : MonoBehaviour
         imageObject.transform.SetParent(parent, false);
         Image image = imageObject.GetComponent<Image>();
         image.color = color;
+        image.raycastTarget = false;
         return image;
+    }
+
+    private void NormalizeSliderVisuals(Slider slider)
+    {
+        if (slider == null)
+        {
+            return;
+        }
+
+        SetLayoutSize(slider.gameObject, RowSliderWidth, SliderTrackHeight);
+        slider.direction = Slider.Direction.LeftToRight;
+
+        Image track = slider.GetComponent<Image>();
+        if (track == null)
+        {
+            track = slider.gameObject.AddComponent<Image>();
+        }
+
+        track.sprite = GetSliderTrackSprite();
+        track.type = Image.Type.Sliced;
+        track.color = new Color(0.055f, 0.075f, 0.078f, 0.92f);
+        track.raycastTarget = true;
+
+        Outline trackOutline = slider.GetComponent<Outline>();
+        if (trackOutline == null)
+        {
+            trackOutline = slider.gameObject.AddComponent<Outline>();
+        }
+
+        trackOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.14f);
+        trackOutline.effectDistance = new Vector2(1f, -1f);
+
+        RectTransform fillAreaRect = GetOrCreateRectChild(slider.transform, "FillArea");
+        fillAreaRect.anchorMin = Vector2.zero;
+        fillAreaRect.anchorMax = Vector2.one;
+        fillAreaRect.offsetMin = new Vector2(3f, 3f);
+        fillAreaRect.offsetMax = new Vector2(-3f, -3f);
+
+        Transform oldFill = slider.transform.Find("Fill");
+        if (oldFill != null && oldFill.parent != fillAreaRect)
+        {
+            oldFill.SetParent(fillAreaRect, false);
+        }
+
+        Image fill = GetOrCreateImage(fillAreaRect, "Fill");
+        fill.transform.SetParent(fillAreaRect, false);
+        fill.color = new Color(0.93f, 0.68f, 0.30f, 0.88f);
+        fill.sprite = GetSliderTrackSprite();
+        fill.type = Image.Type.Sliced;
+        fill.raycastTarget = false;
+        fill.rectTransform.anchorMin = Vector2.zero;
+        fill.rectTransform.anchorMax = Vector2.one;
+        fill.rectTransform.offsetMin = Vector2.zero;
+        fill.rectTransform.offsetMax = Vector2.zero;
+
+        RectTransform handleAreaRect = GetOrCreateRectChild(slider.transform, "HandleArea");
+        handleAreaRect.anchorMin = new Vector2(0f, 0.5f);
+        handleAreaRect.anchorMax = new Vector2(1f, 0.5f);
+        handleAreaRect.pivot = new Vector2(0.5f, 0.5f);
+        handleAreaRect.anchoredPosition = Vector2.zero;
+        handleAreaRect.sizeDelta = Vector2.zero;
+
+        Transform oldHandle = slider.transform.Find("Handle");
+        if (oldHandle != null && oldHandle.parent != handleAreaRect)
+        {
+            oldHandle.SetParent(handleAreaRect, false);
+        }
+
+        Image handle = GetOrCreateImage(handleAreaRect, "Handle");
+        handle.transform.SetParent(handleAreaRect, false);
+        handle.color = new Color(0.80f, 0.85f, 0.84f, 1f);
+        handle.sprite = GetSliderHandleSprite();
+        handle.type = Image.Type.Simple;
+        handle.raycastTarget = false;
+        handle.rectTransform.anchorMin = new Vector2(0f, 0.5f);
+        handle.rectTransform.anchorMax = new Vector2(0f, 0.5f);
+        handle.rectTransform.sizeDelta = new Vector2(SliderHandleSize, SliderHandleSize);
+
+        Transform glow = handle.transform.Find("Glow");
+        if (glow != null)
+        {
+            glow.gameObject.SetActive(false);
+        }
+
+        slider.fillRect = fill.rectTransform;
+        slider.handleRect = handle.rectTransform;
+        slider.targetGraphic = handle;
+    }
+
+    private RectTransform GetOrCreateRectChild(Transform parent, string objectName)
+    {
+        Transform child = parent.Find(objectName);
+        if (child == null)
+        {
+            GameObject childObject = new GameObject(objectName, typeof(RectTransform));
+            childObject.transform.SetParent(parent, false);
+            child = childObject.transform;
+        }
+
+        RectTransform rect = child.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            rect = child.gameObject.AddComponent<RectTransform>();
+        }
+
+        return rect;
+    }
+
+    private Image GetOrCreateImage(Transform parent, string objectName)
+    {
+        Transform child = FindDescendant(parent, objectName);
+        if (child == null)
+        {
+            GameObject childObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            childObject.transform.SetParent(parent, false);
+            return childObject.GetComponent<Image>();
+        }
+
+        Image image = child.GetComponent<Image>();
+        if (image == null)
+        {
+            image = child.gameObject.AddComponent<Image>();
+        }
+
+        return image;
+    }
+
+    private Sprite GetSliderTrackSprite()
+    {
+        if (sliderTrackSprite == null)
+        {
+            sliderTrackSprite = CreateRoundedSprite("Settings Slider Track", 64, 14, 7f, new Vector4(7f, 7f, 7f, 7f));
+        }
+
+        return sliderTrackSprite;
+    }
+
+    private Sprite GetSliderHandleSprite()
+    {
+        if (sliderHandleSprite == null)
+        {
+            sliderHandleSprite = CreateRoundedSprite("Settings Slider Handle", 20, 20, 10f, Vector4.zero);
+        }
+
+        return sliderHandleSprite;
+    }
+
+    private Sprite CreateRoundedSprite(string spriteName, int width, int height, float radius, Vector4 border)
+    {
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.name = spriteName + " Texture";
+        texture.hideFlags = HideFlags.HideAndDontSave;
+        texture.filterMode = FilterMode.Bilinear;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        Color32[] pixels = new Color32[width * height];
+        Vector2 center = new Vector2(width * 0.5f, height * 0.5f);
+        Vector2 inner = new Vector2(width * 0.5f - radius, height * 0.5f - radius);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Vector2 point = new Vector2(x + 0.5f, y + 0.5f);
+                Vector2 delta = new Vector2(Mathf.Abs(point.x - center.x), Mathf.Abs(point.y - center.y));
+                Vector2 corner = new Vector2(Mathf.Max(delta.x - inner.x, 0f), Mathf.Max(delta.y - inner.y, 0f));
+                float distance = corner.magnitude;
+                byte alpha = (byte)Mathf.RoundToInt(Mathf.Clamp01(radius + 0.75f - distance) * 255f);
+                pixels[y * width + x] = new Color32(255, 255, 255, alpha);
+            }
+        }
+
+        texture.SetPixels32(pixels);
+        texture.Apply();
+
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f, 0u, SpriteMeshType.FullRect, border);
+        sprite.name = spriteName;
+        sprite.hideFlags = HideFlags.HideAndDontSave;
+        return sprite;
     }
 
     private Button CreateButton(Transform parent, string objectName, string label, float width, float height, float fontSize)
@@ -648,6 +1106,204 @@ public class SettingsUIController : MonoBehaviour
                 binding.Text.text = T(binding.Key);
             }
         }
+    }
+
+    private void NormalizeLayout()
+    {
+        if (embeddedMode)
+        {
+            NormalizeEmbeddedLayout();
+            return;
+        }
+
+        RectTransform rootRect = GetComponent<RectTransform>();
+        if (rootRect != null)
+        {
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+        }
+
+        RectTransform dialogRect = FindDescendant(transform, "SettingsDialog")?.GetComponent<RectTransform>();
+        if (dialogRect != null)
+        {
+            dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+            dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+            dialogRect.anchoredPosition = Vector2.zero;
+            dialogRect.sizeDelta = new Vector2(DialogWidth, DialogHeight);
+        }
+
+        RectTransform viewportRect = FindDescendant(transform, "Viewport")?.GetComponent<RectTransform>();
+        if (viewportRect != null)
+        {
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = new Vector2(58f, 98f);
+            viewportRect.offsetMax = new Vector2(-58f, -124f);
+        }
+
+        Transform content = FindDescendant(transform, "Content");
+        if (content != null)
+        {
+            VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
+            if (contentLayout != null)
+            {
+                contentLayout.spacing = 8f;
+                contentLayout.childControlWidth = true;
+                contentLayout.childControlHeight = false;
+                contentLayout.childForceExpandWidth = true;
+                contentLayout.childForceExpandHeight = false;
+            }
+
+            NormalizeRows(content);
+        }
+
+        NormalizeFloatingButton("TopCloseButton", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-116f, -54f), 150f, 46f, 18f);
+        NormalizeFloatingButton("ApplyButton", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-310f, 48f), FooterButtonWidth, FooterButtonHeight, 20f);
+        NormalizeFloatingButton("ResetButton", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-132f, 48f), FooterButtonWidth, FooterButtonHeight, 20f);
+
+        if (Application.isPlaying)
+        {
+            MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+        }
+    }
+
+    private void NormalizeEmbeddedLayout()
+    {
+        RectTransform viewportRect = FindDescendant(transform, "EmbeddedViewport")?.GetComponent<RectTransform>();
+        if (viewportRect != null)
+        {
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+        }
+
+        Transform content = FindDescendant(transform, "Content");
+        if (content != null)
+        {
+            VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
+            if (contentLayout != null)
+            {
+                contentLayout.spacing = 8f;
+                contentLayout.childControlWidth = true;
+                contentLayout.childControlHeight = false;
+                contentLayout.childForceExpandWidth = true;
+                contentLayout.childForceExpandHeight = false;
+            }
+
+            NormalizeRows(content);
+        }
+
+        if (Application.isPlaying)
+        {
+            MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+        }
+    }
+
+    private void NormalizeRows(Transform content)
+    {
+        Transform[] rows = content.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < rows.Length; i++)
+        {
+            Transform row = rows[i];
+            if (row == null || !row.name.EndsWith("Row"))
+            {
+                continue;
+            }
+
+            SetLayoutSize(row.gameObject, 0f, RowHeight);
+            HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+            if (layout != null)
+            {
+                layout.spacing = RowSpacing;
+                layout.childAlignment = TextAnchor.MiddleLeft;
+                layout.childControlWidth = false;
+                layout.childControlHeight = false;
+                layout.childForceExpandWidth = false;
+                layout.childForceExpandHeight = false;
+            }
+
+            TMP_Text label = FindDescendant(row, "LabelText")?.GetComponent<TMP_Text>();
+            if (label != null)
+            {
+                SetLayoutSize(label.gameObject, RowLabelWidth, 40f);
+                label.alignment = TextAlignmentOptions.MidlineLeft;
+                FitText(label, 18f, false);
+            }
+
+            Slider slider = row.GetComponentInChildren<Slider>(true);
+            if (slider != null)
+            {
+                NormalizeSliderVisuals(slider);
+            }
+
+            TMP_Text valueText = FindDescendant(row, "ValueText")?.GetComponent<TMP_Text>();
+            if (valueText != null)
+            {
+                SetLayoutSize(valueText.gameObject, RowValueWidth, 40f);
+                valueText.alignment = TextAlignmentOptions.Center;
+                FitText(valueText, 18f, false);
+            }
+
+            Button[] buttons = row.GetComponentsInChildren<Button>(true);
+            for (int buttonIndex = 0; buttonIndex < buttons.Length; buttonIndex++)
+            {
+                Button button = buttons[buttonIndex];
+                if (button == null)
+                {
+                    continue;
+                }
+
+                SetLayoutSize(button.gameObject, RowButtonWidth, RowButtonHeight);
+                TMP_Text buttonText = button.GetComponentInChildren<TMP_Text>(true);
+                FitText(buttonText, 17f, false);
+                MenuButtonHoverEffect.EnsureOn(button);
+            }
+        }
+    }
+
+    private void NormalizeFloatingButton(string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 position, float width, float height, float maxFontSize)
+    {
+        Transform buttonTransform = FindDescendant(transform, objectName);
+        if (buttonTransform == null)
+        {
+            return;
+        }
+
+        RectTransform rect = buttonTransform.GetComponent<RectTransform>();
+        if (rect != null)
+        {
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(width, height);
+        }
+
+        SetLayoutSize(buttonTransform.gameObject, width, height);
+        Button button = buttonTransform.GetComponent<Button>();
+        if (button != null)
+        {
+            MenuButtonHoverEffect.EnsureOn(button);
+        }
+
+        FitText(buttonTransform.GetComponentInChildren<TMP_Text>(true), maxFontSize, false);
+    }
+
+    private void FitText(TMP_Text text, float maxFontSize, bool wrap)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 11f;
+        text.fontSizeMax = maxFontSize;
+        text.fontSize = Mathf.Min(text.fontSize, maxFontSize);
+        text.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        text.overflowMode = wrap ? TextOverflowModes.Overflow : TextOverflowModes.Ellipsis;
     }
 
     private void SetLayoutSize(GameObject target, float width, float height)

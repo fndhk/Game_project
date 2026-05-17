@@ -160,11 +160,6 @@ public static class SettingsPanelLauncher
 
     private static void EnsureEventSystem()
     {
-        if (Object.FindAnyObjectByType<EventSystem>() != null)
-        {
-            return;
-        }
-
-        new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        UiEventSystemUtility.EnsureSingle(null);
     }
 }

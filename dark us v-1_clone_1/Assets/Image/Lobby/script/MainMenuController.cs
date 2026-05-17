@@ -54,6 +54,8 @@ public class MainMenuController : MonoBehaviour
     {
         PhotonConnectionDefaults.Apply();
         MenuCursorState.UnlockCursor();
+        SettingsPanelLauncher.DestroyInstance();
+        EnsureEventSystem();
 
         if (!Application.isPlaying)
         {
@@ -67,6 +69,7 @@ public class MainMenuController : MonoBehaviour
         EnsureMenuPanels();
         EnsureMainMenuBindings();
         DisableSeparatedScenePanels();
+        MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
 
         if (joinFriendPanel != null)
         {
@@ -88,11 +91,14 @@ public class MainMenuController : MonoBehaviour
         if (Application.isPlaying)
         {
             MenuCursorState.UnlockCursor();
+            EnsureEventSystem();
             EnsureQuitUi();
             EnsureMainMenuLayout();
             EnsureMenuPanels();
             EnsureMainMenuBindings();
             DisableSeparatedScenePanels();
+            MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+            ClearSelectedUi();
             return;
         }
 
@@ -252,7 +258,9 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
-        SceneManager.LoadScene(sceneName);
+        ClearSelectedUi();
+        SettingsPanelLauncher.DestroyInstance();
+        SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
     }
 
     private bool IsValidRoomCode(string roomCode)
@@ -287,6 +295,7 @@ public class MainMenuController : MonoBehaviour
 
         panel.transform.SetAsLastSibling();
         panel.SetActive(true);
+        MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
 
     }
 
@@ -314,6 +323,7 @@ public class MainMenuController : MonoBehaviour
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(action);
+        MenuButtonHoverEffect.EnsureOn(button);
     }
 
     private void EnsureQuitUi()
@@ -500,7 +510,7 @@ public class MainMenuController : MonoBehaviour
 
     private void EnsureMainMenuChrome(Transform buttonGroup)
     {
-        Canvas canvas = FindObjectOfType<Canvas>();
+        Canvas canvas = FindSceneCanvas();
         if (canvas == null)
         {
             return;
@@ -639,7 +649,7 @@ public class MainMenuController : MonoBehaviour
             outline.effectDistance = new Vector2(2f, -2f);
         }
 
-        MenuButtonHoverEffect hover = buttonTransform.GetComponent<MenuButtonHoverEffect>();
+        MenuButtonHoverEffect hover = MenuButtonHoverEffect.EnsureOn(buttonTransform.gameObject);
         if (hover != null)
         {
             hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.58f);
@@ -684,6 +694,11 @@ public class MainMenuController : MonoBehaviour
         }
     }
 
+    private void EnsureEventSystem()
+    {
+        UiEventSystemUtility.EnsureSingle(gameObject);
+    }
+
     private void EnsureMenuPanels()
     {
         if (joinFriendPanel == null)
@@ -720,7 +735,7 @@ public class MainMenuController : MonoBehaviour
 
     private GameObject CreateMenuPanel(string objectName, string title, string body, string primaryLabel, UnityEngine.Events.UnityAction primaryAction)
     {
-        Canvas canvas = FindObjectOfType<Canvas>();
+        Canvas canvas = FindSceneCanvas();
         if (canvas == null)
         {
             Debug.LogWarning("Canvas is not found. Menu panel was not created.");
@@ -759,6 +774,7 @@ public class MainMenuController : MonoBehaviour
         if (existingInput != null)
         {
             findRoomCodeInput = existingInput.GetComponent<TMP_InputField>();
+            NormalizeJoinFriendPanel(panelObject);
             return;
         }
 
@@ -768,6 +784,7 @@ public class MainMenuController : MonoBehaviour
         }
 
         BuildPanelContents(panelObject, "Join Friend", "Enter the 4-digit room code from the host.", "Join", OnClickFindRoomConfirm);
+        NormalizeJoinFriendPanel(panelObject);
     }
 
     private void ClearChildren(Transform parent)
@@ -816,7 +833,7 @@ public class MainMenuController : MonoBehaviour
         dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
         dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
         dialogRect.anchoredPosition = new Vector2(0f, 10f);
-        dialogRect.sizeDelta = new Vector2(680f, 360f);
+        dialogRect.sizeDelta = new Vector2(700f, 390f);
 
         Image dialogImage = dialogObject.GetComponent<Image>();
         dialogImage.color = new Color(0.015f, 0.018f, 0.02f, 0.94f);
@@ -825,29 +842,29 @@ public class MainMenuController : MonoBehaviour
         dialogOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.4f);
         dialogOutline.effectDistance = new Vector2(2f, -2f);
 
-        TMP_Text titleText = CreateLabel(dialogObject.transform, "TitleText", title, 46f, FontStyles.UpperCase);
+        TMP_Text titleText = CreateLabel(dialogObject.transform, "TitleText", title, 42f, FontStyles.UpperCase);
         RegisterLocalizedText(titleText, title);
         RectTransform titleRect = titleText.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(1f, 1f);
-        titleRect.anchoredPosition = new Vector2(0f, -78f);
-        titleRect.sizeDelta = new Vector2(-80f, 74f);
+        titleRect.anchoredPosition = new Vector2(0f, -62f);
+        titleRect.sizeDelta = new Vector2(-80f, 64f);
         titleText.color = new Color(1f, 0.8f, 0.42f, 1f);
 
-        TMP_Text bodyText = CreateLabel(dialogObject.transform, "BodyText", body, 28f, FontStyles.Normal);
+        TMP_Text bodyText = CreateLabel(dialogObject.transform, "BodyText", body, 26f, FontStyles.Normal);
         RegisterLocalizedText(bodyText, body);
         RectTransform bodyRect = bodyText.GetComponent<RectTransform>();
         bodyRect.anchorMin = new Vector2(0f, 0.5f);
         bodyRect.anchorMax = new Vector2(1f, 0.5f);
-        bodyRect.anchoredPosition = new Vector2(0f, 18f);
-        bodyRect.sizeDelta = new Vector2(-120f, 110f);
-        bodyText.enableWordWrapping = true;
+        bodyRect.anchoredPosition = new Vector2(0f, 8f);
+        bodyRect.sizeDelta = new Vector2(-120f, 80f);
+        bodyText.textWrappingMode = TextWrappingModes.Normal;
         bodyText.color = new Color(0.76f, 0.82f, 0.84f, 1f);
 
         if (title == "Find Room" || title == "Join Friend")
         {
-            bodyRect.anchoredPosition = new Vector2(0f, 54f);
-            bodyRect.sizeDelta = new Vector2(-120f, 86f);
+            bodyRect.anchoredPosition = new Vector2(0f, 22f);
+            bodyRect.sizeDelta = new Vector2(-120f, 72f);
             findRoomCodeInput = CreateRoomCodeInput(dialogObject.transform);
         }
 
@@ -864,6 +881,118 @@ public class MainMenuController : MonoBehaviour
         closeRect.anchorMax = new Vector2(0.5f, 0f);
         closeRect.anchoredPosition = new Vector2(124f, 70f);
         closeButton.onClick.AddListener(() => OnClickClosePanel(panelObject));
+        NormalizeJoinFriendPanel(panelObject);
+    }
+
+    private void NormalizeJoinFriendPanel(GameObject panelObject)
+    {
+        if (panelObject == null)
+        {
+            return;
+        }
+
+        Transform dialog = panelObject.transform.Find("Dialog");
+        if (dialog == null)
+        {
+            return;
+        }
+
+        RectTransform dialogRect = dialog.GetComponent<RectTransform>();
+        if (dialogRect != null)
+        {
+            dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+            dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+            dialogRect.anchoredPosition = new Vector2(0f, 10f);
+            dialogRect.sizeDelta = new Vector2(700f, 390f);
+        }
+
+        TMP_Text titleText = dialog.Find("TitleText")?.GetComponent<TMP_Text>();
+        if (titleText != null)
+        {
+            RectTransform titleRect = titleText.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.anchoredPosition = new Vector2(0f, -62f);
+            titleRect.sizeDelta = new Vector2(-80f, 64f);
+            FitPanelText(titleText, 42f, false);
+        }
+
+        TMP_Text bodyText = dialog.Find("BodyText")?.GetComponent<TMP_Text>();
+        if (bodyText != null)
+        {
+            RectTransform bodyRect = bodyText.GetComponent<RectTransform>();
+            bodyRect.anchorMin = new Vector2(0f, 0.5f);
+            bodyRect.anchorMax = new Vector2(1f, 0.5f);
+            bodyRect.anchoredPosition = new Vector2(0f, 22f);
+            bodyRect.sizeDelta = new Vector2(-120f, 72f);
+            FitPanelText(bodyText, 25f, true);
+        }
+
+        RectTransform inputRect = dialog.Find("RoomCodeInput")?.GetComponent<RectTransform>();
+        if (inputRect != null)
+        {
+            inputRect.anchorMin = new Vector2(0.5f, 0.5f);
+            inputRect.anchorMax = new Vector2(0.5f, 0.5f);
+            inputRect.anchoredPosition = new Vector2(0f, -48f);
+            inputRect.sizeDelta = new Vector2(280f, 56f);
+        }
+
+        NormalizePanelButton(dialog, "JoinButton", new Vector2(-124f, 74f));
+        NormalizePanelButton(dialog, "FindButton", new Vector2(-124f, 74f));
+        NormalizePanelButton(dialog, "CloseButton", new Vector2(124f, 74f));
+
+        if (Application.isPlaying)
+        {
+            MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+        }
+    }
+
+    private void NormalizePanelButton(Transform dialog, string objectName, Vector2 position)
+    {
+        Transform buttonTransform = dialog.Find(objectName);
+        if (buttonTransform == null)
+        {
+            return;
+        }
+
+        RectTransform rect = buttonTransform.GetComponent<RectTransform>();
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0f);
+            rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(210f, 60f);
+        }
+
+        LayoutElement layout = buttonTransform.GetComponent<LayoutElement>();
+        if (layout != null)
+        {
+            layout.preferredWidth = 210f;
+            layout.preferredHeight = 60f;
+        }
+
+        Button button = buttonTransform.GetComponent<Button>();
+        if (button != null)
+        {
+            MenuButtonHoverEffect.EnsureOn(button);
+        }
+
+        FitPanelText(buttonTransform.GetComponentInChildren<TMP_Text>(true), 25f, false);
+    }
+
+    private void FitPanelText(TMP_Text text, float maxFontSize, bool wrap)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 14f;
+        text.fontSizeMax = maxFontSize;
+        text.fontSize = Mathf.Min(text.fontSize, maxFontSize);
+        text.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        text.overflowMode = wrap ? TextOverflowModes.Overflow : TextOverflowModes.Ellipsis;
     }
 
     private TMP_InputField CreateRoomCodeInput(Transform parent)
@@ -1249,7 +1378,7 @@ public class MainMenuController : MonoBehaviour
 
     private GameObject CreateQuitConfirmPanel()
     {
-        Canvas canvas = FindObjectOfType<Canvas>();
+        Canvas canvas = FindSceneCanvas();
         if (canvas == null)
         {
             Debug.LogWarning("Canvas is not found. Quit confirm panel was not created.");
@@ -1350,9 +1479,23 @@ public class MainMenuController : MonoBehaviour
         Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
         foreach (Transform targetTransform in transforms)
         {
-            if (targetTransform.name == objectName && targetTransform.gameObject.scene.IsValid())
+            if (targetTransform.name == objectName && targetTransform.gameObject.scene == gameObject.scene)
             {
                 return targetTransform;
+            }
+        }
+
+        return null;
+    }
+
+    private Canvas FindSceneCanvas()
+    {
+        Canvas[] canvases = Resources.FindObjectsOfTypeAll<Canvas>();
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas != null && canvas.gameObject.scene == gameObject.scene)
+            {
+                return canvas;
             }
         }
 

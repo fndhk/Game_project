@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
@@ -60,9 +61,68 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
     // 버튼을 누르고 있는지 저장한다.
     private bool isPressed = false;
 
+    private Selectable selectable;
+
+    public static MenuButtonHoverEffect EnsureOn(Button button)
+    {
+        return button != null ? EnsureOn(button.gameObject) : null;
+    }
+
+    public static MenuButtonHoverEffect EnsureOn(GameObject target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        MenuButtonHoverEffect hover = target.GetComponent<MenuButtonHoverEffect>();
+        if (hover == null)
+        {
+            if (target.GetComponent<Image>() == null)
+            {
+                return null;
+            }
+
+            hover = target.AddComponent<MenuButtonHoverEffect>();
+        }
+
+        hover.EnsureReferences();
+        return hover;
+    }
+
+    public static void EnsureOnAllSceneButtons(Scene scene)
+    {
+        if (!scene.IsValid())
+        {
+            return;
+        }
+
+        Button[] buttons = Resources.FindObjectsOfTypeAll<Button>();
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button button = buttons[i];
+            bool hasTextLabel = button != null && button.GetComponentInChildren<TMP_Text>(true) != null;
+            bool alreadyHasHover = button != null && button.GetComponent<MenuButtonHoverEffect>() != null;
+            if (button != null && button.gameObject.scene == scene && (hasTextLabel || alreadyHasHover))
+            {
+                EnsureOn(button);
+            }
+        }
+    }
+
     private void Awake()
     {
         // 참조가 비어 있으면 자동으로 찾는다.
+        EnsureReferences();
+        targetBackgroundColor = normalBackgroundColor;
+        targetTextColor = normalTextColor;
+        targetScale = Vector3.one;
+
+        ApplyImmediateState();
+    }
+
+    private void EnsureReferences()
+    {
         if (buttonImage == null)
         {
             buttonImage = GetComponent<Image>();
@@ -73,11 +133,7 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
             labelText = GetComponentInChildren<TMP_Text>(true);
         }
 
-        targetBackgroundColor = normalBackgroundColor;
-        targetTextColor = normalTextColor;
-        targetScale = Vector3.one;
-
-        ApplyImmediateState();
+        selectable = GetComponent<Selectable>();
     }
 
     private void Update()
@@ -113,6 +169,11 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
     // 마우스를 올렸을 때 호출된다.
     public void OnPointerEnter(PointerEventData eventData)
     {
+        if (selectable == null || selectable.interactable)
+        {
+            GameAudioManager.PlayUiHover();
+        }
+
         isHovered = true;
         RefreshTargetState();
     }
@@ -128,6 +189,11 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
     // 버튼을 눌렀을 때 호출된다.
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (selectable == null || selectable.interactable)
+        {
+            GameAudioManager.PlayUiClick();
+        }
+
         isPressed = true;
         RefreshTargetState();
     }

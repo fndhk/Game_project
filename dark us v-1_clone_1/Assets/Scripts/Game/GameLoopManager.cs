@@ -408,6 +408,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         }
 
         Debug.Log("Game Over: " + (citizensWon ? "Citizens Win" : "Killer Wins") + " / " + gameOverReason);
+        GameAudioManager.PlayGameOver(citizensWon);
         ScheduleReturnToLobby();
     }
 

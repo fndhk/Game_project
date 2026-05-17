@@ -104,24 +104,6 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             return;
         }
 
-        if (!SettingsPanelLauncher.IsCapturingKey &&
-            (Input.GetKeyDown(KeyCode.Escape) || GameInputBindings.GetKeyDown(GameInputBindings.PauseKey, KeyCode.Escape)))
-        {
-            if (SettingsPanelLauncher.ClosedByEscapeThisFrame)
-            {
-                return;
-            }
-
-            if (SettingsPanelLauncher.IsOpen)
-            {
-                SettingsPanelLauncher.MarkEscapeCloseFrame();
-                SettingsPanelLauncher.Hide();
-                return;
-            }
-
-            OpenSettingsPanel();
-        }
-
         AnimateLobbyUi();
         RefreshVoicePanelOnInterval();
     }
@@ -828,6 +810,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         pendingColorSelection = colorIndex;
+        GameAudioManager.PlayColorSelect();
         RefreshColorPicker();
     }
 
@@ -839,6 +822,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         SetLocalColor(pendingColorSelection);
+        GameAudioManager.PlayColorSelect();
     }
 
     private void ToggleColorPickerFromSlot(int slotIndex)
@@ -986,12 +970,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private void EnsureEventSystem()
     {
-        if (FindObjectOfType<EventSystem>() != null)
-        {
-            return;
-        }
-
-        new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        UiEventSystemUtility.EnsureSingle(gameObject);
     }
 
     private void EnsureRoomLobbyUi()
@@ -999,10 +978,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         if (FindUiTransform("Canvas") != null && FindUiTransform("ReadyButton") != null)
         {
             BindExistingRoomLobbyUi();
+            MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
             return;
         }
 
         BuildRoomLobbyUi();
+        MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
     }
 
     private void BindExistingRoomLobbyUi()
@@ -2022,6 +2003,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(action);
+        MenuButtonHoverEffect.EnsureOn(button);
         return button;
     }
 

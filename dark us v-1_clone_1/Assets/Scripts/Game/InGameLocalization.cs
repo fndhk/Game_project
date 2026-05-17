@@ -93,6 +93,7 @@ public static class InGameLocalization
             case "Hide From Imposter": return "임포스터를 피하십시오";
             case "Returning to Lobby": return "대기방으로 이동 중";
             case "PAUSED": return "일시정지";
+            case "MENU": return "메뉴";
             case "SETTINGS": return "설정";
             case "CONTROLS": return "조작";
             case "PLAYERS": return "플레이어";
@@ -134,6 +135,8 @@ public static class InGameLocalization
             case "Quit to Main Menu": return "메인 메뉴로";
             case "Quit Game": return "게임 종료";
             case "Master Volume": return "전체 볼륨";
+            case "BGM Volume": return "배경음 볼륨";
+            case "SFX Volume": return "효과음 볼륨";
             case "Voice Volume": return "마이크 볼륨";
             case "Display": return "화면";
             case "Audio": return "오디오";
@@ -241,6 +244,7 @@ public static class InGameLocalization
             case "Hide From Imposter": return "インポスターから逃げろ";
             case "Returning to Lobby": return "待機ルームへ移動中";
             case "PAUSED": return "一時停止";
+            case "MENU": return "メニュー";
             case "SETTINGS": return "設定";
             case "CONTROLS": return "操作";
             case "PLAYERS": return "プレイヤー";
@@ -281,6 +285,8 @@ public static class InGameLocalization
             case "Quit to Main Menu": return "メインメニューへ";
             case "Quit Game": return "ゲーム終了";
             case "Master Volume": return "全体音量";
+            case "BGM Volume": return "BGM音量";
+            case "SFX Volume": return "効果音音量";
             case "Voice Volume": return "マイク音量";
             case "Display": return "画面";
             case "Audio": return "オーディオ";

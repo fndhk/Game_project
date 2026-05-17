@@ -74,11 +74,6 @@ public class SettingsSceneController : MonoBehaviour
 
     private void EnsureEventSystem()
     {
-        if (FindAnyObjectByType<EventSystem>() != null)
-        {
-            return;
-        }
-
-        new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        UiEventSystemUtility.EnsureSingle(gameObject);
     }
 }

@@ -9,15 +9,23 @@ using UnityEngine.UI;
 
 public class InGamePauseMenu : MonoBehaviour
 {
-    public string mainMenuSceneName = "LobbyScene 1";
+    public string mainMenuSceneName = "LobbyScene";
     public string roomLobbySceneName = "CreateRoomLobbyScene";
     public KeyCode toggleKey = KeyCode.Escape;
+
+    private const string MainMenuSceneName = "LobbyScene";
+    private const string LegacyMainMenuSceneName = "LobbyScene 1";
+    private const string PrivateRoomSceneName = "CreateRoomLobbyScene";
+    private const string PublicRoomSceneName = "PublicRoomListScene";
+    private const string GameSceneName = "labor";
 
     private static InGamePauseMenu instance;
 
     private Canvas canvas;
     private GameObject root;
     private GameObject confirmDialog;
+    private GameObject embeddedSettingsObject;
+    private SettingsUIController embeddedSettingsController;
     private TMP_Text titleText;
     private TMP_Text bodyText;
     private TMP_Text roomCodeText;
@@ -49,10 +57,7 @@ public class InGamePauseMenu : MonoBehaviour
     private static void TryCreateForActiveScene()
     {
         string sceneName = SceneManager.GetActiveScene().name;
-        if (sceneName == "LobbyScene" ||
-            sceneName == "LobbyScene 1" ||
-            sceneName == "CreateRoomLobbyScene" ||
-            sceneName == "PublicRoomListScene")
+        if (!ShouldShowInScene(sceneName))
         {
             if (instance != null)
             {
@@ -73,6 +78,13 @@ public class InGamePauseMenu : MonoBehaviour
         DontDestroyOnLoad(menuObject);
     }
 
+    private static bool ShouldShowInScene(string sceneName)
+    {
+        return sceneName == PrivateRoomSceneName ||
+               sceneName == PublicRoomSceneName ||
+               sceneName == GameSceneName;
+    }
+
     private void Awake()
     {
         if (instance != null && instance != this)
@@ -90,7 +102,9 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void Update()
     {
+        bool embeddedSettingsCapturingKey = embeddedSettingsController != null && embeddedSettingsController.IsCapturingKey;
         if (!SettingsPanelLauncher.IsCapturingKey &&
+            !embeddedSettingsCapturingKey &&
             (Input.GetKeyDown(KeyCode.Escape) || GameInputBindings.GetKeyDown(GameInputBindings.PauseKey, KeyCode.Escape)))
         {
             if (SettingsPanelLauncher.ClosedByEscapeThisFrame)
@@ -126,6 +140,7 @@ public class InGamePauseMenu : MonoBehaviour
         if (!open)
         {
             SettingsPanelLauncher.Hide();
+            HideEmbeddedSettingsPanel();
         }
 
         if (open)
@@ -187,8 +202,9 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void ShowHomePanel()
     {
-        currentPanelKey = "PAUSED";
-        titleText.text = T("PAUSED");
+        HideEmbeddedSettingsPanel();
+        currentPanelKey = "MENU";
+        titleText.text = T("MENU");
         roomCodeText.text = GetRoomCodeLine();
         bodyText.gameObject.SetActive(true);
         SetBody(
@@ -202,15 +218,20 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void ShowSettingsPanel()
     {
-        SettingsPanelLauncher.Show();
+        SettingsPanelLauncher.Hide();
         currentPanelKey = "SETTINGS";
         titleText.text = T("SETTINGS");
         roomCodeText.text = T("IN-GAME SETTINGS");
-        bodyText.gameObject.SetActive(true);
+        bodyText.gameObject.SetActive(false);
+        if (embeddedSettingsController != null)
+        {
+            embeddedSettingsController.Show();
+        }
     }
 
     private void ShowControlsPanel()
     {
+        HideEmbeddedSettingsPanel();
         currentPanelKey = "CONTROLS";
         titleText.text = T("CONTROLS");
         bodyText.gameObject.SetActive(true);
@@ -236,6 +257,7 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void ShowPlayersPanel()
     {
+        HideEmbeddedSettingsPanel();
         currentPanelKey = "PLAYERS";
         titleText.text = T("PLAYERS");
         bodyText.gameObject.SetActive(true);
@@ -312,7 +334,12 @@ public class InGamePauseMenu : MonoBehaviour
             PhotonNetwork.LeaveRoom();
         }
 
-        SceneManager.LoadScene(mainMenuSceneName);
+        if (PhotonNetwork.InLobby)
+        {
+            PhotonNetwork.LeaveLobby();
+        }
+
+        SceneManager.LoadScene(GetMainMenuSceneName());
     }
 
     private void QuitGame()
@@ -419,11 +446,9 @@ public class InGamePauseMenu : MonoBehaviour
         SetLayoutSize(logo.gameObject, 0f, 60f);
 
         CreateButton(leftPanel.transform, "ResumeButton", T("Resume"), SetOpenFalse);
-        CreateButton(leftPanel.transform, "SettingsButton", T("Settings"), ShowSettingsPanel);
-        CreateButton(leftPanel.transform, "ControlsButton", T("Controls"), ShowControlsPanel);
-        CreateButton(leftPanel.transform, "PlayersButton", T("Players"), ShowPlayersPanel);
         CreateSpacer(leftPanel.transform, 18f);
         CreateButton(leftPanel.transform, "MainMenuButton", T("Quit to Main Menu"), ConfirmQuitToMainMenu);
+        CreateButton(leftPanel.transform, "SettingsButton", T("Settings"), ShowSettingsPanel);
         CreateButton(leftPanel.transform, "QuitGameButton", T("Quit Game"), ConfirmQuitGame);
 
         GameObject infoPanel = CreatePanel(root.transform, "InfoPanel", new Vector2(-120f, 0f), new Vector2(940f, 780f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
@@ -453,12 +478,56 @@ public class InGamePauseMenu : MonoBehaviour
         bodyText.alignment = TextAlignmentOptions.TopLeft;
         bodyText.lineSpacing = 18f;
 
+        embeddedSettingsController = CreateEmbeddedSettingsPanel(infoPanel.transform);
+        embeddedSettingsObject = embeddedSettingsController.gameObject;
+        embeddedSettingsObject.SetActive(false);
+
         confirmDialog = CreateConfirmDialog(root.transform);
     }
 
     private void SetOpenFalse()
     {
         SetOpen(false);
+    }
+
+    private string GetMainMenuSceneName()
+    {
+        if (string.IsNullOrWhiteSpace(mainMenuSceneName) || mainMenuSceneName == LegacyMainMenuSceneName)
+        {
+            return MainMenuSceneName;
+        }
+
+        return mainMenuSceneName;
+    }
+
+    private SettingsUIController CreateEmbeddedSettingsPanel(Transform parent)
+    {
+        GameObject settingsObject = new GameObject("EmbeddedSettingsPanel", typeof(RectTransform));
+        settingsObject.SetActive(false);
+        settingsObject.transform.SetParent(parent, false);
+
+        RectTransform rect = settingsObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.offsetMin = new Vector2(70f, 70f);
+        rect.offsetMax = new Vector2(-70f, -210f);
+
+        SettingsUIController controller = settingsObject.AddComponent<SettingsUIController>();
+        controller.SetEmbeddedMode(true);
+        return controller;
+    }
+
+    private void HideEmbeddedSettingsPanel()
+    {
+        if (embeddedSettingsController != null)
+        {
+            embeddedSettingsController.HideWithoutNotify();
+        }
+
+        if (bodyText != null)
+        {
+            bodyText.gameObject.SetActive(true);
+        }
     }
 
     private Canvas CreateCanvas()
@@ -619,13 +688,7 @@ public class InGamePauseMenu : MonoBehaviour
 
     private void EnsureEventSystem()
     {
-        if (FindObjectOfType<EventSystem>() != null)
-        {
-            return;
-        }
-
-        GameObject eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-        DontDestroyOnLoad(eventSystem);
+        UiEventSystemUtility.EnsureSingle(gameObject);
     }
 
     private string T(string key)

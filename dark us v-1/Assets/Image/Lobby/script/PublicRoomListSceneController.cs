@@ -362,10 +362,12 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         if (FindUiTransform("Canvas") != null && FindUiTransform("RoomListPanel") != null)
         {
             BindExistingPublicRoomListUi();
+            MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
             return;
         }
 
         BuildUi();
+        MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
     }
 
     private void BindExistingPublicRoomListUi()
@@ -693,12 +695,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
 
     private void EnsureEventSystem()
     {
-        if (FindObjectOfType<EventSystem>() != null)
-        {
-            return;
-        }
-
-        new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        UiEventSystemUtility.EnsureSingle(gameObject);
     }
 
     private Button BindButton(string objectName, UnityEngine.Events.UnityAction action)
@@ -711,6 +708,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(action);
+        MenuButtonHoverEffect.EnsureOn(button);
         return button;
     }
 

@@ -6,6 +6,8 @@ public static class SettingsManager
     public const string FpsLimitKey = "setting_fps_limit";
     public const string LanguageKey = "setting_language";
     public const string MasterVolumeKey = "setting_master_volume";
+    public const string BgmVolumeKey = "setting_bgm_volume";
+    public const string SfxVolumeKey = "setting_sfx_volume";
     public const string VoiceVolumeKey = "setting_voice_volume";
     public const string MouseXKey = "setting_mouse_x";
     public const string MouseYKey = "setting_mouse_y";
@@ -47,6 +49,18 @@ public static class SettingsManager
         set => PlayerPrefs.SetFloat(MasterVolumeKey, Mathf.Clamp01(value));
     }
 
+    public static float BgmVolume
+    {
+        get => PlayerPrefs.GetFloat(BgmVolumeKey, 0.65f);
+        set => PlayerPrefs.SetFloat(BgmVolumeKey, Mathf.Clamp01(value));
+    }
+
+    public static float SfxVolume
+    {
+        get => PlayerPrefs.GetFloat(SfxVolumeKey, 0.55f);
+        set => PlayerPrefs.SetFloat(SfxVolumeKey, Mathf.Clamp01(value));
+    }
+
     public static float VoiceVolume
     {
         get => PlayerPrefs.GetFloat(VoiceVolumeKey, 1f);
@@ -76,10 +90,16 @@ public static class SettingsManager
         Resolution resolution = Screen.currentResolution;
         Screen.SetResolution(resolution.width, resolution.height, ScreenMode, resolution.refreshRate);
         Application.targetFrameRate = FpsLimit;
-        AudioListener.volume = MasterVolume;
-        PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
+        ApplyAudio();
         ApplyLowGraphics();
         PlayerPrefs.Save();
+    }
+
+    public static void ApplyAudio()
+    {
+        AudioListener.volume = MasterVolume;
+        PlayerVoiceChat.ApplySavedVoiceVolumeToAll();
+        GameAudioManager.ApplyVolumes();
     }
 
     public static void ResetAll()
@@ -88,6 +108,8 @@ public static class SettingsManager
         PlayerPrefs.DeleteKey(FpsLimitKey);
         PlayerPrefs.DeleteKey(LanguageKey);
         PlayerPrefs.DeleteKey(MasterVolumeKey);
+        PlayerPrefs.DeleteKey(BgmVolumeKey);
+        PlayerPrefs.DeleteKey(SfxVolumeKey);
         PlayerPrefs.DeleteKey(VoiceVolumeKey);
         PlayerPrefs.DeleteKey(MouseXKey);
         PlayerPrefs.DeleteKey(MouseYKey);

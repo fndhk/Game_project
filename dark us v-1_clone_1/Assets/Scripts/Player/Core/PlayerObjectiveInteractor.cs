@@ -240,7 +240,17 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         // 일반 상호작용은 대상에 맞는 키를 한 번 누르면 실행한다.
         if (Input.GetKeyDown(key))
         {
+            bool isPickup = currentTarget is WorldItemPickup;
             currentTarget.Interact(this);
+            if (isPickup)
+            {
+                GameAudioManager.PlayPickup();
+            }
+            else
+            {
+                GameAudioManager.PlayInteract();
+            }
+
             UpdateCurrentTarget();
         }
     }
@@ -273,6 +283,7 @@ public class PlayerObjectiveInteractor : MonoBehaviour
             {
                 currentHoldTarget = holdTarget;
                 isHoldingInteraction = true;
+                GameAudioManager.PlayInteract();
             }
         }
 
