@@ -164,12 +164,17 @@ public class InGamePauseMenu : MonoBehaviour
     private void LockPlayerInput()
     {
         lockedBehaviours.Clear();
-        AddLockTargets(FindObjectsOfType<MouseLook>(true));
-        AddLockTargets(FindObjectsOfType<PlayerMotor>(true));
-        AddLockTargets(FindObjectsOfType<PlayerObjectiveInteractor>(true));
-        AddLockTargets(FindObjectsOfType<PlayerInventory>(true));
-        AddLockTargets(FindObjectsOfType<PlayerItemUser>(true));
-        AddLockTargets(FindObjectsOfType<LidarSpotScanner>(true));
+        AddLockTargets(FindSceneObjects<MouseLook>());
+        AddLockTargets(FindSceneObjects<PlayerMotor>());
+        AddLockTargets(FindSceneObjects<PlayerObjectiveInteractor>());
+        AddLockTargets(FindSceneObjects<PlayerInventory>());
+        AddLockTargets(FindSceneObjects<PlayerItemUser>());
+        AddLockTargets(FindSceneObjects<LidarSpotScanner>());
+    }
+
+    private static T[] FindSceneObjects<T>() where T : UnityEngine.Object
+    {
+        return UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
     }
 
     private void AddLockTargets<T>(T[] targets) where T : Behaviour

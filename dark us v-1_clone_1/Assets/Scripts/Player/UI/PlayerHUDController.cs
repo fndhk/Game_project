@@ -199,7 +199,7 @@ public class PlayerHUDController : MonoBehaviour
 
         if (targetDotRenderer == null)
         {
-            targetDotRenderer = FindObjectOfType<InstancedScanDotRenderer>();
+            targetDotRenderer = Object.FindFirstObjectByType<InstancedScanDotRenderer>();
         }
     }
 
@@ -256,7 +256,7 @@ public class PlayerHUDController : MonoBehaviour
 
         if (!IsValidHudCanvas(hudCanvas))
         {
-            Canvas[] canvases = FindObjectsOfType<Canvas>(true);
+            Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             for (int i = 0; i < canvases.Length; i++)
             {
@@ -861,7 +861,7 @@ public class PlayerHUDController : MonoBehaviour
         label.alignment = alignment;
         label.color = color;
         label.raycastTarget = false;
-        label.enableWordWrapping = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
         label.overflowMode = TextOverflowModes.Ellipsis;
         Shadow shadow = rect.gameObject.AddComponent<Shadow>();
         shadow.effectColor = new Color(0f, 0f, 0f, 0.86f);

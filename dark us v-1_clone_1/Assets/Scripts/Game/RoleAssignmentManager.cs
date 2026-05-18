@@ -217,7 +217,7 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
     {
         if (players == null || players.Length == 0)
         {
-            PlayerCombatTarget localTarget = FindObjectOfType<PlayerCombatTarget>();
+            PlayerCombatTarget localTarget = Object.FindFirstObjectByType<PlayerCombatTarget>();
             if (localTarget != null)
             {
                 localTarget.SetRole(role);

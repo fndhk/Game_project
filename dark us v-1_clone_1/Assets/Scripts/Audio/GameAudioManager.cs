@@ -157,7 +157,7 @@ public class GameAudioManager : MonoBehaviour
             return;
         }
 
-        if (IsMenuScene(scene.name))
+        if (IsMainMenuMusicScene(scene.name))
         {
             instance.PlayMusic("menu", instance.menuMusicClip);
             return;
@@ -172,12 +172,11 @@ public class GameAudioManager : MonoBehaviour
         instance.StopMusic();
     }
 
-    private static bool IsMenuScene(string sceneName)
+    private static bool IsMainMenuMusicScene(string sceneName)
     {
         return sceneName == "LobbyScene" ||
-               sceneName == "SettingsScene" ||
-               sceneName == "CreateRoomLobbyScene" ||
-               sceneName == "PublicRoomListScene";
+               sceneName == "LobbyScene 1" ||
+               sceneName == "SettingsScene";
     }
 
     private static void PlaySfx(AudioClip clip, float volumeScale)

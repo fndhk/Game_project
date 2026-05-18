@@ -141,12 +141,17 @@ public class RoleRevealIntro : MonoBehaviour
     private void LockPlayerInput()
     {
         lockedBehaviours.Clear();
-        AddLockTargets(FindObjectsOfType<MouseLook>(true));
-        AddLockTargets(FindObjectsOfType<PlayerMotor>(true));
-        AddLockTargets(FindObjectsOfType<PlayerObjectiveInteractor>(true));
-        AddLockTargets(FindObjectsOfType<PlayerInventory>(true));
-        AddLockTargets(FindObjectsOfType<PlayerItemUser>(true));
-        AddLockTargets(FindObjectsOfType<LidarSpotScanner>(true));
+        AddLockTargets(FindSceneObjects<MouseLook>());
+        AddLockTargets(FindSceneObjects<PlayerMotor>());
+        AddLockTargets(FindSceneObjects<PlayerObjectiveInteractor>());
+        AddLockTargets(FindSceneObjects<PlayerInventory>());
+        AddLockTargets(FindSceneObjects<PlayerItemUser>());
+        AddLockTargets(FindSceneObjects<LidarSpotScanner>());
+    }
+
+    private static T[] FindSceneObjects<T>() where T : UnityEngine.Object
+    {
+        return UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
     }
 
     private void AddLockTargets<T>(T[] targets) where T : Behaviour
@@ -179,7 +184,7 @@ public class RoleRevealIntro : MonoBehaviour
 
     private PlayerCombatTarget FindLocalCombatTarget()
     {
-        PlayerCombatTarget[] targets = FindObjectsOfType<PlayerCombatTarget>(true);
+        PlayerCombatTarget[] targets = FindSceneObjects<PlayerCombatTarget>();
         for (int i = 0; i < targets.Length; i++)
         {
             if (targets[i] == null)
@@ -302,7 +307,7 @@ public class RoleRevealIntro : MonoBehaviour
         tmp.fontSize = fontSize;
         tmp.alignment = alignment;
         tmp.raycastTarget = false;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         LocalizedTmpFontProvider.Apply(tmp);
 
         Shadow shadow = textObject.GetComponent<Shadow>();

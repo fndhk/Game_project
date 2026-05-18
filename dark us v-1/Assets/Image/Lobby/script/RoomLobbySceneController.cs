@@ -2009,7 +2009,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private Transform FindUiTransform(string objectName)
     {
-        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        Transform[] transforms = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (Transform target in transforms)
         {
             if (target.name == objectName && target.gameObject.scene == gameObject.scene)

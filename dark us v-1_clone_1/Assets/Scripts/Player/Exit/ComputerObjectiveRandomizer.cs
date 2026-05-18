@@ -338,7 +338,10 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
             return filtered;
         }
 
-        ObjectiveComputer[] sceneCandidates = FindObjectsOfType<ObjectiveComputer>(includeInactiveComputers);
+        ObjectiveComputer[] sceneCandidates = Object.FindObjectsByType<ObjectiveComputer>(
+            includeInactiveComputers ? FindObjectsInactive.Include : FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None
+        );
         filtered = FilterCandidates(sceneCandidates);
         return filtered;
     }

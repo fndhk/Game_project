@@ -35,7 +35,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
     {
         PunWorldAudioSync.EnsureExists();
         EnsureLocalVoiceChat();
-        localFootstepTemplate = FindObjectOfType<PlayerFootstepAudio>();
+        localFootstepTemplate = Object.FindFirstObjectByType<PlayerFootstepAudio>();
     }
 
     private void OnEnable()
@@ -218,7 +218,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
 
         if (localFootstepTemplate == null)
         {
-            localFootstepTemplate = FindObjectOfType<PlayerFootstepAudio>();
+            localFootstepTemplate = Object.FindFirstObjectByType<PlayerFootstepAudio>();
         }
 
         if (localFootstepTemplate == null)

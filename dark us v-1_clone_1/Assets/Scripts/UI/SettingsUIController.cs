@@ -17,6 +17,7 @@ public class SettingsUIController : MonoBehaviour
     private KeyCode pendingDefaultKey;
     private float pendingKeyStartedAt;
     private bool built;
+    private bool opening;
     private Sprite sliderTrackSprite;
     private Sprite sliderHandleSprite;
 
@@ -71,7 +72,7 @@ public class SettingsUIController : MonoBehaviour
         }
 
         BuildIfNeeded();
-        if (Application.isPlaying)
+        if (Application.isPlaying && !opening)
         {
             HideWithoutNotify();
         }
@@ -106,18 +107,26 @@ public class SettingsUIController : MonoBehaviour
 
     public void Show()
     {
-        BuildIfNeeded();
-        gameObject.SetActive(true);
-        transform.SetAsLastSibling();
-        NormalizeLayout();
-        if (!embeddedMode)
+        opening = true;
+        try
         {
-            MenuCursorState.UnlockCursor();
-        }
+            gameObject.SetActive(true);
+            BuildIfNeeded();
+            transform.SetAsLastSibling();
+            NormalizeLayout();
+            if (!embeddedMode)
+            {
+                MenuCursorState.UnlockCursor();
+            }
 
-        pendingKeyPrefsKey = null;
-        pendingKeyText = null;
-        RefreshAll();
+            pendingKeyPrefsKey = null;
+            pendingKeyText = null;
+            RefreshAll();
+        }
+        finally
+        {
+            opening = false;
+        }
     }
 
     public void Hide()

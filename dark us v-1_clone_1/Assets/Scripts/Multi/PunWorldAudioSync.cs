@@ -26,7 +26,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
             return instance;
         }
 
-        PunWorldAudioSync existing = FindObjectOfType<PunWorldAudioSync>();
+        PunWorldAudioSync existing = Object.FindFirstObjectByType<PunWorldAudioSync>();
         if (existing != null)
         {
             instance = existing;
@@ -125,7 +125,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
         switch (kind)
         {
             case SoundKind.ScanPulse:
-                LidarSpotScanner scanner = FindObjectOfType<LidarSpotScanner>();
+                LidarSpotScanner scanner = Object.FindFirstObjectByType<LidarSpotScanner>();
                 if (scanner == null)
                 {
                     return null;
@@ -135,7 +135,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
                 return scanSource != null ? scanSource.clip : null;
 
             case SoundKind.ComputerStart:
-                ObjectiveComputer computer = FindObjectOfType<ObjectiveComputer>();
+                ObjectiveComputer computer = Object.FindFirstObjectByType<ObjectiveComputer>();
                 if (computer == null)
                 {
                     return null;
@@ -149,7 +149,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
                 return computer.loopAudioSource != null ? computer.loopAudioSource.clip : null;
 
             case SoundKind.Footstep:
-                PlayerFootstepAudio footsteps = FindObjectOfType<PlayerFootstepAudio>();
+                PlayerFootstepAudio footsteps = Object.FindFirstObjectByType<PlayerFootstepAudio>();
                 return footsteps != null ? GetFootstepClip(footsteps) : null;
 
             default:

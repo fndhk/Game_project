@@ -1476,7 +1476,7 @@ public class MainMenuController : MonoBehaviour
 
     private Transform FindUiTransform(string objectName)
     {
-        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        Transform[] transforms = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (Transform targetTransform in transforms)
         {
             if (targetTransform.name == objectName && targetTransform.gameObject.scene == gameObject.scene)
@@ -1490,7 +1490,7 @@ public class MainMenuController : MonoBehaviour
 
     private Canvas FindSceneCanvas()
     {
-        Canvas[] canvases = Resources.FindObjectsOfTypeAll<Canvas>();
+        Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (Canvas canvas in canvases)
         {
             if (canvas != null && canvas.gameObject.scene == gameObject.scene)

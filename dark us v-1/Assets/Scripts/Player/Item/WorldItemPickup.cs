@@ -114,7 +114,7 @@ public class WorldItemPickup : MonoBehaviour, IPlayerInteractable
 
         if (scanDotRenderers == null || scanDotRenderers.Length <= 0)
         {
-            scanDotRenderers = FindObjectsOfType<InstancedScanDotRenderer>();
+            scanDotRenderers = Object.FindObjectsByType<InstancedScanDotRenderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         }
 
         if (scanDotRenderers == null || scanDotRenderers.Length <= 0)

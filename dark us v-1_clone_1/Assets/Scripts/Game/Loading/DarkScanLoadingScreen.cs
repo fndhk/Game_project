@@ -74,7 +74,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
 
     private static void TryCreateForScene(Scene scene)
     {
-        if (activeInstance != null || FindObjectOfType<DarkScanLoadingScreen>() != null)
+        if (activeInstance != null || Object.FindFirstObjectByType<DarkScanLoadingScreen>() != null)
         {
             return;
         }
@@ -106,7 +106,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
             return true;
         }
 
-        return FindObjectOfType<LaboratoryGenerator>(true) != null;
+        return Object.FindFirstObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include) != null;
     }
 
     private void Awake()
@@ -192,12 +192,12 @@ public class DarkScanLoadingScreen : MonoBehaviour
 
         while (waitForGameSceneBeforeFallback &&
                !ShouldShowForScene(SceneManager.GetActiveScene()) &&
-               FindObjectOfType<LaboratoryGenerator>(true) == null)
+               Object.FindFirstObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include) == null)
         {
             yield return null;
         }
 
-        LaboratoryGenerator generator = FindObjectOfType<LaboratoryGenerator>(true);
+        LaboratoryGenerator generator = Object.FindFirstObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include);
 
         if (generator == null)
         {
@@ -464,7 +464,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
         tmp.fontSize = fontSize;
         tmp.alignment = alignment;
         tmp.raycastTarget = false;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.fontStyle = FontStyles.UpperCase;
         return tmp;
     }

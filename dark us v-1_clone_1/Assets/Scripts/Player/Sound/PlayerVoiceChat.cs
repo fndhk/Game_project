@@ -589,7 +589,7 @@ public class PlayerVoiceChat : MonoBehaviourPunCallbacks, IOnEventCallback
 
     public static void ApplySavedVoiceVolumeToAll()
     {
-        PlayerVoiceChat[] voiceChats = FindObjectsOfType<PlayerVoiceChat>(true);
+        PlayerVoiceChat[] voiceChats = Object.FindObjectsByType<PlayerVoiceChat>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < voiceChats.Length; i++)
         {
             voiceChats[i].ApplySavedVoiceVolume();

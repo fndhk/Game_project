@@ -37,24 +37,6 @@ public static class LocalizedTmpFontProvider
             return null;
         }
 
-        string[] osFontNames =
-        {
-            "Malgun Gothic",
-            "맑은 고딕",
-            "Noto Sans CJK KR",
-            "Noto Sans CJK JP"
-        };
-
-        foreach (string fontName in osFontNames)
-        {
-            Font sourceFont = Font.CreateDynamicFontFromOSFont(fontName, 90);
-            localizedFontAsset = CreateTmpFontAsset(sourceFont);
-            if (localizedFontAsset != null)
-            {
-                return localizedFontAsset;
-            }
-        }
-
         string[] fontPaths =
         {
             "C:/Windows/Fonts/malgun.ttf",
