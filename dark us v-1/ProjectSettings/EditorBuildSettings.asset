@@ -20,4 +20,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/labor.unity
     guid: 5bf52a0cb20260846b1289eec882a933
+  - enabled: 1
+    path: Assets/Scenes/SkillChoice.unity
+    guid: 5c567af77aa5f5e409a150ce79b4ce98
   m_configObjects: {}
