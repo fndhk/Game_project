@@ -205,10 +205,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         isStartingGame = true;
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
-        EnsureMapSeedProperty();
+        int mapSeed = EnsureMapSeedProperty();
         int[] imposterActors = RoleAssignmentManager.SelectNewPhotonImposterActors();
         PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
         {
+            { MapSeedPropertyKey, mapSeed },
             { StartSignalPropertyKey, true }
         });
         PhotonNetwork.SendAllOutgoingCommands();
@@ -216,14 +217,14 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         DarkScanLoadingScreen.ShowImmediate("MATCH LOCKED...");
 
-        float waitUntil = Time.time + 1.5f;
+        float waitUntil = Time.time + 0.75f;
         while (Time.time < waitUntil && !RoleAssignmentManager.ArePhotonImposterActorsReady(imposterActors))
         {
             yield return null;
         }
 
         PhotonNetwork.SendAllOutgoingCommands();
-        yield return new WaitForSeconds(0.2f);
+        yield return new WaitForSeconds(0.1f);
 
         PhotonNetwork.LoadLevel(gameSceneName);
     }
@@ -898,23 +899,33 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
     }
 
-    private void EnsureMapSeedProperty()
+    private int EnsureMapSeedProperty()
     {
         if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || !PhotonNetwork.IsMasterClient)
         {
-            return;
+            return Random.Range(1, int.MaxValue);
         }
 
         if (PhotonNetwork.CurrentRoom.CustomProperties != null &&
-            PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(MapSeedPropertyKey))
+            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(MapSeedPropertyKey, out object existingSeed))
         {
-            return;
+            if (existingSeed is int intSeed)
+            {
+                return intSeed;
+            }
+
+            if (existingSeed != null && int.TryParse(existingSeed.ToString(), out int parsedSeed))
+            {
+                return parsedSeed;
+            }
         }
 
+        int seed = Random.Range(1, int.MaxValue);
         PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
         {
-            { MapSeedPropertyKey, Random.Range(1, int.MaxValue) }
+            { MapSeedPropertyKey, seed }
         });
+        return seed;
     }
 
     private string GetBackSceneName()

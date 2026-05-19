@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // 이 스크립트는 플레이어가 실제로 이동한 거리를 기준으로
@@ -6,6 +7,9 @@ using UnityEngine;
 [RequireComponent(typeof(AudioSource))]
 public class PlayerFootstepAudio : MonoBehaviour
 {
+    private static readonly Dictionary<Transform, PlayerFootstepAudio> activeFootstepsByRoot =
+        new Dictionary<Transform, PlayerFootstepAudio>();
+
     [Header("참조")]
     // 실제로 움직이는 플레이어 루트 Transform이다.
     public Transform playerRoot;
@@ -143,12 +147,36 @@ public class PlayerFootstepAudio : MonoBehaviour
     {
         if (playerRoot != null)
         {
+            if (activeFootstepsByRoot.TryGetValue(playerRoot, out PlayerFootstepAudio existing) &&
+                existing != null &&
+                existing != this &&
+                existing.enabled)
+            {
+                enabled = false;
+                return;
+            }
+
+            activeFootstepsByRoot[playerRoot] = this;
+        }
+
+        if (playerRoot != null)
+        {
             lastRootPosition = playerRoot.position;
         }
 
         // 누적 이동 거리와 마지막 재생 인덱스를 초기화한다.
         accumulatedDistance = 0f;
         lastPlayedClipIndex = -1;
+    }
+
+    private void OnDisable()
+    {
+        if (playerRoot != null &&
+            activeFootstepsByRoot.TryGetValue(playerRoot, out PlayerFootstepAudio existing) &&
+            existing == this)
+        {
+            activeFootstepsByRoot.Remove(playerRoot);
+        }
     }
 
     // 매 프레임 실제 이동량을 읽어서 발소리를 처리한다.
