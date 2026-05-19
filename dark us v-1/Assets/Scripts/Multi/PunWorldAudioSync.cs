@@ -17,7 +17,10 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
     private static PunWorldAudioSync instance;
 
     public float minDistance = 1.5f;
-    public float maxDistance = 18f;
+    public float maxDistance = 14f;
+
+    private Transform cachedAudioListenerTransform;
+    private float nextAudioListenerSearchTime;
 
     public static PunWorldAudioSync EnsureExists()
     {
@@ -96,7 +99,12 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
 
     public void OnEvent(EventData photonEvent)
     {
-        if (photonEvent.Code != WorldAudioEventCode || photonEvent.Sender == PhotonNetwork.LocalPlayer.ActorNumber)
+        if (photonEvent.Code != WorldAudioEventCode)
+        {
+            return;
+        }
+
+        if (PhotonNetwork.LocalPlayer != null && photonEvent.Sender == PhotonNetwork.LocalPlayer.ActorNumber)
         {
             return;
         }
@@ -110,6 +118,12 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
         SoundKind kind = (SoundKind)ToInt(payload[0]);
         Vector3 position = new Vector3(ToFloat(payload[1]), ToFloat(payload[2]), ToFloat(payload[3]));
         float volume = Mathf.Clamp(ToFloat(payload[4]), 0.01f, 2.5f);
+
+        if (!IsWithinAudibleRange(position))
+        {
+            return;
+        }
+
         AudioClip clip = ResolveClip(kind);
 
         if (clip == null)
@@ -207,6 +221,43 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
         source.Play();
 
         Destroy(audioObject, clip.length + 0.25f);
+    }
+
+    private bool IsWithinAudibleRange(Vector3 position)
+    {
+        Transform listenerTransform = GetAudioListenerTransform();
+        if (listenerTransform == null)
+        {
+            return true;
+        }
+
+        float cutoffDistance = Mathf.Max(0.1f, maxDistance);
+        return (listenerTransform.position - position).sqrMagnitude <= cutoffDistance * cutoffDistance;
+    }
+
+    private Transform GetAudioListenerTransform()
+    {
+        if (cachedAudioListenerTransform != null && cachedAudioListenerTransform.gameObject.activeInHierarchy)
+        {
+            return cachedAudioListenerTransform;
+        }
+
+        if (Time.unscaledTime < nextAudioListenerSearchTime)
+        {
+            return cachedAudioListenerTransform;
+        }
+
+        nextAudioListenerSearchTime = Time.unscaledTime + 0.5f;
+        AudioListener listener = Object.FindFirstObjectByType<AudioListener>();
+        if (listener != null)
+        {
+            cachedAudioListenerTransform = listener.transform;
+            return cachedAudioListenerTransform;
+        }
+
+        Camera mainCamera = Camera.main;
+        cachedAudioListenerTransform = mainCamera != null ? mainCamera.transform : null;
+        return cachedAudioListenerTransform;
     }
 
     private int ToInt(object value)

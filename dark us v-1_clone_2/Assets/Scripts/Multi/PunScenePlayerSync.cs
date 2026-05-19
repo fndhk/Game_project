@@ -18,7 +18,6 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
 
     private readonly Dictionary<int, RemotePlayerState> remotePlayers = new Dictionary<int, RemotePlayerState>();
     private Transform eyeTransform;
-    private PlayerFootstepAudio localFootstepTemplate;
     private PlayerVoiceChat localVoiceChat;
     private PlayerCombatTarget localCombatTarget;
     private float nextSendTime;
@@ -34,15 +33,14 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
 
     private void Awake()
     {
-        PunWorldAudioSync.EnsureExists();
+        ConfigureWorldAudioSync();
         EnsureLocalVoiceChat();
-        localFootstepTemplate = Object.FindFirstObjectByType<PlayerFootstepAudio>();
     }
 
     private void OnEnable()
     {
         PhotonNetwork.AddCallbackTarget(this);
-        PunWorldAudioSync.EnsureExists();
+        ConfigureWorldAudioSync();
         EnsureLocalVoiceChat();
     }
 
@@ -80,7 +78,12 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
 
     public void OnEvent(EventData photonEvent)
     {
-        if (photonEvent.Code != TransformEventCode || photonEvent.Sender == PhotonNetwork.LocalPlayer.ActorNumber)
+        if (photonEvent.Code != TransformEventCode)
+        {
+            return;
+        }
+
+        if (PhotonNetwork.LocalPlayer != null && photonEvent.Sender == PhotonNetwork.LocalPlayer.ActorNumber)
         {
             return;
         }
@@ -169,6 +172,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
         visibleAvatar.hideCollidersWhenHidden = false;
         visibleAvatar.addScanColliders = true;
         visibleAvatar.RebuildAvatar();
+        EnsureRemoteScanFallbackColliders(remoteObject);
 
         PlayerCombatTarget combatTarget = remoteObject.AddComponent<PlayerCombatTarget>();
         combatTarget.isRemoteProxy = true;
@@ -188,6 +192,53 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
         remotePlayers[actorNumber] = state;
         AddRemoteFootsteps(remoteObject);
         return state;
+    }
+
+    private void EnsureRemoteScanFallbackColliders(GameObject remoteObject)
+    {
+        if (remoteObject == null || remoteObject.transform.Find("RemoteScanFallback") != null)
+        {
+            return;
+        }
+
+        const int scanLayer = 7;
+        GameObject root = new GameObject("RemoteScanFallback");
+        root.layer = scanLayer;
+        root.transform.SetParent(remoteObject.transform, false);
+        root.transform.localPosition = Vector3.zero;
+        root.transform.localRotation = Quaternion.identity;
+        root.transform.localScale = Vector3.one;
+
+        CreateRemoteScanCapsule(root.transform, "Body", new Vector3(0f, 0.9f, 0f), 0.28f, 1.55f, scanLayer);
+        CreateRemoteScanSphere(root.transform, "Head", new Vector3(0f, 1.65f, 0f), 0.22f, scanLayer);
+    }
+
+    private void CreateRemoteScanCapsule(Transform parent, string objectName, Vector3 center, float radius, float height, int layer)
+    {
+        GameObject colliderObject = new GameObject(objectName);
+        colliderObject.layer = layer;
+        colliderObject.transform.SetParent(parent, false);
+        CapsuleCollider capsule = colliderObject.AddComponent<CapsuleCollider>();
+        capsule.center = center;
+        capsule.radius = radius;
+        capsule.height = height;
+        capsule.direction = 1;
+        capsule.isTrigger = false;
+        ScanSurfaceInfo surfaceInfo = colliderObject.AddComponent<ScanSurfaceInfo>();
+        surfaceInfo.surfaceType = ScanSurfaceType.PlayerBody;
+    }
+
+    private void CreateRemoteScanSphere(Transform parent, string objectName, Vector3 center, float radius, int layer)
+    {
+        GameObject colliderObject = new GameObject(objectName);
+        colliderObject.layer = layer;
+        colliderObject.transform.SetParent(parent, false);
+        SphereCollider sphere = colliderObject.AddComponent<SphereCollider>();
+        sphere.center = center;
+        sphere.radius = radius;
+        sphere.isTrigger = false;
+        ScanSurfaceInfo surfaceInfo = colliderObject.AddComponent<ScanSurfaceInfo>();
+        surfaceInfo.surfaceType = ScanSurfaceType.PlayerBody;
     }
 
     private void UpdateRemoteRole(int actorNumber, RemotePlayerState state)
@@ -216,6 +267,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
         localVoiceChat.spatialBlend = 1f;
         localVoiceChat.minDistance = 1.2f;
         localVoiceChat.maxDistance = 9f;
+        localVoiceChat.voiceEnabled = true;
         localVoiceChat.showLocalMicHud = true;
     }
 
@@ -226,61 +278,18 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
             return;
         }
 
-        if (localFootstepTemplate == null)
-        {
-            localFootstepTemplate = Object.FindFirstObjectByType<PlayerFootstepAudio>();
-        }
-
-        if (localFootstepTemplate == null)
-        {
-            return;
-        }
-
-        AudioSource source = remoteObject.GetComponent<AudioSource>();
-        if (source == null)
-        {
-            source = remoteObject.AddComponent<AudioSource>();
-        }
-
-        source.playOnAwake = false;
-        source.loop = false;
-        source.spatialBlend = 1f;
-        source.dopplerLevel = 0f;
-        source.minDistance = remoteFootstepMinDistance;
-        source.maxDistance = remoteFootstepMaxDistance;
-        source.rolloffMode = AudioRolloffMode.Logarithmic;
-
         PlayerFootstepAudio footsteps = remoteObject.GetComponent<PlayerFootstepAudio>();
-        if (footsteps == null)
+        if (footsteps != null)
         {
-            footsteps = remoteObject.AddComponent<PlayerFootstepAudio>();
+            footsteps.enabled = false;
         }
+    }
 
-        footsteps.playerRoot = remoteObject.transform;
-        footsteps.playerMotor = null;
-        footsteps.characterController = null;
-        footsteps.groundMask = localFootstepTemplate.groundMask;
-        footsteps.groundCheckDistance = Mathf.Max(0.75f, localFootstepTemplate.groundCheckDistance);
-        footsteps.useGroundRaycastFallback = true;
-        footsteps.commonClips = localFootstepTemplate.commonClips;
-        footsteps.walkClips = localFootstepTemplate.walkClips;
-        footsteps.sprintClips = localFootstepTemplate.sprintClips;
-        footsteps.crouchClips = localFootstepTemplate.crouchClips;
-        footsteps.minimumMoveSpeed = localFootstepTemplate.minimumMoveSpeed;
-        footsteps.walkStepDistance = localFootstepTemplate.walkStepDistance;
-        footsteps.sprintStepDistance = localFootstepTemplate.sprintStepDistance;
-        footsteps.crouchStepDistance = localFootstepTemplate.crouchStepDistance;
-        footsteps.walkVolume = Mathf.Max(localFootstepTemplate.walkVolume, 0.95f);
-        footsteps.sprintVolume = Mathf.Max(localFootstepTemplate.sprintVolume, 1.1f);
-        footsteps.crouchVolume = Mathf.Max(localFootstepTemplate.crouchVolume, 0.6f);
-        footsteps.minPitch = localFootstepTemplate.minPitch;
-        footsteps.maxPitch = localFootstepTemplate.maxPitch;
-
-        System.Reflection.FieldInfo broadcastField = typeof(PlayerFootstepAudio).GetField("broadcastFootstepsToNetwork");
-        if (broadcastField != null)
-        {
-            broadcastField.SetValue(footsteps, false);
-        }
+    private void ConfigureWorldAudioSync()
+    {
+        PunWorldAudioSync worldAudioSync = PunWorldAudioSync.EnsureExists();
+        worldAudioSync.minDistance = remoteFootstepMinDistance;
+        worldAudioSync.maxDistance = remoteFootstepMaxDistance;
     }
 
     private float ToFloat(object value)

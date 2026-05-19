@@ -275,6 +275,18 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("켜면 생성된 맵/아이템의 일반 BoxCollider를 끄고 MeshCollider 표면만 스캔/충돌에 사용")]
         public bool UseMeshCollidersInsteadOfBoxColliders = false;
 
+        [Header("Startup Performance")]
+        [Tooltip("켜면 생성된 방/복도 MeshFilter마다 MeshCollider를 런타임에 추가함. 시작 렉이 커질 수 있어서 기본은 끔")]
+        public bool CreateScanMeshCollidersForGeneratedCells = false;
+
+        [Tooltip("맵 생성 중 몇 개 Cell마다 한 프레임 쉬어갈지. 0이면 한 프레임에 전부 생성")]
+        [Range(0, 20)]
+        public int GeneratedCellsPerFrame = 4;
+
+        [Tooltip("멀티플레이 맵 시드를 기다릴 최대 시간. 방 생성 때 이미 시드가 들어가므로 길게 기다리지 않음")]
+        [Range(0.1f, 3f)]
+        public float PhotonSeedWaitTimeoutSeconds = 1f;
+
         [Header("Generated Light Optimization")]
         [Tooltip("생성된 방/복도/문 안에 있는 Light의 그림자 설정을 자동으로 정리해서 URP shadow atlas 경고를 줄임")]
         public bool OptimizeGeneratedLightShadows = true;
@@ -384,9 +396,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         public static bool IsAnyGenerationRunning { get; private set; }
         public bool IsGenerationComplete { get; private set; }
 
-        private void Start()
+        private IEnumerator Start()
         {
-            ApplyPhotonRoomSeed();
+            yield return StartCoroutine(WaitForPhotonRoomSeed());
             ApplyPlayerCountBalance();
 
             if (GenerateOnStart)
@@ -400,6 +412,28 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 IsGenerationComplete = true;
                 SetLoadingPhase("SCAN READY", 1f);
                 GenerationFinished?.Invoke();
+            }
+        }
+
+        private IEnumerator WaitForPhotonRoomSeed()
+        {
+            ApplyPhotonRoomSeed();
+
+            if (!UsePhotonRoomSeed || !PhotonNetwork.InRoom || hasPhotonMapSeed)
+            {
+                yield break;
+            }
+
+            float timeoutAt = Time.realtimeSinceStartup + Mathf.Max(0.1f, PhotonSeedWaitTimeoutSeconds);
+            while (!hasPhotonMapSeed && Time.realtimeSinceStartup < timeoutAt)
+            {
+                yield return null;
+                ApplyPhotonRoomSeed();
+            }
+
+            if (!hasPhotonMapSeed)
+            {
+                Debug.LogWarning("[LaboratoryGenerator] Photon map seed was not ready. Falling back to local random state.");
             }
         }
 
@@ -450,8 +484,13 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             MaxItemsPerRoom = Mathf.Clamp(playerCount >= 8 ? 3 : 2, 1, 20);
             StartRoomMinDistance = Mathf.Max(12f, 18f + extraPlayers * 1.5f);
             ExitMinDistanceFromStart = Mathf.Max(20f, 28f + extraPlayers * 2f);
-            MaxPlacementAttempts = Mathf.Max(MaxPlacementAttempts, Mathf.Clamp(RoomCount * 10, 300, 1200));
-            MaxFullGenerationAttempts = Mathf.Max(MaxFullGenerationAttempts, 12);
+            int balancedPlacementAttempts = Mathf.Clamp(RoomCount * 8, 240, 650);
+            MaxPlacementAttempts = Mathf.Clamp(
+                Mathf.Min(Mathf.Max(1, MaxPlacementAttempts), balancedPlacementAttempts),
+                120,
+                650
+            );
+            MaxFullGenerationAttempts = Mathf.Clamp(MaxFullGenerationAttempts, 3, 6);
 
             if (lastLoggedBalancePlayerCount != playerCount ||
                 lastLoggedBalanceRoomCount != RoomCount ||
@@ -515,9 +554,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                     ClearGeneratedChildren();
                 }
 
+                ApplyPhotonGenerationAttemptSeed(attempt);
                 ResetRuntimeData();
 
-                bool success = TryGenerateOnce();
+                GenerationAttemptResult result = new GenerationAttemptResult();
+                yield return StartCoroutine(TryGenerateOnce(result));
+                bool success = result.Success;
 
                 if (success)
                 {
@@ -546,9 +588,15 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
         }
 
-        // 맵 1회 생성을 시도한다.
-        private bool TryGenerateOnce()
+        private class GenerationAttemptResult
         {
+            public bool Success;
+        }
+
+        // 맵 1회 생성을 시도한다.
+        private IEnumerator TryGenerateOnce(GenerationAttemptResult result)
+        {
+            result.Success = false;
             List<OpenExit> openExits = new List<OpenExit>();
 
             Cell firstRoomPrefab = GetFirstRoomPrefab();
@@ -556,7 +604,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             if (firstRoomPrefab == null)
             {
                 Debug.LogError("[LaboratoryGenerator] 첫 방으로 사용할 CellPrefab이 없음.");
-                return false;
+                yield break;
             }
 
             Cell firstRoom = Instantiate(firstRoomPrefab, MapCenter, Quaternion.identity, transform);
@@ -567,13 +615,14 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             if (!IsCellInsideMapBounds(firstRoom))
             {
                 Debug.LogWarning("[LaboratoryGenerator] 첫 방이 맵 크기 제한 밖으로 나감.");
-                return false;
+                yield break;
             }
 
             AddOpenExitsFromCell(openExits, firstRoom, null, 0);
 
             int createdMainCells = 1;
             int failStreak = 0;
+            int cellsCreatedThisFrame = 1;
 
             while (createdMainCells < RoomCount && failStreak < MaxPlacementAttempts)
             {
@@ -612,6 +661,18 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                     DestroyExitObject(targetExit.Exit);
                     DestroyExitObject(selectedExit);
+
+                    if (GeneratedCellsPerFrame > 0)
+                    {
+                        cellsCreatedThisFrame++;
+                        if (cellsCreatedThisFrame >= GeneratedCellsPerFrame)
+                        {
+                            cellsCreatedThisFrame = 0;
+                            float progress = Mathf.Lerp(0.16f, 0.58f, createdMainCells / (float)Mathf.Max(1, RoomCount));
+                            SetLoadingPhase("BUILDING PATHS...", progress);
+                            yield return null;
+                        }
+                    }
                 }
                 else
                 {
@@ -630,7 +691,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             if (createdMainCells < 3)
             {
                 Debug.LogWarning("[LaboratoryGenerator] 메인 맵이 너무 적게 생성됨.");
-                return false;
+                yield break;
             }
 
             if (GenerateDedicatedStartRooms)
@@ -640,7 +701,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 if (!startRoomsOk)
                 {
                     Debug.LogWarning("[LaboratoryGenerator] 시작방 생성 실패.");
-                    return false;
+                    yield break;
                 }
             }
 
@@ -649,20 +710,25 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             if (!exitDoorOk)
             {
                 Debug.LogWarning("[LaboratoryGenerator] 탈출구 생성 실패.");
-                return false;
+                yield break;
             }
 
             SetLoadingPhase("CLOSING PATHS...", 0.64f);
+            yield return null;
             BlockRemainingExits();
             SetLoadingPhase("CALIBRATING SCANNER...", 0.72f);
+            yield return null;
             ApplyRuntimeVisualState();
             SetLoadingPhase("SYNCING PLAYERS...", 0.82f);
+            yield return null;
+            ApplyPhotonStageSeed(1000003, "player spawn");
             SpawnPlayersAfterGeneratedMap();
             ApplyPhotonStageSeed(2000003, "item");
             SetLoadingPhase("PLACING SIGNALS...", 0.92f);
+            yield return null;
             SpawnItemsAfterGeneratedMap();
 
-            return true;
+            result.Success = true;
         }
 
         private static void SetLoadingPhase(string message, float progress)
@@ -1339,7 +1405,12 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
 
             ApplyGeneratedLightOptimization(cell.gameObject);
-            EnsureScanMeshColliders(cell.gameObject);
+
+            if (CreateScanMeshCollidersForGeneratedCells || UseMeshCollidersInsteadOfBoxColliders)
+            {
+                EnsureScanMeshColliders(cell.gameObject);
+            }
+
             DisableRuntimeBoxColliders(cell.gameObject, cell.TriggerBox);
             DisableGeneratedHelperColliders(cell.gameObject);
 
@@ -1778,6 +1849,18 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         private int GetPhotonLocalPlayerIndex()
         {
             Photon.Realtime.Player[] players = PhotonNetwork.PlayerList;
+            if (players == null || players.Length <= 0)
+            {
+                return 0;
+            }
+
+            Array.Sort(players, (left, right) =>
+            {
+                int leftActor = left != null ? left.ActorNumber : int.MaxValue;
+                int rightActor = right != null ? right.ActorNumber : int.MaxValue;
+                return leftActor.CompareTo(rightActor);
+            });
+
             for (int i = 0; i < players.Length; i++)
             {
                 if (players[i] != null && players[i].ActorNumber == PhotonNetwork.LocalPlayer.ActorNumber)
@@ -2314,6 +2397,18 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             int stageSeed = unchecked(photonMapSeed + salt);
             Random.InitState(stageSeed);
             Debug.Log("[LaboratoryGenerator] Photon " + stageName + " seed applied: " + stageSeed);
+        }
+
+        private void ApplyPhotonGenerationAttemptSeed(int attempt)
+        {
+            if (!hasPhotonMapSeed)
+            {
+                return;
+            }
+
+            int generationSeed = unchecked(photonMapSeed + 1000003 + attempt * 8191);
+            Random.InitState(generationSeed);
+            Debug.Log("[LaboratoryGenerator] Photon generation seed applied: " + generationSeed + " / attempt " + attempt);
         }
 
         // ItemSpawnPoint가 선반/가구 높이에 있어도 실제로 보이는 지지대가 없으므로 Cell의 층 바닥 높이를 우선 사용한다.
@@ -3116,6 +3211,8 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return;
             }
 
+            cell.gameObject.SetActive(false);
+
             if (Application.isPlaying)
             {
                 Destroy(cell.gameObject);
@@ -3135,6 +3232,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
                 if (Application.isPlaying)
                 {
+                    child.gameObject.SetActive(false);
                     Destroy(child.gameObject);
                 }
                 else

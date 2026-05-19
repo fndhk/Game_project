@@ -24,6 +24,8 @@ public class PlayerVoiceChat : MonoBehaviour
     private static PunVoiceClient registeredSpeakerEventClient;
     private static bool localVoiceMuted;
     private static GameObject speakerPrefab;
+    private static Transform cachedAudioListenerTransform;
+    private static float nextAudioListenerSearchTime;
     private static float lastMuteToggleTime = -100f;
 
     [Header("Input")]
@@ -34,11 +36,11 @@ public class PlayerVoiceChat : MonoBehaviour
 
     [Header("Capture")]
     public string microphoneDeviceName = "";
-    public int sampleRate = 16000;
+    public int sampleRate = 48000;
     public int microphoneBufferSeconds = 1;
     public int chunkSampleCount = 720;
-    public float silenceThreshold = 0.008f;
-    public float voiceHangoverSeconds = 0.22f;
+    public float silenceThreshold = 0.005f;
+    public float voiceHangoverSeconds = 0.45f;
 
     [Header("Playback")]
     public float remoteVoiceVolume = 1f;
@@ -54,7 +56,9 @@ public class PlayerVoiceChat : MonoBehaviour
     private PunVoiceClient voiceClient;
     private int lastRecorderActorNumber = -1;
     private bool recorderAddedToVoiceClient;
+    private bool recorderConfigured;
     private bool muteKeyWasDown;
+    private float nextSpeakerAudioRefreshTime;
 
     private void Awake()
     {
@@ -83,11 +87,20 @@ public class PlayerVoiceChat : MonoBehaviour
 
     private void Update()
     {
-        EnsurePhotonVoiceSetup();
+        if (voiceClient == null || recorder == null || !recorderAddedToVoiceClient)
+        {
+            EnsurePhotonVoiceSetup();
+        }
+
         ApplySavedVoiceVolume();
         HandleMuteToggle();
         UpdateRecorderState();
-        RefreshAllSpeakerAudioSources();
+
+        if (Time.unscaledTime >= nextSpeakerAudioRefreshTime)
+        {
+            nextSpeakerAudioRefreshTime = Time.unscaledTime + 0.35f;
+            RefreshAllSpeakerAudioSources();
+        }
     }
 
     private void EnsurePhotonVoiceSetup()
@@ -97,7 +110,11 @@ public class PlayerVoiceChat : MonoBehaviour
             return;
         }
 
-        voiceClient = GetOrCreateVoiceClient();
+        if (voiceClient == null)
+        {
+            voiceClient = GetOrCreateVoiceClient();
+        }
+
         RegisterSpeakerEvents(voiceClient);
         EnsureSpeakerPrefab(voiceClient);
         EnsureRecorder();
@@ -124,17 +141,21 @@ public class PlayerVoiceChat : MonoBehaviour
             }
         }
 
-        recorder.SourceType = Recorder.InputSourceType.Microphone;
-        recorder.MicrophoneType = Recorder.MicType.Photon;
-        recorder.SamplingRate = ToPhotonSamplingRate(sampleRate);
-        recorder.FrameDuration = OpusCodec.FrameDuration.Frame20ms;
-        recorder.Bitrate = 30000;
-        recorder.VoiceDetection = true;
-        recorder.VoiceDetectionThreshold = Mathf.Clamp(silenceThreshold, 0.001f, 0.2f);
-        recorder.VoiceDetectionDelayMs = Mathf.RoundToInt(Mathf.Clamp(voiceHangoverSeconds, 0.05f, 2f) * 1000f);
-        recorder.RecordWhenJoined = true;
-        recorder.DebugEchoMode = enableLocalMonitor;
-        recorder.ReliableMode = false;
+        if (!recorderConfigured)
+        {
+            recorder.SourceType = Recorder.InputSourceType.Microphone;
+            recorder.MicrophoneType = Recorder.MicType.Photon;
+            recorder.SamplingRate = ToPhotonSamplingRate(sampleRate);
+            recorder.FrameDuration = OpusCodec.FrameDuration.Frame20ms;
+            recorder.Bitrate = 30000;
+            recorder.VoiceDetection = true;
+            recorder.VoiceDetectionThreshold = Mathf.Clamp(silenceThreshold, 0.001f, 0.2f);
+            recorder.VoiceDetectionDelayMs = Mathf.RoundToInt(Mathf.Clamp(voiceHangoverSeconds, 0.05f, 2f) * 1000f);
+            recorder.RecordWhenJoined = true;
+            recorder.DebugEchoMode = enableLocalMonitor;
+            recorder.ReliableMode = false;
+            recorderConfigured = true;
+        }
 
         if (PhotonNetwork.LocalPlayer != null)
         {
@@ -154,6 +175,8 @@ public class PlayerVoiceChat : MonoBehaviour
                 audioDsp = gameObject.AddComponent<WebRtcAudioDsp>();
             }
         }
+
+        audioDsp.AEC = ToPhotonSampleRateValue(recorder.SamplingRate) == AudioSettings.outputSampleRate;
     }
 
     private void UpdateRecorderState()
@@ -174,7 +197,6 @@ public class PlayerVoiceChat : MonoBehaviour
         if (isMuteKeyDown && !muteKeyWasDown)
         {
             localVoiceMuted = !localVoiceMuted;
-            voiceEnabled = !localVoiceMuted;
             lastMuteToggleTime = Time.unscaledTime;
         }
 
@@ -229,6 +251,7 @@ public class PlayerVoiceChat : MonoBehaviour
         }
 
         GameObject clientObject = new GameObject("DarkUsPunVoiceClient");
+        Object.DontDestroyOnLoad(clientObject);
         return clientObject.AddComponent<DarkUsPunVoiceClient>();
     }
 
@@ -309,17 +332,81 @@ public class PlayerVoiceChat : MonoBehaviour
         if (source.spatialBlend > 0.01f && actorNumber > 0)
         {
             Transform remoteTransform = FindRemoteActorTransform(actorNumber);
-            if (remoteTransform != null && !speaker.transform.IsChildOf(remoteTransform))
+            Transform stableRoot = GetStableSpeakerRoot();
+            if (stableRoot != null && speaker.transform.parent != stableRoot)
             {
-                speaker.transform.SetParent(remoteTransform, false);
-                speaker.transform.localPosition = Vector3.up * 1.65f;
+                speaker.transform.SetParent(stableRoot, true);
             }
+
+            if (remoteTransform != null)
+            {
+                speaker.transform.position = remoteTransform.position + Vector3.up * 1.65f;
+            }
+
+            source.mute = ShouldMuteSpatialSpeaker(remoteTransform, source.maxDistance);
         }
-        else if (activeVoice != null && !speaker.transform.IsChildOf(activeVoice.transform))
+        else
         {
-            speaker.transform.SetParent(activeVoice.transform, false);
-            speaker.transform.localPosition = Vector3.zero;
+            if (activeVoice != null && !speaker.transform.IsChildOf(activeVoice.transform))
+            {
+                speaker.transform.SetParent(activeVoice.transform, false);
+                speaker.transform.localPosition = Vector3.zero;
+            }
+
+            source.mute = false;
         }
+    }
+
+    private static Transform GetStableSpeakerRoot()
+    {
+        if (registeredSpeakerEventClient != null)
+        {
+            return registeredSpeakerEventClient.transform;
+        }
+
+        return localVoiceChat != null ? localVoiceChat.transform : null;
+    }
+
+    private static bool ShouldMuteSpatialSpeaker(Transform remoteTransform, float maxAudibleDistance)
+    {
+        if (remoteTransform == null)
+        {
+            return true;
+        }
+
+        Transform listenerTransform = GetAudioListenerTransform();
+        if (listenerTransform == null)
+        {
+            return false;
+        }
+
+        float maxDistance = Mathf.Max(0.1f, maxAudibleDistance);
+        return (listenerTransform.position - remoteTransform.position).sqrMagnitude > maxDistance * maxDistance;
+    }
+
+    private static Transform GetAudioListenerTransform()
+    {
+        if (cachedAudioListenerTransform != null && cachedAudioListenerTransform.gameObject.activeInHierarchy)
+        {
+            return cachedAudioListenerTransform;
+        }
+
+        if (Time.unscaledTime < nextAudioListenerSearchTime)
+        {
+            return cachedAudioListenerTransform;
+        }
+
+        nextAudioListenerSearchTime = Time.unscaledTime + 0.5f;
+        AudioListener listener = Object.FindFirstObjectByType<AudioListener>();
+        if (listener != null)
+        {
+            cachedAudioListenerTransform = listener.transform;
+            return cachedAudioListenerTransform;
+        }
+
+        Camera mainCamera = Camera.main;
+        cachedAudioListenerTransform = mainCamera != null ? mainCamera.transform : null;
+        return cachedAudioListenerTransform;
     }
 
     private static AnimationCurve CreateVoiceRolloff(float minDistance, float maxDistance)
@@ -462,6 +549,27 @@ public class PlayerVoiceChat : MonoBehaviour
         }
 
         return SamplingRate.Sampling48000;
+    }
+
+    private static int ToPhotonSampleRateValue(SamplingRate samplingRate)
+    {
+        switch (samplingRate)
+        {
+            case SamplingRate.Sampling08000:
+                return 8000;
+
+            case SamplingRate.Sampling12000:
+                return 12000;
+
+            case SamplingRate.Sampling16000:
+                return 16000;
+
+            case SamplingRate.Sampling24000:
+                return 24000;
+
+            default:
+                return 48000;
+        }
     }
 
     private void OnGUI()
