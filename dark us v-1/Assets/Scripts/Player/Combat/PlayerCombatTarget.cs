@@ -119,6 +119,12 @@ public class PlayerCombatTarget : MonoBehaviour
             return photonActorNumber;
         }
 
+        Photon.Pun.PhotonView photonView = GetComponent<Photon.Pun.PhotonView>();
+        if (photonView != null && photonView.Owner != null)
+        {
+            return photonView.Owner.ActorNumber;
+        }
+
         if (!isRemoteProxy && Photon.Pun.PhotonNetwork.LocalPlayer != null)
         {
             return Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber;

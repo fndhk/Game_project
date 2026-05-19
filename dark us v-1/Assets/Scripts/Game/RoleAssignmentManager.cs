@@ -138,7 +138,7 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
         }
 
         int existingActor = GetPhotonImposterActor();
-        if (existingActor > 0)
+        if (existingActor > 0 && IsActorInCurrentRoom(existingActor))
         {
             return existingActor;
         }
@@ -191,7 +191,18 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
 
     public static bool IsWaitingForPhotonRole()
     {
-        return PhotonNetwork.InRoom && GetPhotonImposterActor() <= 0;
+        if (!PhotonNetwork.InRoom)
+        {
+            return false;
+        }
+
+        int imposterActor = GetPhotonImposterActor();
+        if ((imposterActor <= 0 || !IsActorInCurrentRoom(imposterActor)) && PhotonNetwork.IsMasterClient)
+        {
+            imposterActor = EnsurePhotonImposterActor();
+        }
+
+        return imposterActor <= 0 || !IsActorInCurrentRoom(imposterActor);
     }
 
     private void AssignLocalPhotonRole()
@@ -208,9 +219,87 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
             ? PlayerRole.Killer
             : PlayerRole.Citizen;
 
-        AssignRoleToListedPlayers(localRole);
+        AssignPhotonRolesToTargets(imposterActor, localRole);
         hasAssignedPhotonRole = true;
         Debug.Log("Local Photon role = " + localRole);
+    }
+
+    public static PlayerRole GetLocalPhotonRole(PlayerRole fallbackRole = PlayerRole.Citizen)
+    {
+        int imposterActor = EnsurePhotonImposterActor();
+        if (imposterActor <= 0 || PhotonNetwork.LocalPlayer == null)
+        {
+            return fallbackRole;
+        }
+
+        return PhotonNetwork.LocalPlayer.ActorNumber == imposterActor ? PlayerRole.Killer : PlayerRole.Citizen;
+    }
+
+    private void AssignPhotonRolesToTargets(int imposterActor, PlayerRole localFallbackRole)
+    {
+        bool assignedAny = false;
+
+        if (players != null)
+        {
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (players[i] == null)
+                {
+                    continue;
+                }
+
+                players[i].SetRole(GetRoleForTarget(players[i], imposterActor, localFallbackRole));
+                assignedAny = true;
+            }
+        }
+
+        if (assignedAny)
+        {
+            return;
+        }
+
+        PlayerCombatTarget[] sceneTargets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < sceneTargets.Length; i++)
+        {
+            if (sceneTargets[i] != null)
+            {
+                sceneTargets[i].SetRole(GetRoleForTarget(sceneTargets[i], imposterActor, localFallbackRole));
+            }
+        }
+    }
+
+    private static PlayerRole GetRoleForTarget(PlayerCombatTarget target, int imposterActor, PlayerRole fallbackRole)
+    {
+        if (target == null || imposterActor <= 0)
+        {
+            return fallbackRole;
+        }
+
+        int actorNumber = target.GetActorNumber();
+        if (actorNumber <= 0)
+        {
+            return fallbackRole;
+        }
+
+        return actorNumber == imposterActor ? PlayerRole.Killer : PlayerRole.Citizen;
+    }
+
+    private static bool IsActorInCurrentRoom(int actorNumber)
+    {
+        if (actorNumber <= 0 || PhotonNetwork.PlayerList == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
+        {
+            if (PhotonNetwork.PlayerList[i] != null && PhotonNetwork.PlayerList[i].ActorNumber == actorNumber)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void AssignRoleToListedPlayers(PlayerRole role)

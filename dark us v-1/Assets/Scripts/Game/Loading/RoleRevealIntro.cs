@@ -102,7 +102,12 @@ public class RoleRevealIntro : MonoBehaviour
         PlayerCombatTarget localTarget = FindLocalCombatTarget();
         if (localTarget != null)
         {
-            revealedRole = localTarget.role;
+            revealedRole = ResolveLocalRole(localTarget);
+            localTarget.SetRole(revealedRole);
+        }
+        else if (PhotonNetwork.InRoom)
+        {
+            revealedRole = RoleAssignmentManager.GetLocalPhotonRole(revealedRole);
         }
 
         bool isImposter = revealedRole == PlayerRole.Killer;
@@ -208,6 +213,16 @@ public class RoleRevealIntro : MonoBehaviour
         }
 
         return targets.Length > 0 ? targets[0] : null;
+    }
+
+    private PlayerRole ResolveLocalRole(PlayerCombatTarget localTarget)
+    {
+        if (PhotonNetwork.InRoom)
+        {
+            return RoleAssignmentManager.GetLocalPhotonRole(localTarget.role);
+        }
+
+        return localTarget.role;
     }
 
     private void BuildUi()

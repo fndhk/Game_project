@@ -8,11 +8,11 @@ TagManager:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - PlayerScan
   - Water
   - UI
-  - 
-  - 
+  - cells
+  - RevealSurface
   - 
   - 
   - 
