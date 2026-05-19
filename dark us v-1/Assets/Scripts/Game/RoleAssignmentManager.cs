@@ -1,12 +1,16 @@
+using System.Collections.Generic;
 using ExitGames.Client.Photon;
 using Photon.Pun;
 using UnityEngine;
 
-// 이 스크립트는 게임 시작 시 플레이어들 중 한 명을 랜덤으로 킬러로 정하고,
-// 나머지는 시민으로 배정한다.
+// 게임 시작 시 플레이어 역할을 정하고 Photon 방 속성으로 동기화한다.
 public class RoleAssignmentManager : MonoBehaviourPunCallbacks
 {
     public const string ImposterActorRoomPropertyKey = "imposterActorNumber";
+    public const string ImposterActorsRoomPropertyKey = "imposterActorNumbers";
+
+    private const char ImposterActorSeparator = ',';
+    private const int TwoImposterPlayerThreshold = 8;
 
     [Header("플레이어 목록")]
     // 역할을 배정할 플레이어들을 Inspector에서 넣는다.
@@ -28,7 +32,6 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
     {
         GameLoopManager.EnsureExists();
 
-        // 자동 시작이 켜져 있으면 역할 배정을 실행한다.
         if (assignRolesOnStart)
         {
             AssignRoles();
@@ -44,36 +47,40 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        // 플레이어 목록이 비어 있으면 종료한다.
         if (players == null || players.Length == 0)
         {
             Debug.LogWarning("RoleAssignmentManager: players가 비어 있음.");
             return;
         }
 
-        // 먼저 전부 시민으로 초기화한다.
+        List<PlayerCombatTarget> validPlayers = new List<PlayerCombatTarget>();
         for (int i = 0; i < players.Length; i++)
         {
-            // 비어 있지 않은 플레이어만 처리한다.
-            if (players[i] != null)
+            if (players[i] == null)
             {
-                players[i].SetRole(PlayerRole.Citizen);
+                continue;
             }
+
+            players[i].SetRole(PlayerRole.Citizen);
+            validPlayers.Add(players[i]);
         }
 
-        // 랜덤으로 킬러 1명을 고른다.
-        int killerIndex = Random.Range(0, players.Length);
-
-        // 해당 플레이어를 킬러로 설정한다.
-        if (players[killerIndex] != null)
+        if (validPlayers.Count <= 0)
         {
-            players[killerIndex].SetRole(PlayerRole.Killer);
+            Debug.LogWarning("RoleAssignmentManager: 배정 가능한 플레이어가 없음.");
+            return;
         }
 
-        // 콘솔에 결과를 출력한다.
+        int killerCount = GetLimitedImposterCount(validPlayers.Count);
+        for (int i = 0; i < killerCount; i++)
+        {
+            int index = Random.Range(0, validPlayers.Count);
+            validPlayers[index].SetRole(PlayerRole.Killer);
+            validPlayers.RemoveAt(index);
+        }
+
         for (int i = 0; i < players.Length; i++)
         {
-            // 비어 있지 않은 플레이어만 출력한다.
             if (players[i] != null)
             {
                 Debug.Log(players[i].name + " => " + players[i].role);
@@ -99,7 +106,13 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
 
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
-        if (!usePhotonRoomRoles || propertiesThatChanged == null || !propertiesThatChanged.ContainsKey(ImposterActorRoomPropertyKey))
+        if (!usePhotonRoomRoles || propertiesThatChanged == null)
+        {
+            return;
+        }
+
+        if (!propertiesThatChanged.ContainsKey(ImposterActorsRoomPropertyKey) &&
+            !propertiesThatChanged.ContainsKey(ImposterActorRoomPropertyKey))
         {
             return;
         }
@@ -109,68 +122,435 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
 
     public static int SelectNewPhotonImposterActor()
     {
+        int[] actors = SelectNewPhotonImposterActors();
+        return actors.Length > 0 ? actors[0] : -1;
+    }
+
+    public static int[] SelectNewPhotonImposterActors()
+    {
         if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
         {
-            return -1;
+            return new int[0];
         }
 
         if (!PhotonNetwork.IsMasterClient || PhotonNetwork.PlayerList == null || PhotonNetwork.PlayerList.Length == 0)
         {
-            return -1;
+            return new int[0];
         }
 
-        int index = Random.Range(0, PhotonNetwork.PlayerList.Length);
-        int imposterActor = PhotonNetwork.PlayerList[index].ActorNumber;
-        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
-        {
-            { ImposterActorRoomPropertyKey, imposterActor }
-        });
+        int[] imposterActors = PickPhotonImposterActors();
+        SetPhotonImposterActors(imposterActors);
 
-        Debug.Log("New Photon imposter actor = " + imposterActor);
-        return imposterActor;
+        Debug.Log("New Photon imposter actors = " + SerializeActorList(imposterActors));
+        return imposterActors;
     }
 
     public static int EnsurePhotonImposterActor()
     {
+        int[] actors = EnsurePhotonImposterActors();
+        return actors.Length > 0 ? actors[0] : -1;
+    }
+
+    public static int[] EnsurePhotonImposterActors()
+    {
         if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
         {
-            return -1;
+            return new int[0];
         }
 
-        int existingActor = GetPhotonImposterActor();
-        if (existingActor > 0 && IsActorInCurrentRoom(existingActor))
+        int[] existingActors = GetPhotonImposterActors();
+        if (HasRequiredPhotonImposterActors(existingActors))
         {
-            return existingActor;
+            return existingActors;
         }
 
         if (!PhotonNetwork.IsMasterClient || PhotonNetwork.PlayerList == null || PhotonNetwork.PlayerList.Length == 0)
         {
-            return -1;
+            return existingActors;
         }
 
-        int index = Random.Range(0, PhotonNetwork.PlayerList.Length);
-        int imposterActor = PhotonNetwork.PlayerList[index].ActorNumber;
-        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
-        {
-            { ImposterActorRoomPropertyKey, imposterActor }
-        });
+        int[] imposterActors = PickPhotonImposterActors();
+        SetPhotonImposterActors(imposterActors);
 
-        Debug.Log("Photon imposter actor = " + imposterActor);
-        return imposterActor;
+        Debug.Log("Photon imposter actors = " + SerializeActorList(imposterActors));
+        return imposterActors;
     }
 
     public static int GetPhotonImposterActor()
     {
+        int[] actors = GetPhotonImposterActors();
+        return actors.Length > 0 ? actors[0] : -1;
+    }
+
+    public static int[] GetPhotonImposterActors()
+    {
         if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || PhotonNetwork.CurrentRoom.CustomProperties == null)
         {
-            return -1;
+            return new int[0];
         }
 
-        if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ImposterActorRoomPropertyKey, out object value))
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ImposterActorsRoomPropertyKey, out object actorsValue))
         {
-            return -1;
+            int[] actors = ParseActorList(actorsValue);
+            if (actors.Length > 0)
+            {
+                return actors;
+            }
         }
 
+        if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ImposterActorRoomPropertyKey, out object actorValue))
+        {
+            return new int[0];
+        }
+
+        return ParseActorList(actorValue);
+    }
+
+    public static bool IsActorImposter(int actorNumber)
+    {
+        if (actorNumber <= 0)
+        {
+            return false;
+        }
+
+        return ContainsActor(GetPhotonImposterActors(), actorNumber);
+    }
+
+    public static int GetRequiredImposterCount(int playerCount)
+    {
+        return Mathf.Max(1, playerCount >= TwoImposterPlayerThreshold ? 2 : 1);
+    }
+
+    public static bool ArePhotonImposterActorsReady(int[] expectedActors)
+    {
+        int[] currentActors = GetPhotonImposterActors();
+        if (!HasRequiredPhotonImposterActors(currentActors))
+        {
+            return false;
+        }
+
+        if (expectedActors == null || expectedActors.Length == 0)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < expectedActors.Length; i++)
+        {
+            if (expectedActors[i] > 0 && !ContainsActor(currentActors, expectedActors[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool IsWaitingForPhotonRole()
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            return false;
+        }
+
+        int[] imposterActors = GetPhotonImposterActors();
+        if (!HasRequiredPhotonImposterActors(imposterActors) && PhotonNetwork.IsMasterClient)
+        {
+            imposterActors = EnsurePhotonImposterActors();
+        }
+
+        return !HasRequiredPhotonImposterActors(imposterActors);
+    }
+
+    private void AssignLocalPhotonRole()
+    {
+        int[] imposterActors = EnsurePhotonImposterActors();
+        if (!HasRequiredPhotonImposterActors(imposterActors))
+        {
+            Debug.Log("Photon imposter actors are not ready yet.");
+            return;
+        }
+
+        PlayerRole localRole = PhotonNetwork.LocalPlayer != null &&
+                               ContainsActor(imposterActors, PhotonNetwork.LocalPlayer.ActorNumber)
+            ? PlayerRole.Killer
+            : PlayerRole.Citizen;
+
+        AssignPhotonRolesToTargets(imposterActors, localRole);
+        hasAssignedPhotonRole = true;
+        Debug.Log("Local Photon role = " + localRole);
+    }
+
+    public static PlayerRole GetLocalPhotonRole(PlayerRole fallbackRole = PlayerRole.Citizen)
+    {
+        int[] imposterActors = EnsurePhotonImposterActors();
+        if (!HasRequiredPhotonImposterActors(imposterActors) || PhotonNetwork.LocalPlayer == null)
+        {
+            return fallbackRole;
+        }
+
+        return ContainsActor(imposterActors, PhotonNetwork.LocalPlayer.ActorNumber) ? PlayerRole.Killer : PlayerRole.Citizen;
+    }
+
+    private void AssignPhotonRolesToTargets(int[] imposterActors, PlayerRole localFallbackRole)
+    {
+        bool assignedAny = false;
+
+        if (players != null)
+        {
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (players[i] == null)
+                {
+                    continue;
+                }
+
+                players[i].SetRole(GetRoleForTarget(players[i], imposterActors, localFallbackRole));
+                assignedAny = true;
+            }
+        }
+
+        if (assignedAny)
+        {
+            return;
+        }
+
+        PlayerCombatTarget[] sceneTargets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < sceneTargets.Length; i++)
+        {
+            if (sceneTargets[i] != null)
+            {
+                sceneTargets[i].SetRole(GetRoleForTarget(sceneTargets[i], imposterActors, localFallbackRole));
+            }
+        }
+    }
+
+    private static PlayerRole GetRoleForTarget(PlayerCombatTarget target, int[] imposterActors, PlayerRole fallbackRole)
+    {
+        if (target == null || imposterActors == null || imposterActors.Length <= 0)
+        {
+            return fallbackRole;
+        }
+
+        int actorNumber = target.GetActorNumber();
+        if (actorNumber <= 0)
+        {
+            return fallbackRole;
+        }
+
+        return ContainsActor(imposterActors, actorNumber) ? PlayerRole.Killer : PlayerRole.Citizen;
+    }
+
+    private static int[] PickPhotonImposterActors()
+    {
+        List<int> actorNumbers = new List<int>();
+
+        if (PhotonNetwork.PlayerList != null)
+        {
+            for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
+            {
+                if (PhotonNetwork.PlayerList[i] != null)
+                {
+                    actorNumbers.Add(PhotonNetwork.PlayerList[i].ActorNumber);
+                }
+            }
+        }
+
+        if (actorNumbers.Count <= 0)
+        {
+            return new int[0];
+        }
+
+        int imposterCount = GetLimitedImposterCount(actorNumbers.Count);
+        int[] selectedActors = new int[imposterCount];
+
+        for (int i = 0; i < imposterCount; i++)
+        {
+            int swapIndex = Random.Range(i, actorNumbers.Count);
+            int temp = actorNumbers[i];
+            actorNumbers[i] = actorNumbers[swapIndex];
+            actorNumbers[swapIndex] = temp;
+            selectedActors[i] = actorNumbers[i];
+        }
+
+        return selectedActors;
+    }
+
+    private static int GetLimitedImposterCount(int playerCount)
+    {
+        if (playerCount <= 1)
+        {
+            return Mathf.Max(1, playerCount);
+        }
+
+        return Mathf.Clamp(GetRequiredImposterCount(playerCount), 1, playerCount - 1);
+    }
+
+    private static bool HasRequiredPhotonImposterActors(int[] actors)
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            return false;
+        }
+
+        int playerCount = GetPhotonPlayerCount();
+        if (playerCount <= 0)
+        {
+            return false;
+        }
+
+        int requiredCount = GetLimitedImposterCount(playerCount);
+        return CountValidUniqueActors(actors) >= requiredCount;
+    }
+
+    private static int GetPhotonPlayerCount()
+    {
+        if (PhotonNetwork.PlayerList != null && PhotonNetwork.PlayerList.Length > 0)
+        {
+            return PhotonNetwork.PlayerList.Length;
+        }
+
+        if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.PlayerCount > 0)
+        {
+            return PhotonNetwork.CurrentRoom.PlayerCount;
+        }
+
+        return 0;
+    }
+
+    private static int CountValidUniqueActors(int[] actors)
+    {
+        if (actors == null || actors.Length == 0)
+        {
+            return 0;
+        }
+
+        List<int> uniqueActors = new List<int>();
+        for (int i = 0; i < actors.Length; i++)
+        {
+            int actorNumber = actors[i];
+            if (actorNumber <= 0 || !IsActorInCurrentRoom(actorNumber) || ContainsActor(uniqueActors, actorNumber))
+            {
+                continue;
+            }
+
+            uniqueActors.Add(actorNumber);
+        }
+
+        return uniqueActors.Count;
+    }
+
+    private static void SetPhotonImposterActors(int[] imposterActors)
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || imposterActors == null || imposterActors.Length == 0)
+        {
+            return;
+        }
+
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { ImposterActorsRoomPropertyKey, SerializeActorList(imposterActors) },
+            { ImposterActorRoomPropertyKey, imposterActors[0] }
+        });
+    }
+
+    private static string SerializeActorList(int[] actors)
+    {
+        if (actors == null || actors.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        string result = string.Empty;
+        for (int i = 0; i < actors.Length; i++)
+        {
+            if (actors[i] <= 0)
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(result))
+            {
+                result += ImposterActorSeparator;
+            }
+
+            result += actors[i].ToString();
+        }
+
+        return result;
+    }
+
+    private static int[] ParseActorList(object value)
+    {
+        if (value == null)
+        {
+            return new int[0];
+        }
+
+        if (value is int[] intArray)
+        {
+            return FilterPositiveActors(intArray);
+        }
+
+        if (value is object[] objectArray)
+        {
+            List<int> actors = new List<int>();
+            for (int i = 0; i < objectArray.Length; i++)
+            {
+                int actorNumber = ToActorNumber(objectArray[i]);
+                if (actorNumber > 0 && !ContainsActor(actors, actorNumber))
+                {
+                    actors.Add(actorNumber);
+                }
+            }
+
+            return actors.ToArray();
+        }
+
+        if (value is string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return new int[0];
+            }
+
+            string[] parts = text.Split(ImposterActorSeparator);
+            List<int> actors = new List<int>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (int.TryParse(parts[i], out int actorNumber) && actorNumber > 0 && !ContainsActor(actors, actorNumber))
+                {
+                    actors.Add(actorNumber);
+                }
+            }
+
+            return actors.ToArray();
+        }
+
+        int singleActor = ToActorNumber(value);
+        return singleActor > 0 ? new[] { singleActor } : new int[0];
+    }
+
+    private static int[] FilterPositiveActors(int[] source)
+    {
+        if (source == null || source.Length == 0)
+        {
+            return new int[0];
+        }
+
+        List<int> actors = new List<int>();
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (source[i] > 0 && !ContainsActor(actors, source[i]))
+            {
+                actors.Add(source[i]);
+            }
+        }
+
+        return actors.ToArray();
+    }
+
+    private static int ToActorNumber(object value)
+    {
         if (value is int intValue)
         {
             return intValue;
@@ -186,102 +566,48 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
             return shortValue;
         }
 
+        if (value is long longValue)
+        {
+            return longValue > int.MaxValue ? -1 : (int)longValue;
+        }
+
         return -1;
     }
 
-    public static bool IsWaitingForPhotonRole()
+    private static bool ContainsActor(int[] actors, int actorNumber)
     {
-        if (!PhotonNetwork.InRoom)
+        if (actors == null || actorNumber <= 0)
         {
             return false;
         }
 
-        int imposterActor = GetPhotonImposterActor();
-        if ((imposterActor <= 0 || !IsActorInCurrentRoom(imposterActor)) && PhotonNetwork.IsMasterClient)
+        for (int i = 0; i < actors.Length; i++)
         {
-            imposterActor = EnsurePhotonImposterActor();
-        }
-
-        return imposterActor <= 0 || !IsActorInCurrentRoom(imposterActor);
-    }
-
-    private void AssignLocalPhotonRole()
-    {
-        int imposterActor = EnsurePhotonImposterActor();
-        if (imposterActor <= 0)
-        {
-            Debug.Log("Photon imposter actor is not ready yet.");
-            return;
-        }
-
-        PlayerRole localRole = PhotonNetwork.LocalPlayer != null &&
-                               PhotonNetwork.LocalPlayer.ActorNumber == imposterActor
-            ? PlayerRole.Killer
-            : PlayerRole.Citizen;
-
-        AssignPhotonRolesToTargets(imposterActor, localRole);
-        hasAssignedPhotonRole = true;
-        Debug.Log("Local Photon role = " + localRole);
-    }
-
-    public static PlayerRole GetLocalPhotonRole(PlayerRole fallbackRole = PlayerRole.Citizen)
-    {
-        int imposterActor = EnsurePhotonImposterActor();
-        if (imposterActor <= 0 || PhotonNetwork.LocalPlayer == null)
-        {
-            return fallbackRole;
-        }
-
-        return PhotonNetwork.LocalPlayer.ActorNumber == imposterActor ? PlayerRole.Killer : PlayerRole.Citizen;
-    }
-
-    private void AssignPhotonRolesToTargets(int imposterActor, PlayerRole localFallbackRole)
-    {
-        bool assignedAny = false;
-
-        if (players != null)
-        {
-            for (int i = 0; i < players.Length; i++)
+            if (actors[i] == actorNumber)
             {
-                if (players[i] == null)
-                {
-                    continue;
-                }
-
-                players[i].SetRole(GetRoleForTarget(players[i], imposterActor, localFallbackRole));
-                assignedAny = true;
+                return true;
             }
         }
 
-        if (assignedAny)
-        {
-            return;
-        }
-
-        PlayerCombatTarget[] sceneTargets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        for (int i = 0; i < sceneTargets.Length; i++)
-        {
-            if (sceneTargets[i] != null)
-            {
-                sceneTargets[i].SetRole(GetRoleForTarget(sceneTargets[i], imposterActor, localFallbackRole));
-            }
-        }
+        return false;
     }
 
-    private static PlayerRole GetRoleForTarget(PlayerCombatTarget target, int imposterActor, PlayerRole fallbackRole)
+    private static bool ContainsActor(List<int> actors, int actorNumber)
     {
-        if (target == null || imposterActor <= 0)
+        if (actors == null || actorNumber <= 0)
         {
-            return fallbackRole;
+            return false;
         }
 
-        int actorNumber = target.GetActorNumber();
-        if (actorNumber <= 0)
+        for (int i = 0; i < actors.Count; i++)
         {
-            return fallbackRole;
+            if (actors[i] == actorNumber)
+            {
+                return true;
+            }
         }
 
-        return actorNumber == imposterActor ? PlayerRole.Killer : PlayerRole.Citizen;
+        return false;
     }
 
     private static bool IsActorInCurrentRoom(int actorNumber)

@@ -19,6 +19,22 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     // 이번 판에 목표로 삼을 컴퓨터 수이다.
     public int requiredComputerCount = 4;
 
+    [Header("Player Count Balance")]
+    [Tooltip("켜면 Photon 방 인원 수에 맞춰 목표 컴퓨터 수를 자동 조정")]
+    public bool autoScaleRequiredComputerCountByPlayerCount = true;
+
+    [Tooltip("0이면 자동. 테스트용으로 특정 인원 목표 수를 강제로 적용하고 싶을 때 사용")]
+    [Range(0, 12)]
+    public int playerCountOverride = 0;
+
+    [Tooltip("4인 기준 목표 컴퓨터 수")]
+    [Range(1, 20)]
+    public int baseRequiredComputerCount = 4;
+
+    [Tooltip("자동 조정으로 늘어날 수 있는 목표 컴퓨터 최대 수")]
+    [Range(1, 20)]
+    public int maxRequiredComputerCount = 8;
+
     // 비활성화된 컴퓨터 오브젝트도 후보에 포함할지 정한다.
     public bool includeInactiveComputers = true;
 
@@ -94,6 +110,7 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     public void SelectObjectivesNow()
     {
         GameLoopManager.EnsureExists();
+        ApplyPlayerCountBalance();
 
         if (objectiveManager == null)
         {
@@ -148,6 +165,48 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
             " / Candidates: " + candidates.Count +
             " / PlayerStarts: " + playerStartPositions.Count
         );
+    }
+
+    private void ApplyPlayerCountBalance()
+    {
+        if (!autoScaleRequiredComputerCountByPlayerCount)
+        {
+            return;
+        }
+
+        int playerCount = GetBalancePlayerCount();
+        int extraPlayers = Mathf.Max(0, playerCount - 4);
+        int extraObjectives = Mathf.CeilToInt(extraPlayers / 2f);
+
+        requiredComputerCount = Mathf.Clamp(baseRequiredComputerCount + extraObjectives, 1, Mathf.Max(1, maxRequiredComputerCount));
+
+        Debug.Log(
+            "[ComputerObjectiveRandomizer] Player balance applied. Players: " + playerCount +
+            " / Required computers: " + requiredComputerCount
+        );
+    }
+
+    private int GetBalancePlayerCount()
+    {
+        if (playerCountOverride > 0)
+        {
+            return Mathf.Clamp(playerCountOverride, 1, 12);
+        }
+
+        if (PhotonNetwork.InRoom)
+        {
+            if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.PlayerCount > 0)
+            {
+                return Mathf.Clamp(PhotonNetwork.CurrentRoom.PlayerCount, 1, 12);
+            }
+
+            if (PhotonNetwork.PlayerList != null && PhotonNetwork.PlayerList.Length > 0)
+            {
+                return Mathf.Clamp(PhotonNetwork.PlayerList.Length, 1, 12);
+            }
+        }
+
+        return 4;
     }
 
     // 거리 규칙을 적용해 성공 컴퓨터를 고른다.

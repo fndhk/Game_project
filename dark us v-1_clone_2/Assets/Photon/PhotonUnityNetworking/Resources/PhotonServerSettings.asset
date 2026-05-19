@@ -11,15 +11,15 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9f3758f8f58fdef43803eb9be1df0608, type: 3}
   m_Name: PhotonServerSettings
-  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.ServerSettings
+  m_EditorClassIdentifier: 
   AppSettings:
-    AppIdRealtime: 7cccaa6a-c845-48ff-b897-dcaa10cc106e
+    AppIdRealtime: f2dd81a9-fb8e-49f0-92f1-35f594bb8163
     AppIdFusion: 
-    AppIdChat: e838265d-2982-4ee7-911f-aa905cb80b9e
-    AppIdVoice: 
+    AppIdChat: 
+    AppIdVoice: 7f9d18bc-cbbb-4ccb-a015-0f619312e931
     AppVersion: 
     UseNameServer: 1
-    FixedRegion: 
+    FixedRegion: asia
     Server: 
     Port: 0
     ProxyServer: 
@@ -28,17 +28,17 @@ MonoBehaviour:
     AuthMode: 0
     EnableLobbyStatistics: 0
     NetworkLogging: 1
-  DevRegion: jp
+  DevRegion: 
   PunLogging: 0
   EnableSupportLogger: 0
   RunInBackground: 1
   StartInOfflineMode: 0
   RpcList:
+  - CantHearYou
+  - ChangeColour
   - ClickRpc
   - DestroyRpc
-  - DestroySpaceship
-  - Fire
-  - RespawnSpaceship
+  - HeresWhy
   DisableAutoOpenWizard: 1
-  ShowSettings: 0
-  DevRegionSetOnce: 1
+  ShowSettings: 1
+  DevRegionSetOnce: 0

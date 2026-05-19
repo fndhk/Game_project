@@ -324,10 +324,9 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
         if (players != null && players.Length > 0)
         {
-            int imposterActor = RoleAssignmentManager.GetPhotonImposterActor();
             for (int i = 0; i < players.Length; i++)
             {
-                if (players[i] != null && players[i].ActorNumber != imposterActor && escapedActors.Contains(players[i].ActorNumber))
+                if (players[i] != null && !RoleAssignmentManager.IsActorImposter(players[i].ActorNumber) && escapedActors.Contains(players[i].ActorNumber))
                 {
                     escapedCitizens++;
                 }
@@ -352,7 +351,6 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         }
 
         Player[] players = PhotonNetwork.InRoom ? PhotonNetwork.PlayerList : null;
-        int imposterActor = RoleAssignmentManager.GetPhotonImposterActor();
 
         if (players == null || players.Length == 0)
         {
@@ -367,7 +365,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         int livingCitizens = 0;
         for (int i = 0; i < players.Length; i++)
         {
-            if (players[i] == null || players[i].ActorNumber == imposterActor)
+            if (players[i] == null || RoleAssignmentManager.IsActorImposter(players[i].ActorNumber))
             {
                 continue;
             }
@@ -482,6 +480,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         {
             { StartSignalPropertyKey, false },
             { MapSeedPropertyKey, Random.Range(1, int.MaxValue) },
+            { RoleAssignmentManager.ImposterActorsRoomPropertyKey, null },
             { RoleAssignmentManager.ImposterActorRoomPropertyKey, null }
         });
         PhotonNetwork.SendAllOutgoingCommands();

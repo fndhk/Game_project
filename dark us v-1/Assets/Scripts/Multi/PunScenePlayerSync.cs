@@ -20,6 +20,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
     private Transform eyeTransform;
     private PlayerFootstepAudio localFootstepTemplate;
     private PlayerVoiceChat localVoiceChat;
+    private PlayerCombatTarget localCombatTarget;
     private float nextSendTime;
 
     private class RemotePlayerState
@@ -54,7 +55,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
     {
         UpdateRemotePlayers();
 
-        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null || Time.time < nextSendTime)
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null || Time.time < nextSendTime || IsLocalPlayerDead())
         {
             return;
         }
@@ -141,6 +142,16 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
         return eyeTransform;
     }
 
+    private bool IsLocalPlayerDead()
+    {
+        if (localCombatTarget == null)
+        {
+            localCombatTarget = GetComponent<PlayerCombatTarget>();
+        }
+
+        return localCombatTarget != null && localCombatTarget.isDead;
+    }
+
     private RemotePlayerState GetOrCreateRemotePlayer(int actorNumber)
     {
         if (remotePlayers.TryGetValue(actorNumber, out RemotePlayerState remote) && remote != null && remote.root != null)
@@ -186,8 +197,7 @@ public class PunScenePlayerSync : MonoBehaviour, IOnEventCallback
             return;
         }
 
-        int imposterActor = RoleAssignmentManager.GetPhotonImposterActor();
-        state.combatTarget.role = actorNumber == imposterActor ? PlayerRole.Killer : PlayerRole.Citizen;
+        state.combatTarget.role = RoleAssignmentManager.IsActorImposter(actorNumber) ? PlayerRole.Killer : PlayerRole.Citizen;
     }
 
     private void EnsureLocalVoiceChat()

@@ -1,3 +1,4 @@
+using Photon.Pun;
 using UnityEngine;
 
 // 이 스크립트는 플레이어의 역할과 사망 상태를 관리한다.
@@ -72,13 +73,21 @@ public class PlayerCombatTarget : MonoBehaviour
         isDead = true;
 
         // 죽었을 때 꺼야 하는 스크립트들을 전부 끈다.
-        for (int i = 0; i < scriptsToDisableOnDeath.Length; i++)
+        if (scriptsToDisableOnDeath != null)
         {
-            // 비어 있지 않은 스크립트만 끈다.
-            if (scriptsToDisableOnDeath[i] != null)
+            for (int i = 0; i < scriptsToDisableOnDeath.Length; i++)
             {
-                scriptsToDisableOnDeath[i].enabled = false;
+                // 비어 있지 않은 스크립트만 끈다.
+                if (scriptsToDisableOnDeath[i] != null && !ShouldKeepAliveAfterDeath(scriptsToDisableOnDeath[i]))
+                {
+                    scriptsToDisableOnDeath[i].enabled = false;
+                }
             }
+        }
+
+        if (!isRemoteProxy)
+        {
+            DisableLocalControlScripts();
         }
 
         // CharacterController가 있으면 꺼서 움직이지 못하게 만든다.
@@ -88,12 +97,15 @@ public class PlayerCombatTarget : MonoBehaviour
         }
 
         // 추가 Collider들이 있으면 꺼서 충돌 판정도 비활성화한다.
-        for (int i = 0; i < collidersToDisable.Length; i++)
+        if (collidersToDisable != null)
         {
-            // 비어 있지 않은 Collider만 끈다.
-            if (collidersToDisable[i] != null)
+            for (int i = 0; i < collidersToDisable.Length; i++)
             {
-                collidersToDisable[i].enabled = false;
+                // 비어 있지 않은 Collider만 끈다.
+                if (collidersToDisable[i] != null)
+                {
+                    collidersToDisable[i].enabled = false;
+                }
             }
         }
 
@@ -110,6 +122,67 @@ public class PlayerCombatTarget : MonoBehaviour
         {
             GameLoopManager.EnsureExists().ReportPlayerDeath(GetActorNumber());
         }
+
+        TryEnterLocalSpectatorMode();
+    }
+
+    private void DisableLocalControlScripts()
+    {
+        DisableBehaviour(GetComponent<PlayerMotor>());
+        DisableBehaviour(GetComponent<MouseLook>());
+        DisableBehaviour(GetComponent<PlayerObjectiveInteractor>());
+        DisableBehaviour(GetComponent<PlayerItemUser>());
+        DisableBehaviour(GetComponent<PlayerInventory>());
+        DisableBehaviour(GetComponent<KillerAttack>());
+        DisableBehaviour(GetComponent<PlayerFootstepAudio>());
+
+        LidarSpotScanner[] scanners = GetComponentsInChildren<LidarSpotScanner>(true);
+        for (int i = 0; i < scanners.Length; i++)
+        {
+            DisableBehaviour(scanners[i]);
+        }
+    }
+
+    private void DisableBehaviour(Behaviour behaviour)
+    {
+        if (behaviour != null && !ShouldKeepAliveAfterDeath(behaviour))
+        {
+            behaviour.enabled = false;
+        }
+    }
+
+    private bool ShouldKeepAliveAfterDeath(Behaviour behaviour)
+    {
+        return behaviour is PunScenePlayerSync ||
+               behaviour is PlayerVoiceChat ||
+               behaviour is PlayerHUDController ||
+               behaviour is PlayerDeathSpectator;
+    }
+
+    private void TryEnterLocalSpectatorMode()
+    {
+        if (!Application.isPlaying || isRemoteProxy || !IsLocalActor())
+        {
+            return;
+        }
+
+        PlayerDeathSpectator spectator = GetComponent<PlayerDeathSpectator>();
+        if (spectator == null)
+        {
+            spectator = gameObject.AddComponent<PlayerDeathSpectator>();
+        }
+
+        spectator.EnterSpectatorMode(this);
+    }
+
+    private bool IsLocalActor()
+    {
+        if (PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer != null)
+        {
+            return GetActorNumber() == PhotonNetwork.LocalPlayer.ActorNumber;
+        }
+
+        return !isRemoteProxy;
     }
 
     public int GetActorNumber()
@@ -119,15 +192,15 @@ public class PlayerCombatTarget : MonoBehaviour
             return photonActorNumber;
         }
 
-        Photon.Pun.PhotonView photonView = GetComponent<Photon.Pun.PhotonView>();
+        PhotonView photonView = GetComponent<PhotonView>();
         if (photonView != null && photonView.Owner != null)
         {
             return photonView.Owner.ActorNumber;
         }
 
-        if (!isRemoteProxy && Photon.Pun.PhotonNetwork.LocalPlayer != null)
+        if (!isRemoteProxy && PhotonNetwork.LocalPlayer != null)
         {
-            return Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber;
+            return PhotonNetwork.LocalPlayer.ActorNumber;
         }
 
         return -1;

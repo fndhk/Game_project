@@ -261,7 +261,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
-        RoleAssignmentManager.EnsurePhotonImposterActor();
+        RoleAssignmentManager.EnsurePhotonImposterActors();
         PhotonNetwork.LoadLevel(gameSceneName);
     }
 

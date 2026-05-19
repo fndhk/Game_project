@@ -11227,12 +11227,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArtNotes.UndergroundLaboratoryGenerator.LaboratoryGenerator
   GenerateOnStart: 1
   UsePhotonRoomSeed: 1
-  RoomCount: 35
-  PlayerCount: 1
+  RoomCount: 36
+  PlayerCount: 4
   CellLayer:
     serializedVersion: 2
     m_Bits: 64
-  UseMapBounds: 0
+  UseMapBounds: 1
   MapCenter: {x: 0, y: 0, z: 0}
   MapSize: {x: 120, y: 120}
   MapBoundsPadding: 0
@@ -11242,7 +11242,7 @@ MonoBehaviour:
   BlockCorridorToCorridor: 1
   ForceCorridorBetweenRooms: 0
   AllowSmallBigDirectConnection: 1
-  StartRoomMinDistance: 12
+  StartRoomMinDistance: 18
   StartRoomsOnlyOnFirstFloor: 0
   GenerateDedicatedStartRooms: 0
   PlayerSpawnPointPrefix: PlayerSpawnPoint
@@ -11269,7 +11269,7 @@ MonoBehaviour:
   - {fileID: 7565169816916176742, guid: 0ed28fa42bd7a3b48bd3d4cb6829eb75, type: 3}
   - {fileID: 3480559283670373739, guid: 884c53604683e3c4381a2db56d93eb2c, type: 3}
   - {fileID: 8821532076256912300, guid: c5b18f3e02837c04892e540e29e8719b, type: 3}
-  ItemSpawnCount: 30
+  ItemSpawnCount: 16
   AllowItemSpawnInPlayerRooms: 0
   MinItemDistanceFromPlayerSpawn: 12
   PreventDuplicateItemSpawnPointUse: 1
@@ -11280,9 +11280,9 @@ MonoBehaviour:
   MaxItemsPerRoom: 2
   SnapSpawnedItemsToSpawnPointGround: 1
   ItemGroundOffset: 0.03
-  ExitMinDistanceFromStart: 22
+  ExitMinDistanceFromStart: 28
   ExitDoorPrefab: {fileID: 2130471771715180275, guid: 64a38a0084fa3bc44a4aedc5643d1ee6, type: 3}
-  MaxPlacementAttempts: 31
+  MaxPlacementAttempts: 360
   MaxFullGenerationAttempts: 12
   InsteadDoor: {fileID: 2130471771715180275, guid: 73278eca9bd804840a07ee5926b9acf0, type: 3}
   DoorPrefabs:

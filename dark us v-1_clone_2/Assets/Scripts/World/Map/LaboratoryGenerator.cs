@@ -23,6 +23,54 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Range(1, 12)]
         public int PlayerCount = 4;
 
+        [Header("Player Count Balance")]
+        [Tooltip("켜면 Photon 방 인원 수에 맞춰 맵 크기, 방 수, 아이템 수를 생성 직전에 자동 조정")]
+        public bool AutoScaleByPlayerCount = true;
+
+        [Tooltip("0이면 자동. 테스트용으로 특정 인원 밸런스를 강제로 적용하고 싶을 때 사용")]
+        [Range(0, 12)]
+        public int BalancePlayerCountOverride = 0;
+
+        [Tooltip("밸런스 기준 인원. 기본은 4인")]
+        [Range(1, 12)]
+        public int BalanceBasePlayerCount = 4;
+
+        [Tooltip("4인 기준 방/복도 개수")]
+        [Range(3, 200)]
+        public int BalanceBaseRoomCount = 36;
+
+        [Tooltip("4인 기준 맵 X/Z 크기")]
+        public Vector2 BalanceBaseMapSize = new Vector2(120f, 120f);
+
+        [Tooltip("4인 기준 아이템 생성 개수")]
+        [Range(0, 100)]
+        public int BalanceBaseItemSpawnCount = 16;
+
+        [Tooltip("4인 초과 인원 1명당 추가 방/복도 개수")]
+        [Range(0, 30)]
+        public int BalanceRoomsPerExtraPlayer = 6;
+
+        [Tooltip("4인 초과 인원 1명당 추가 맵 크기")]
+        public float BalanceMapSizePerExtraPlayer = 10f;
+
+        [Tooltip("4인 초과 인원 1명당 추가 아이템 개수")]
+        [Range(0, 20)]
+        public int BalanceItemsPerExtraPlayer = 3;
+
+        [Tooltip("8인 이상부터 추가로 늘릴 방/복도 개수")]
+        [Range(0, 10)]
+        public int BalanceHighPlayerExtraRooms = 1;
+
+        [Tooltip("8인 이상부터 추가로 늘릴 맵 크기")]
+        public float BalanceHighPlayerExtraMapSize = 2f;
+
+        [Tooltip("8인 이상부터 추가로 늘릴 아이템 개수")]
+        [Range(0, 10)]
+        public int BalanceHighPlayerExtraItems = 1;
+
+        [Tooltip("자동 밸런스 적용 시 맵 경계 제한을 켜서 크기 조정이 실제 생성에 반영되게 함")]
+        public bool BalanceEnableMapBounds = true;
+
         [Tooltip("겹침 검사에 사용할 Cell 레이어")]
         public LayerMask CellLayer;
 
@@ -326,6 +374,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
         private bool hasPhotonMapSeed;
         private int photonMapSeed;
+        private int lastLoggedBalancePlayerCount = -1;
+        private int lastLoggedBalanceRoomCount = -1;
+        private int lastLoggedBalanceItemCount = -1;
 
         public static event Action<string, float> LoadingPhaseChanged;
         public static event Action GenerationFinished;
@@ -336,6 +387,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         private void Start()
         {
             ApplyPhotonRoomSeed();
+            ApplyPlayerCountBalance();
 
             if (GenerateOnStart)
             {
@@ -351,9 +403,102 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             }
         }
 
+        private void ApplyPlayerCountBalance()
+        {
+            if (!AutoScaleByPlayerCount)
+            {
+                return;
+            }
+
+            int playerCount = GetBalancePlayerCount();
+            int basePlayers = Mathf.Max(1, BalanceBasePlayerCount);
+            int extraPlayers = Mathf.Max(0, playerCount - basePlayers);
+            int highPlayerExtra = Mathf.Max(0, playerCount - 8);
+
+            PlayerCount = playerCount;
+            RoomCount = Mathf.Clamp(
+                BalanceBaseRoomCount +
+                extraPlayers * BalanceRoomsPerExtraPlayer +
+                highPlayerExtra * BalanceHighPlayerExtraRooms,
+                3,
+                200
+            );
+
+            float scaledWidth = Mathf.Max(20f,
+                BalanceBaseMapSize.x +
+                extraPlayers * BalanceMapSizePerExtraPlayer +
+                highPlayerExtra * BalanceHighPlayerExtraMapSize);
+            float scaledDepth = Mathf.Max(20f,
+                BalanceBaseMapSize.y +
+                extraPlayers * BalanceMapSizePerExtraPlayer +
+                highPlayerExtra * BalanceHighPlayerExtraMapSize);
+            MapSize = new Vector2(scaledWidth, scaledDepth);
+
+            if (BalanceEnableMapBounds)
+            {
+                UseMapBounds = true;
+            }
+
+            ItemSpawnCount = Mathf.Clamp(
+                BalanceBaseItemSpawnCount +
+                extraPlayers * BalanceItemsPerExtraPlayer +
+                highPlayerExtra * BalanceHighPlayerExtraItems,
+                0,
+                100
+            );
+
+            MaxItemsPerRoom = Mathf.Clamp(playerCount >= 8 ? 3 : 2, 1, 20);
+            StartRoomMinDistance = Mathf.Max(12f, 18f + extraPlayers * 1.5f);
+            ExitMinDistanceFromStart = Mathf.Max(20f, 28f + extraPlayers * 2f);
+            MaxPlacementAttempts = Mathf.Max(MaxPlacementAttempts, Mathf.Clamp(RoomCount * 10, 300, 1200));
+            MaxFullGenerationAttempts = Mathf.Max(MaxFullGenerationAttempts, 12);
+
+            if (lastLoggedBalancePlayerCount != playerCount ||
+                lastLoggedBalanceRoomCount != RoomCount ||
+                lastLoggedBalanceItemCount != ItemSpawnCount)
+            {
+                Debug.Log(
+                    "[LaboratoryGenerator] Player balance applied. Players: " + playerCount +
+                    " / Rooms: " + RoomCount +
+                    " / Map: " + MapSize.x.ToString("0") + "x" + MapSize.y.ToString("0") +
+                    " / Items: " + ItemSpawnCount
+                );
+
+                lastLoggedBalancePlayerCount = playerCount;
+                lastLoggedBalanceRoomCount = RoomCount;
+                lastLoggedBalanceItemCount = ItemSpawnCount;
+            }
+        }
+
+        private int GetBalancePlayerCount()
+        {
+            if (BalancePlayerCountOverride > 0)
+            {
+                return Mathf.Clamp(BalancePlayerCountOverride, 1, 12);
+            }
+
+            if (PhotonNetwork.InRoom)
+            {
+                if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.PlayerCount > 0)
+                {
+                    return Mathf.Clamp(PhotonNetwork.CurrentRoom.PlayerCount, 1, 12);
+                }
+
+                if (PhotonNetwork.PlayerList != null && PhotonNetwork.PlayerList.Length > 0)
+                {
+                    return Mathf.Clamp(PhotonNetwork.PlayerList.Length, 1, 12);
+                }
+            }
+
+            int configuredPlayers = CountConfiguredExistingPlayers();
+            int fallbackPlayers = Mathf.Max(Mathf.Max(BalanceBasePlayerCount, PlayerCount), configuredPlayers);
+            return Mathf.Clamp(fallbackPlayers, 1, 12);
+        }
+
         // 외부에서 조건으로 맵을 다시 생성할 수 있도록 public으로 둔다.
         public IEnumerator StartGeneration()
         {
+            ApplyPlayerCountBalance();
             IsAnyGenerationRunning = true;
             IsGenerationComplete = false;
             SetLoadingPhase("SCANNING AREA...", 0.06f);

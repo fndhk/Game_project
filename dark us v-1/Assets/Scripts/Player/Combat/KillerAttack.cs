@@ -32,6 +32,9 @@ public class KillerAttack : MonoBehaviour
     // 실제 멀티 프록시를 놓치지 않기 위한 최소 즉사 탐지 거리이다.
     public float minimumKillReach = 2.4f;
 
+    // 아주 가까이 붙은 대상은 정면 조준이 조금 빗나가도 잡히게 하는 거리이다.
+    public float closeRangeForgivenessDistance = 1.55f;
+
     // 카메라 정면으로 인정할 최소 각도 내적값이다.
     [Range(-1f, 1f)]
     public float forwardDotThreshold = 0.28f;
@@ -239,7 +242,8 @@ public class KillerAttack : MonoBehaviour
 
             Vector3 toTarget = distance > 0.001f ? toTargetRaw / distance : playerCamera.forward;
             float dot = Vector3.Dot(playerCamera.forward, toTarget);
-            if (dot < forwardDotThreshold)
+            bool isVeryClose = distance <= Mathf.Max(0f, closeRangeForgivenessDistance);
+            if (!isVeryClose && dot < forwardDotThreshold)
             {
                 continue;
             }
@@ -250,7 +254,7 @@ public class KillerAttack : MonoBehaviour
             }
 
             // 카메라 정면에 더 가까운 대상을 우선하기 위해 점수를 계산한다.
-            float score = dot * 10f - distance;
+            float score = dot * 10f - distance + (isVeryClose ? 3f : 0f);
 
             // 더 좋은 타겟이면 갱신한다.
             if (score > bestScore)
@@ -283,7 +287,7 @@ public class KillerAttack : MonoBehaviour
             return false;
         }
 
-        return PhotonNetwork.LocalPlayer.ActorNumber == RoleAssignmentManager.GetPhotonImposterActor();
+        return RoleAssignmentManager.IsActorImposter(PhotonNetwork.LocalPlayer.ActorNumber);
     }
 
     // 벽 너머의 대상을 맞지 않게 하기 위해 시야가 통하는지 검사하는 함수이다.

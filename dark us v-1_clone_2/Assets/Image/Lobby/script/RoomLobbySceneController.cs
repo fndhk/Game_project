@@ -206,7 +206,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
         EnsureMapSeedProperty();
-        int imposterActor = RoleAssignmentManager.SelectNewPhotonImposterActor();
+        int[] imposterActors = RoleAssignmentManager.SelectNewPhotonImposterActors();
         PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
         {
             { StartSignalPropertyKey, true }
@@ -217,7 +217,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         DarkScanLoadingScreen.ShowImmediate("MATCH LOCKED...");
 
         float waitUntil = Time.time + 1.5f;
-        while (Time.time < waitUntil && RoleAssignmentManager.GetPhotonImposterActor() != imposterActor)
+        while (Time.time < waitUntil && !RoleAssignmentManager.ArePhotonImposterActorsReady(imposterActors))
         {
             yield return null;
         }
