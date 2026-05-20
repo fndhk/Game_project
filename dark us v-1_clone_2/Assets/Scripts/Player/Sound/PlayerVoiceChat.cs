@@ -36,7 +36,7 @@ public class PlayerVoiceChat : MonoBehaviour
 
     [Header("Capture")]
     public string microphoneDeviceName = "";
-    public int sampleRate = 48000;
+    public int sampleRate = 16000;
     public int microphoneBufferSeconds = 1;
     public int chunkSampleCount = 720;
     public float silenceThreshold = 0.005f;
@@ -244,7 +244,7 @@ public class PlayerVoiceChat : MonoBehaviour
 
     private static PunVoiceClient GetOrCreateVoiceClient()
     {
-        PunVoiceClient existingClient = Object.FindFirstObjectByType<PunVoiceClient>();
+        PunVoiceClient existingClient = Object.FindAnyObjectByType<PunVoiceClient>();
         if (existingClient != null)
         {
             return existingClient;
@@ -397,7 +397,7 @@ public class PlayerVoiceChat : MonoBehaviour
         }
 
         nextAudioListenerSearchTime = Time.unscaledTime + 0.5f;
-        AudioListener listener = Object.FindFirstObjectByType<AudioListener>();
+        AudioListener listener = Object.FindAnyObjectByType<AudioListener>();
         if (listener != null)
         {
             cachedAudioListenerTransform = listener.transform;

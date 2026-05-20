@@ -42,7 +42,7 @@ namespace UnityStandardAssets.CrossPlatformInput
 #endif
             {
                 #if UNITY_6000_0_OR_NEWER
-                UnityEngine.EventSystems.EventSystem system = FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>();
+                UnityEngine.EventSystems.EventSystem system = FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>();
                 #else
                 UnityEngine.EventSystems.EventSystem system = FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
                 #endif

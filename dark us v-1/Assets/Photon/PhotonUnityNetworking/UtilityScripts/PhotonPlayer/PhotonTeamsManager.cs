@@ -78,7 +78,7 @@ namespace Photon.Pun.UtilityScripts
                 {
                     
                     #if UNITY_6000_0_OR_NEWER
-                    instance = FindFirstObjectByType<PhotonTeamsManager>();
+                    instance = FindAnyObjectByType<PhotonTeamsManager>();
                     #else
                     instance = FindObjectOfType<PhotonTeamsManager>();
                     #endif

@@ -714,7 +714,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
 
     private Transform FindUiTransform(string objectName)
     {
-        Transform[] transforms = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Transform[] transforms = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include);
         foreach (Transform target in transforms)
         {
             if (target.name == objectName && target.gameObject.scene == gameObject.scene)

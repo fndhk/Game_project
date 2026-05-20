@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR || UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_IOS || UNITY_VISIONOS || UNITY_ANDROID || UNITY_WSA
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_IOS || UNITY_VISIONOS || UNITY_ANDROID || UNITY_WSA
 #define PLATFORM_IS_SUPPORTED
 #endif
 
@@ -361,7 +361,7 @@ namespace Photon.Voice.Unity
         private void setOutputListener(bool set)
         {
             #if UNITY_6000_0_OR_NEWER
-            var audioListener = FindFirstObjectByType<AudioListener>();
+            var audioListener = FindAnyObjectByType<AudioListener>();
             #else
             var audioListener = FindObjectOfType<AudioListener>();
             #endif

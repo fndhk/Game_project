@@ -7,7 +7,7 @@ public static class UiEventSystemUtility
     public static EventSystem EnsureSingle(GameObject context)
     {
         Scene contextScene = context != null ? context.scene : SceneManager.GetActiveScene();
-        EventSystem[] systems = Object.FindObjectsByType<EventSystem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        EventSystem[] systems = Object.FindObjectsByType<EventSystem>(FindObjectsInactive.Include);
         EventSystem primary = FindPrimary(systems, contextScene);
 
         if (primary == null)

@@ -29,7 +29,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
             return instance;
         }
 
-        PunWorldAudioSync existing = Object.FindFirstObjectByType<PunWorldAudioSync>();
+        PunWorldAudioSync existing = Object.FindAnyObjectByType<PunWorldAudioSync>();
         if (existing != null)
         {
             instance = existing;
@@ -139,7 +139,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
         switch (kind)
         {
             case SoundKind.ScanPulse:
-                LidarSpotScanner scanner = Object.FindFirstObjectByType<LidarSpotScanner>();
+                LidarSpotScanner scanner = Object.FindAnyObjectByType<LidarSpotScanner>();
                 if (scanner == null)
                 {
                     return null;
@@ -149,7 +149,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
                 return scanSource != null ? scanSource.clip : null;
 
             case SoundKind.ComputerStart:
-                ObjectiveComputer computer = Object.FindFirstObjectByType<ObjectiveComputer>();
+                ObjectiveComputer computer = Object.FindAnyObjectByType<ObjectiveComputer>();
                 if (computer == null)
                 {
                     return null;
@@ -163,7 +163,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
                 return computer.loopAudioSource != null ? computer.loopAudioSource.clip : null;
 
             case SoundKind.Footstep:
-                PlayerFootstepAudio footsteps = Object.FindFirstObjectByType<PlayerFootstepAudio>();
+                PlayerFootstepAudio footsteps = Object.FindAnyObjectByType<PlayerFootstepAudio>();
                 return footsteps != null ? GetFootstepClip(footsteps) : null;
 
             default:
@@ -248,7 +248,7 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
         }
 
         nextAudioListenerSearchTime = Time.unscaledTime + 0.5f;
-        AudioListener listener = Object.FindFirstObjectByType<AudioListener>();
+        AudioListener listener = Object.FindAnyObjectByType<AudioListener>();
         if (listener != null)
         {
             cachedAudioListenerTransform = listener.transform;

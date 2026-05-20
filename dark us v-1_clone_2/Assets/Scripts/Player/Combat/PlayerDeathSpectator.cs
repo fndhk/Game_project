@@ -114,7 +114,7 @@ public class PlayerDeathSpectator : MonoBehaviour
         nextTargetRefreshTime = Time.unscaledTime + Mathf.Max(0.05f, targetRefreshInterval);
         availableTargets.Clear();
 
-        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Exclude);
         for (int i = 0; i < targets.Length; i++)
         {
             PlayerCombatTarget target = targets[i];

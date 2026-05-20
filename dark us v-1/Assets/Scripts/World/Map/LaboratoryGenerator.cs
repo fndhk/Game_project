@@ -624,7 +624,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             int failStreak = 0;
             int cellsCreatedThisFrame = 1;
 
-            while (createdMainCells < RoomCount && failStreak < MaxPlacementAttempts)
+            int openExitFailureLimit = GetOpenExitFailureLimit();
+
+            while (createdMainCells < RoomCount && failStreak < openExitFailureLimit)
             {
                 CleanupOpenExits(openExits);
 
@@ -855,7 +857,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return false;
             }
 
-            for (int i = 0; i < MaxPlacementAttempts; i++)
+            int selectionAttemptLimit = GetPrefabSelectionAttemptLimit();
+
+            for (int i = 0; i < selectionAttemptLimit; i++)
             {
                 Cell candidatePrefab = GetWeightedRandomCell(candidates);
 
@@ -1103,7 +1107,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 return false;
             }
 
-            for (int i = 0; i < MaxPlacementAttempts; i++)
+            int alignmentAttemptLimit = GetExitAlignmentAttemptLimit();
+
+            for (int i = 0; i < alignmentAttemptLimit; i++)
             {
                 Transform tempSelectedExit = usableExits[Random.Range(0, usableExits.Count)];
 
@@ -1129,6 +1135,21 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
             DestroyCreatedCell(tempCell);
             return false;
+        }
+
+        private int GetOpenExitFailureLimit()
+        {
+            return Mathf.Clamp(MaxPlacementAttempts, 24, 80);
+        }
+
+        private int GetPrefabSelectionAttemptLimit()
+        {
+            return Mathf.Clamp(MaxPlacementAttempts / 12, 8, 24);
+        }
+
+        private int GetExitAlignmentAttemptLimit()
+        {
+            return Mathf.Clamp(MaxPlacementAttempts / 18, 4, 20);
         }
 
         // 후보 프리팹이 현재 출구에 붙을 수 있는지 검사한다.

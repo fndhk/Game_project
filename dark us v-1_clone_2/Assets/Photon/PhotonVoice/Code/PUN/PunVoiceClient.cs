@@ -1,4 +1,4 @@
-﻿// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // <copyright file="PunVoiceClient.cs" company="Exit Games GmbH">
 // Photon Voice - Copyright (C) 2018 Exit Games GmbH
 // </copyright>
@@ -61,7 +61,7 @@ namespace Photon.Voice.PUN
                 if (instance == null)
                 {
                     #if UNITY_6000_0_OR_NEWER
-                    PunVoiceClient[] objects = FindObjectsByType<PunVoiceClient>(FindObjectsSortMode.InstanceID);
+                    PunVoiceClient[] objects = FindObjectsByType<PunVoiceClient>();
                     #else
                     PunVoiceClient[] objects = FindObjectsOfType<PunVoiceClient>();
                     #endif

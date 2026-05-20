@@ -170,7 +170,7 @@ public class PlayerItemUser : MonoBehaviour
 
         if (dotRenderer == null)
         {
-            dotRenderer = Object.FindFirstObjectByType<InstancedScanDotRenderer>();
+            dotRenderer = Object.FindAnyObjectByType<InstancedScanDotRenderer>();
         }
 
         if (playerStats == null)

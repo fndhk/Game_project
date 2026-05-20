@@ -384,7 +384,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         // 점 렌더러가 비어 있으면 씬에서 자동으로 찾는다.
         if (scanDotRenderers == null || scanDotRenderers.Length == 0)
         {
-            scanDotRenderers = Object.FindObjectsByType<InstancedScanDotRenderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            scanDotRenderers = Object.FindObjectsByType<InstancedScanDotRenderer>(FindObjectsInactive.Exclude);
         }
 
         // 그래도 없으면 처리하지 않는다.

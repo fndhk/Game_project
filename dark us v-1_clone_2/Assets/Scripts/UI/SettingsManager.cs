@@ -88,7 +88,7 @@ public static class SettingsManager
     public static void Apply()
     {
         Resolution resolution = Screen.currentResolution;
-        Screen.SetResolution(resolution.width, resolution.height, ScreenMode, resolution.refreshRate);
+        Screen.SetResolution(resolution.width, resolution.height, ScreenMode, resolution.refreshRateRatio);
         Application.targetFrameRate = FpsLimit;
         ApplyAudio();
         ApplyLowGraphics();

@@ -29,6 +29,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
     private float displayProgress = 0.08f;
     private float visibleStartedAt;
     private bool finishing;
+    private bool generationFailed;
     private bool destroyRequested;
     private bool waitForGameSceneBeforeFallback;
     private string initialMessage = "SCANNING AREA...";
@@ -74,7 +75,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
 
     private static void TryCreateForScene(Scene scene)
     {
-        if (activeInstance != null || Object.FindFirstObjectByType<DarkScanLoadingScreen>() != null)
+        if (activeInstance != null || Object.FindAnyObjectByType<DarkScanLoadingScreen>() != null)
         {
             return;
         }
@@ -106,7 +107,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
             return true;
         }
 
-        return Object.FindFirstObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include) != null;
+        return Object.FindAnyObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include) != null;
     }
 
     private void Awake()
@@ -192,12 +193,12 @@ public class DarkScanLoadingScreen : MonoBehaviour
 
         while (waitForGameSceneBeforeFallback &&
                !ShouldShowForScene(SceneManager.GetActiveScene()) &&
-               Object.FindFirstObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include) == null)
+               Object.FindAnyObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include) == null)
         {
             yield return null;
         }
 
-        LaboratoryGenerator generator = Object.FindFirstObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include);
+        LaboratoryGenerator generator = Object.FindAnyObjectByType<LaboratoryGenerator>(FindObjectsInactive.Include);
 
         if (generator == null)
         {
@@ -215,6 +216,13 @@ public class DarkScanLoadingScreen : MonoBehaviour
         if (!finishing && generator.IsGenerationComplete)
         {
             HandleGenerationFinished();
+        }
+        else if (!finishing)
+        {
+            generationFailed = true;
+            HandleLoadingPhaseChanged("SCAN FAILED", 1f);
+            yield return new WaitForSecondsRealtime(MinimumVisibleTime);
+            StartCoroutine(FadeOutAndDestroy());
         }
     }
 
@@ -293,7 +301,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
         ReleaseInputBlocking();
         DisableGraphicsBeforeDestroy();
 
-        if (ShouldShowRoleRevealForScene(SceneManager.GetActiveScene()))
+        if (!generationFailed && ShouldShowRoleRevealForScene(SceneManager.GetActiveScene()))
         {
             RoleRevealIntro.ShowWhenReady();
         }

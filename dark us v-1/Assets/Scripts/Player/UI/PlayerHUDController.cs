@@ -199,7 +199,7 @@ public class PlayerHUDController : MonoBehaviour
 
         if (targetDotRenderer == null)
         {
-            targetDotRenderer = Object.FindFirstObjectByType<InstancedScanDotRenderer>();
+            targetDotRenderer = Object.FindAnyObjectByType<InstancedScanDotRenderer>();
         }
     }
 
@@ -256,7 +256,7 @@ public class PlayerHUDController : MonoBehaviour
 
         if (!IsValidHudCanvas(hudCanvas))
         {
-            Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include);
 
             for (int i = 0; i < canvases.Length; i++)
             {

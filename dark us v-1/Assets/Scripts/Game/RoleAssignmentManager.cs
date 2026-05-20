@@ -314,7 +314,7 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        PlayerCombatTarget[] sceneTargets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        PlayerCombatTarget[] sceneTargets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include);
         for (int i = 0; i < sceneTargets.Length; i++)
         {
             if (sceneTargets[i] != null)
@@ -632,7 +632,7 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
     {
         if (players == null || players.Length == 0)
         {
-            PlayerCombatTarget localTarget = Object.FindFirstObjectByType<PlayerCombatTarget>();
+            PlayerCombatTarget localTarget = Object.FindAnyObjectByType<PlayerCombatTarget>();
             if (localTarget != null)
             {
                 localTarget.SetRole(role);

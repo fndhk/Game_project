@@ -179,7 +179,7 @@ namespace Photon.Voice.Unity
             if (initSpatialBlend > 0)
             {
                 #if UNITY_6000_0_OR_NEWER
-                var al = FindFirstObjectByType<AudioListener>();
+                var al = FindAnyObjectByType<AudioListener>();
                 #else
                 var al = FindObjectOfType<AudioListener>();
                 #endif

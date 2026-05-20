@@ -78,7 +78,7 @@ public class AccessCorePickup : MonoBehaviour, IPlayerInteractable
 
         if (scanDotRenderers == null || scanDotRenderers.Length <= 0)
         {
-            scanDotRenderers = Object.FindObjectsByType<InstancedScanDotRenderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            scanDotRenderers = Object.FindObjectsByType<InstancedScanDotRenderer>(FindObjectsInactive.Exclude);
         }
 
         if (scanDotRenderers == null || scanDotRenderers.Length <= 0)

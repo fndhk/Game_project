@@ -1,4 +1,4 @@
-﻿namespace Photon.Voice.Unity.Editor
+namespace Photon.Voice.Unity.Editor
 {
     using ExitGames.Client.Photon;
     using System.Collections.Generic;
@@ -236,7 +236,7 @@
                 List<RemoteVoiceLink> cachedVoices = this.connection.CachedRemoteVoices;
 
                 #if UNITY_6000_0_OR_NEWER
-                Speaker[] speakers = FindObjectsByType<Speaker>(FindObjectsSortMode.InstanceID);
+                Speaker[] speakers = FindObjectsByType<Speaker>();
                 #else
                 Speaker[] speakers = FindObjectsOfType<Speaker>();
                 #endif

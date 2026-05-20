@@ -179,7 +179,7 @@ namespace Photon.Pun
                 }
                 
                 #if UNITY_6000_0_OR_NEWER
-                instanceField = GameObject.FindFirstObjectByType<PunSceneViews>();
+                instanceField = GameObject.FindAnyObjectByType<PunSceneViews>();
                 #else
                 instanceField = GameObject.FindObjectOfType<PunSceneViews>();
                 #endif

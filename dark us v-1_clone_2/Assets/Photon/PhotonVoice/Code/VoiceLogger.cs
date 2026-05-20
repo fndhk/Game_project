@@ -1,4 +1,4 @@
-﻿// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // <copyright file="VoiceLogger.cs" company="Exit Games GmbH">
 //   Photon Voice for Unity - Copyright (C) 2018 Exit Games GmbH
 // </copyright>
@@ -39,7 +39,7 @@ namespace Photon.Voice.Unity
             // look for VoiceLogger at the root
             VoiceLogger vlRoot = null;
             #if UNITY_6000_0_OR_NEWER
-            VoiceLogger[] vlArray = FindObjectsByType<VoiceLogger>(FindObjectsSortMode.InstanceID);
+            VoiceLogger[] vlArray = FindObjectsByType<VoiceLogger>();
             #else
             VoiceLogger[] vlArray = FindObjectsOfType<VoiceLogger>();
             #endif

@@ -156,7 +156,7 @@ public class RoleRevealIntro : MonoBehaviour
 
     private static T[] FindSceneObjects<T>() where T : UnityEngine.Object
     {
-        return UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        return UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include);
     }
 
     private void AddLockTargets<T>(T[] targets) where T : Behaviour

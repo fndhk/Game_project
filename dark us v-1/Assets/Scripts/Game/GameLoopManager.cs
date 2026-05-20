@@ -53,7 +53,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
             return Instance;
         }
 
-        GameLoopManager existing = Object.FindFirstObjectByType<GameLoopManager>();
+        GameLoopManager existing = Object.FindAnyObjectByType<GameLoopManager>();
         if (existing != null)
         {
             Instance = existing;
@@ -118,7 +118,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
     {
         computersById.Clear();
 
-        ObjectiveComputer[] computers = Object.FindObjectsByType<ObjectiveComputer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        ObjectiveComputer[] computers = Object.FindObjectsByType<ObjectiveComputer>(FindObjectsInactive.Include);
         for (int i = 0; i < computers.Length; i++)
         {
             if (computers[i] == null || computers[i].NetworkObjectiveId < 0)
@@ -307,7 +307,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
     private void ApplyDeathToActorObjects(int actorNumber)
     {
-        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include);
         for (int i = 0; i < targets.Length; i++)
         {
             if (targets[i] != null && targets[i].GetActorNumber() == actorNumber)
@@ -493,7 +493,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
             return;
         }
 
-        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include);
         for (int i = 0; i < targets.Length; i++)
         {
             if (targets[i] != null && !targets[i].isRemoteProxy)

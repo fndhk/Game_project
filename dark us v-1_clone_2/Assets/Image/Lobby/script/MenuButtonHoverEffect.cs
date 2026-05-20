@@ -97,7 +97,7 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
             return;
         }
 
-        Button[] buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Button[] buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include);
         for (int i = 0; i < buttons.Length; i++)
         {
             Button button = buttons[i];

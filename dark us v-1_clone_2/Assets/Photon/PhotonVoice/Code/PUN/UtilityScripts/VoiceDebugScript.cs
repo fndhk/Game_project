@@ -1,4 +1,4 @@
-﻿#if PUN_2_OR_NEWER
+#if PUN_2_OR_NEWER
 namespace Photon.Voice.PUN.UtilityScripts
 {
     using Pun;
@@ -188,7 +188,7 @@ namespace Photon.Voice.PUN.UtilityScripts
             if (this.IncreaseLogLevels)
             {
                 #if UNITY_6000_0_OR_NEWER
-                VoiceLogger[] vlArray = FindObjectsByType<VoiceLogger>(FindObjectsSortMode.InstanceID);
+                VoiceLogger[] vlArray = FindObjectsByType<VoiceLogger>();
                 #else
                 VoiceLogger[] vlArray = FindObjectsOfType<VoiceLogger>();
                 #endif
