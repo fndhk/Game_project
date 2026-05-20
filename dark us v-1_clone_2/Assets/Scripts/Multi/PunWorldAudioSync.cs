@@ -44,7 +44,12 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
 
     public static void RaiseScanPulse(Vector3 position, float volume)
     {
-        Raise(SoundKind.ScanPulse, position, volume, SendOptions.SendUnreliable);
+        RaiseScanPulse(position, volume, position, Vector3.forward, Vector3.up);
+    }
+
+    public static void RaiseScanPulse(Vector3 position, float volume, Vector3 scanOrigin, Vector3 scanForward, Vector3 scanUp)
+    {
+        RaiseScanPulseEvent(position, volume, scanOrigin, scanForward, scanUp);
     }
 
     public static void RaiseComputerStart(Vector3 position, float volume)
@@ -79,6 +84,40 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
             payload,
             new RaiseEventOptions { Receivers = ReceiverGroup.Others },
             sendOptions
+        );
+    }
+
+    private static void RaiseScanPulseEvent(Vector3 position, float volume, Vector3 scanOrigin, Vector3 scanForward, Vector3 scanUp)
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return;
+        }
+
+        EnsureExists();
+        object[] payload =
+        {
+            (byte)SoundKind.ScanPulse,
+            position.x,
+            position.y,
+            position.z,
+            Mathf.Clamp(volume, 0.01f, 2.5f),
+            scanOrigin.x,
+            scanOrigin.y,
+            scanOrigin.z,
+            scanForward.x,
+            scanForward.y,
+            scanForward.z,
+            scanUp.x,
+            scanUp.y,
+            scanUp.z
+        };
+
+        PhotonNetwork.RaiseEvent(
+            WorldAudioEventCode,
+            payload,
+            new RaiseEventOptions { Receivers = ReceiverGroup.Others },
+            SendOptions.SendUnreliable
         );
     }
 
@@ -124,14 +163,64 @@ public class PunWorldAudioSync : MonoBehaviour, IOnEventCallback
             return;
         }
 
-        AudioClip clip = ResolveClip(kind);
+        if (kind == SoundKind.ScanPulse)
+        {
+            RenderRemoteScanPulse(payload, position);
+        }
 
+        AudioClip clip = ResolveClip(kind);
         if (clip == null)
         {
             return;
         }
 
         PlaySpatialOneShot(clip, position, volume);
+    }
+
+    private void RenderRemoteScanPulse(object[] payload, Vector3 fallbackPosition)
+    {
+        if (!ShouldRenderRemoteScanPulse())
+        {
+            return;
+        }
+
+        Vector3 scanOrigin = fallbackPosition;
+        Vector3 scanForward = Vector3.forward;
+        Vector3 scanUp = Vector3.up;
+
+        if (payload != null && payload.Length >= 14)
+        {
+            scanOrigin = new Vector3(ToFloat(payload[5]), ToFloat(payload[6]), ToFloat(payload[7]));
+            scanForward = new Vector3(ToFloat(payload[8]), ToFloat(payload[9]), ToFloat(payload[10]));
+            scanUp = new Vector3(ToFloat(payload[11]), ToFloat(payload[12]), ToFloat(payload[13]));
+        }
+
+        RemoteScanPulseRenderer.RenderPulse(scanOrigin, scanForward, scanUp);
+    }
+
+    private bool ShouldRenderRemoteScanPulse()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+        {
+            return false;
+        }
+
+        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Exclude);
+        for (int i = 0; i < targets.Length; i++)
+        {
+            PlayerCombatTarget target = targets[i];
+            if (target == null || target.isRemoteProxy)
+            {
+                continue;
+            }
+
+            if (target.GetActorNumber() == PhotonNetwork.LocalPlayer.ActorNumber)
+            {
+                return target.isDead;
+            }
+        }
+
+        return false;
     }
 
     private AudioClip ResolveClip(SoundKind kind)

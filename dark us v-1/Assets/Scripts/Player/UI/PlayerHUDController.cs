@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -48,6 +49,7 @@ public class PlayerHUDController : MonoBehaviour
     private Image[] dotMeterBlocks;
     private TMP_Text dotCounterText;
     private TMP_Text objectiveRuntimeText;
+    private TMP_Text roundStatusText;
     private TMP_Text vitalLabelText;
     private TMP_Text staminaLabelText;
     private TMP_Text dotMemoryLabelText;
@@ -95,6 +97,9 @@ public class PlayerHUDController : MonoBehaviour
     private float micStatusVisibleUntil;
     private int lastKillTimeWindowIndex = -2;
     private float killTimeMessageVisibleUntil;
+    private float nextRoundStatusRefreshTime;
+    private string cachedRoundStatusText = "";
+    private readonly HashSet<int> countedCitizenActors = new HashSet<int>();
 
     private void Awake()
     {
@@ -121,6 +126,7 @@ public class PlayerHUDController : MonoBehaviour
         UpdateScanCooldown();
         UpdateDotMemory();
         UpdateObjectiveText();
+        UpdateRoundStatus();
         UpdateLocalizedStaticText();
         UpdateHudOpacity();
         UpdateRoundTimer();
@@ -150,7 +156,11 @@ public class PlayerHUDController : MonoBehaviour
             return false;
         }
 
-        bool hideHud = Application.isPlaying && (InGamePauseMenu.IsOpen || RoleRevealIntro.IsShowing);
+        bool hideHud = Application.isPlaying && (
+            InGamePauseMenu.IsOpen ||
+            RoleRevealIntro.IsShowing ||
+            DarkScanLoadingScreen.IsShowing ||
+            VictoryScreen.IsShowing);
 
         if (hudRoot.gameObject.activeSelf == hideHud)
         {
@@ -302,6 +312,7 @@ public class PlayerHUDController : MonoBehaviour
         BuildCenterScanModule();
         BuildDotMemoryModule();
         BuildObjectiveModule();
+        BuildRoundStatusModule();
         BuildRoundTimerModule();
         BuildVoiceStatusModule();
     }
@@ -465,6 +476,12 @@ public class PlayerHUDController : MonoBehaviour
         objectiveRuntimeText.rectTransform.sizeDelta = new Vector2(520f, 38f);
     }
 
+    private void BuildRoundStatusModule()
+    {
+        roundStatusText = CreateLabel("", hudRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -88f), 14, new Color(0.72f, 0.86f, 0.88f, 0.82f), TextAlignmentOptions.Right);
+        roundStatusText.rectTransform.sizeDelta = new Vector2(520f, 28f);
+    }
+
     private void BuildRoundTimerModule()
     {
         roundTimerText = CreateLabel("20:00", hudRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), 24, new Color(0.96f, 0.96f, 0.92f, 0.98f), TextAlignmentOptions.Center);
@@ -515,6 +532,7 @@ public class PlayerHUDController : MonoBehaviour
         UpdateScanCooldown();
         UpdateDotMemory();
         UpdateObjectiveText();
+        UpdateRoundStatus();
         UpdateLocalizedStaticText();
         UpdateRoundTimer();
     }
@@ -639,8 +657,10 @@ public class PlayerHUDController : MonoBehaviour
         }
 
         hasDisplayedRole = false;
+        nextRoundStatusRefreshTime = 0f;
         UpdateScanCooldown();
         UpdateObjectiveText();
+        UpdateRoundStatus();
     }
 
     private void UpdateRoundTimer()
@@ -693,7 +713,7 @@ public class PlayerHUDController : MonoBehaviour
 
         bool isKiller = targetCombatTarget != null && targetCombatTarget.role == PlayerRole.Killer;
         killTimeWarningText.text = isKiller
-            ? T("Kill Time") + " / " + T("Press") + " " + GameInputBindings.GetLabel(GameInputBindings.KillKey, KeyCode.Q) + " " + T("to Kill")
+            ? T("Kill Time") + " / [" + GameInputBindings.GetLabel(GameInputBindings.KillKey, KeyCode.Q) + "] " + T("Kill")
             : T("Kill Time") + " / " + T("Hide From Imposter");
         killTimeWarningText.color = new Color(1f, 0.18f, 0.12f, 0.98f);
     }
@@ -726,10 +746,74 @@ public class PlayerHUDController : MonoBehaviour
             return;
         }
 
-        micStatusText.text = muted ? "MIC MUTED" : "MIC OPEN";
+        micStatusText.text = muted ? T("MIC MUTED") : T("MIC OPEN");
         micStatusText.color = muted ? new Color(1f, 0.32f, 0.24f, 0.96f) : new Color(0.48f, 1f, 0.68f, 0.96f);
         micStatusIcon.sprite = muted ? micMutedIconSprite : micOpenIconSprite;
         micStatusIcon.color = micStatusText.color;
+    }
+
+    private void UpdateRoundStatus()
+    {
+        if (roundStatusText == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying && Time.unscaledTime < nextRoundStatusRefreshTime)
+        {
+            roundStatusText.text = cachedRoundStatusText;
+            return;
+        }
+
+        nextRoundStatusRefreshTime = Time.unscaledTime + 0.4f;
+
+        PlayerRole role = targetCombatTarget != null
+            ? targetCombatTarget.role
+            : RoleAssignmentManager.GetLocalPhotonRole(PlayerRole.Citizen);
+
+        GetCitizenCounts(out int aliveCitizens, out int totalCitizens);
+
+        string roleName = InGameLocalization.RoleName(role);
+        cachedRoundStatusText = roleName + "  /  " + T("Alive Citizens") + " " + aliveCitizens + "/" + Mathf.Max(aliveCitizens, totalCitizens);
+        roundStatusText.text = cachedRoundStatusText;
+        roundStatusText.color = role == PlayerRole.Killer
+            ? new Color(1f, 0.36f, 0.28f, 0.90f)
+            : new Color(0.58f, 0.92f, 1f, 0.88f);
+    }
+
+    private void GetCitizenCounts(out int aliveCitizens, out int totalCitizens)
+    {
+        aliveCitizens = 0;
+        totalCitizens = 0;
+        countedCitizenActors.Clear();
+
+        PlayerCombatTarget[] targets = Object.FindObjectsByType<PlayerCombatTarget>(FindObjectsInactive.Include);
+        for (int i = 0; i < targets.Length; i++)
+        {
+            PlayerCombatTarget target = targets[i];
+            if (target == null || target.role != PlayerRole.Citizen)
+            {
+                continue;
+            }
+
+            int actor = target.GetActorNumber();
+            if (actor > 0 && !countedCitizenActors.Add(actor))
+            {
+                continue;
+            }
+
+            totalCitizens++;
+            if (!target.isDead && target.gameObject.activeInHierarchy)
+            {
+                aliveCitizens++;
+            }
+        }
+
+        if (totalCitizens == 0 && targetCombatTarget != null && targetCombatTarget.role == PlayerRole.Citizen)
+        {
+            totalCitizens = 1;
+            aliveCitizens = targetCombatTarget.isDead ? 0 : 1;
+        }
     }
 
     private void UpdateHudOpacity()

@@ -28,7 +28,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
     public bool autoReturnToRoomLobby = true;
     public bool showInGameResultOverlay = false;
     public string roomLobbySceneName = "CreateRoomLobbyScene";
-    public float returnToLobbyDelay = 1.5f;
+    public float returnToLobbyDelay = 8f;
 
     [Header("State")]
     [SerializeField] private bool gameOver;
@@ -407,6 +407,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
         Debug.Log("Game Over: " + (citizensWon ? "Citizens Win" : "Killer Wins") + " / " + gameOverReason);
         GameAudioManager.PlayGameOver(citizensWon);
+        VictoryScreen.Show(citizensWon, gameOverReason, returnToLobbyDelay);
         ScheduleReturnToLobby();
     }
 
@@ -436,7 +437,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
     {
         isReturningToLobby = false;
         ResetLocalReadyState();
-        DarkScanLoadingScreen.ShowImmediate(InGameLocalization.Text("Returning to Lobby"));
+        DarkScanLoadingScreen.ShowImmediate(InGameLocalization.Text("Returning to Lobby"), false);
 
         if (PhotonNetwork.InRoom)
         {

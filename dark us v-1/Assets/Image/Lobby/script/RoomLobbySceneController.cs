@@ -57,6 +57,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private int languageIndex;
     private int pendingColorSelection = -1;
     private bool isStartingGame;
+    private bool roomFlowStarted;
+    private bool roomOperationInFlight;
     private float uiStartedAt;
     private float nextVoicePanelRefreshTime;
 
@@ -257,17 +259,32 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     public override void OnConnectedToMaster()
     {
         SetNetworkStatus("PHOTON CONNECTED");
-        ExecutePendingRoomFlow();
+        if (roomFlowStarted)
+        {
+            ExecutePendingRoomFlow();
+        }
+    }
+
+    public override void OnJoinedLobby()
+    {
+        SetNetworkStatus("PHOTON READY");
+        if (roomFlowStarted)
+        {
+            ExecutePendingRoomFlow();
+        }
     }
 
     public override void OnCreatedRoom()
     {
+        roomOperationInFlight = false;
         EnsureMapSeedProperty();
         SetNetworkStatus("ROOM CREATED");
     }
 
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
+        roomOperationInFlight = false;
+
         if (!pendingCreateRoom || createRetryCount >= 10)
         {
             SetNetworkStatus("CREATE FAILED: " + message);
@@ -280,16 +297,18 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PlayerPrefs.Save();
         UpdateRoomTitleText();
         UpdateRoomCodeText();
-        CreatePhotonRoom();
+        ExecutePendingRoomFlow();
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
+        roomOperationInFlight = false;
         SetNetworkStatus("ROOM NOT FOUND: " + pendingRoomCode);
     }
 
     public override void OnJoinedRoom()
     {
+        roomOperationInFlight = false;
         pendingRoomCode = PhotonNetwork.CurrentRoom.Name;
         PlayerPrefs.SetString(RoomCodePrefsKey, pendingRoomCode);
         SaveJoinedRoomTitle();
@@ -335,12 +354,15 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnDisconnected(DisconnectCause cause)
     {
+        roomOperationInFlight = false;
         SetNetworkStatus("DISCONNECTED: " + cause);
     }
 
     private void StartPhotonRoomFlow()
     {
         PhotonNetwork.AutomaticallySyncScene = true;
+        roomFlowStarted = true;
+        roomOperationInFlight = false;
         pendingRoomCode = GetRoomCode();
         pendingCreateRoom = PlayerPrefs.GetInt(RoomHostPrefsKey, 1) == 1;
         createRetryCount = 0;
@@ -362,9 +384,15 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             return;
         }
 
-        if (PhotonNetwork.IsConnectedAndReady)
+        if (IsReadyForRoomOperation())
         {
             ExecutePendingRoomFlow();
+            return;
+        }
+
+        if (PhotonNetwork.IsConnected)
+        {
+            SetNetworkStatus("CONNECTING PHOTON");
             return;
         }
 
@@ -374,18 +402,58 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     private void ExecutePendingRoomFlow()
     {
+        if (PhotonNetwork.InRoom)
+        {
+            roomOperationInFlight = false;
+            pendingRoomCode = PhotonNetwork.CurrentRoom.Name;
+            pendingCreateRoom = PhotonNetwork.IsMasterClient;
+            SaveJoinedRoomTitle();
+            PlayerPrefs.SetString(RoomCodePrefsKey, pendingRoomCode);
+            PlayerPrefs.SetInt(RoomHostPrefsKey, PhotonNetwork.IsMasterClient ? 1 : 0);
+            PlayerPrefs.Save();
+            UpdateRoomCodeText();
+            SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
+            EnsureLocalColorSelection();
+            RefreshPlayerSlots();
+            return;
+        }
+
+        if (roomOperationInFlight)
+        {
+            return;
+        }
+
+        if (!IsReadyForRoomOperation())
+        {
+            SetNetworkStatus("CONNECTING PHOTON");
+
+            if (!PhotonNetwork.IsConnected)
+            {
+                PhotonNetwork.ConnectUsingSettings();
+            }
+
+            return;
+        }
+
         if (pendingCreateRoom)
         {
-            CreatePhotonRoom();
+            roomOperationInFlight = CreatePhotonRoom();
         }
         else
         {
             SetNetworkStatus("JOINING ROOM " + pendingRoomCode);
-            PhotonNetwork.JoinRoom(pendingRoomCode);
+            roomOperationInFlight = PhotonNetwork.JoinRoom(pendingRoomCode);
         }
     }
 
-    private void CreatePhotonRoom()
+    private bool IsReadyForRoomOperation()
+    {
+        ClientState state = PhotonNetwork.NetworkClientState;
+        return PhotonNetwork.IsConnectedAndReady &&
+               (state == ClientState.ConnectedToMasterServer || state == ClientState.JoinedLobby);
+    }
+
+    private bool CreatePhotonRoom()
     {
         bool isVisible = PlayerPrefs.GetInt(RoomVisiblePrefsKey, 0) == 1;
         string roomTitle = PlayerPrefs.GetString(RoomTitlePrefsKey, isVisible ? "Public Room" : "Private Room");
@@ -405,7 +473,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         };
 
         SetNetworkStatus("CREATING ROOM " + pendingRoomCode);
-        PhotonNetwork.CreateRoom(pendingRoomCode, options, TypedLobby.Default);
+        return PhotonNetwork.CreateRoom(pendingRoomCode, options, TypedLobby.Default);
     }
 
     private void RefreshPlayerSlots()

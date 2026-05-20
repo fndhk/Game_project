@@ -232,7 +232,15 @@ public class LidarSpotScanner : MonoBehaviour
 
         // 사운드를 재생한다.
         PlayPulseSound();
-        PunWorldAudioSync.RaiseScanPulse(transform.position, GetNetworkScanPulseVolume());
+
+        Transform scanTransform = scanCamera != null ? scanCamera.transform : transform;
+        PunWorldAudioSync.RaiseScanPulse(
+            transform.position,
+            GetNetworkScanPulseVolume(),
+            scanTransform.position,
+            scanTransform.forward,
+            scanTransform.up
+        );
     }
 
     // 스캔 사운드를 재생하는 함수이다.

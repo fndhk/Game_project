@@ -23,4 +23,13 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/SkillChoice.unity
     guid: 5c567af77aa5f5e409a150ce79b4ce98
+  - enabled: 1
+    path: Assets/Scenes/LoadingScreen.unity
+    guid: e8bc53e3e85eb1b43b5cd0798096b91c
+  - enabled: 1
+    path: Assets/Scenes/RoleRevealScreen.unity
+    guid: 82673126e62711d4ca0c3a3a2a1b35bb
+  - enabled: 1
+    path: Assets/Scenes/VictoryScreen.unity
+    guid: 968bac7b952c4e14c8fd6cd06c8b04c1
   m_configObjects: {}

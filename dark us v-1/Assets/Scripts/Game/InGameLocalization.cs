@@ -89,8 +89,13 @@ public static class InGameLocalization
             case "Round Complete": return "라운드 종료";
             case "Kill Time": return "킬타임";
             case "One Shot Available": return "즉사 1회 가능";
+            case "Press": return "누르기";
+            case "to Kill": return "처치";
             case "Press Q to Kill": return "[Q] 즉사";
             case "Hide From Imposter": return "임포스터를 피하십시오";
+            case "Alive Citizens": return "생존 시민";
+            case "MIC OPEN": return "마이크 켜짐";
+            case "MIC MUTED": return "마이크 음소거";
             case "Returning to Lobby": return "대기방으로 이동 중";
             case "PAUSED": return "일시정지";
             case "MENU": return "메뉴";
@@ -240,8 +245,13 @@ public static class InGameLocalization
             case "Round Complete": return "ラウンド終了";
             case "Kill Time": return "キルタイム";
             case "One Shot Available": return "即死1回可能";
+            case "Press": return "押す";
+            case "to Kill": return "キル";
             case "Press Q to Kill": return "[Q] 即死";
             case "Hide From Imposter": return "インポスターから逃げろ";
+            case "Alive Citizens": return "生存市民";
+            case "MIC OPEN": return "マイクオン";
+            case "MIC MUTED": return "マイクミュート";
             case "Returning to Lobby": return "待機ルームへ移動中";
             case "PAUSED": return "一時停止";
             case "MENU": return "メニュー";

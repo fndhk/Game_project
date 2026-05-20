@@ -9,16 +9,17 @@ using UnityEngine.UI;
 public class RoleRevealIntro : MonoBehaviour
 {
     private const float IntroDuration = 3.4f;
+    private const string RoleRevealSceneName = "RoleRevealScreen";
 
     private static bool hasShownForScene;
     private static RoleRevealIntro activeInstance;
+    private static bool sceneLoadRequested;
 
     private CanvasGroup canvasGroup;
     private TMP_Text roleText;
     private TMP_Text titleText;
     private TMP_Text hintText;
     private Image pulseRing;
-    private RectTransform scanLine;
     private AudioSource audioSource;
     private PlayerRole revealedRole = PlayerRole.Citizen;
     private readonly Dictionary<Behaviour, bool> lockedBehaviours = new Dictionary<Behaviour, bool>();
@@ -34,6 +35,13 @@ public class RoleRevealIntro : MonoBehaviour
 
         if (activeInstance != null || hasShownForScene)
         {
+            return;
+        }
+
+        if (!sceneLoadRequested && Application.CanStreamedLevelBeLoaded(RoleRevealSceneName))
+        {
+            sceneLoadRequested = true;
+            SceneManager.LoadSceneAsync(RoleRevealSceneName, LoadSceneMode.Additive);
             return;
         }
 
@@ -77,7 +85,14 @@ public class RoleRevealIntro : MonoBehaviour
     private void Awake()
     {
         activeInstance = this;
-        BuildUi();
+        sceneLoadRequested = false;
+        DontDestroyOnLoad(gameObject);
+
+        if (!TryBindExistingUi())
+        {
+            BuildUi();
+        }
+
         LockPlayerInput();
         StartCoroutine(RevealRoutine());
     }
@@ -133,7 +148,6 @@ public class RoleRevealIntro : MonoBehaviour
                 ? new Color(1f, 0.20f, 0.12f, Mathf.Lerp(0.06f, 0.22f, Mathf.PingPong(Time.unscaledTime * 1.1f, 1f)))
                 : new Color(0.45f, 0.95f, 1f, Mathf.Lerp(0.06f, 0.22f, Mathf.PingPong(Time.unscaledTime * 1.1f, 1f)));
             pulseRing.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.88f, 1.18f, Mathf.PingPong(Time.unscaledTime * 0.7f, 1f));
-            scanLine.anchoredPosition = new Vector2(Mathf.Lerp(-360f, 360f, Mathf.PingPong(Time.unscaledTime * 0.5f, 1f)), 0f);
 
             yield return null;
         }
@@ -255,11 +269,6 @@ public class RoleRevealIntro : MonoBehaviour
         pulseRing.rectTransform.sizeDelta = new Vector2(620f, 620f);
         pulseRing.rectTransform.anchoredPosition = Vector2.zero;
 
-        scanLine = CreateImage("Scan Line", root, new Color(0.65f, 0.95f, 1f, 0.18f)).rectTransform;
-        scanLine.anchorMin = new Vector2(0.5f, 0.5f);
-        scanLine.anchorMax = new Vector2(0.5f, 0.5f);
-        scanLine.sizeDelta = new Vector2(3f, 520f);
-
         titleText = CreateText("Title", root, InGameLocalization.Text("Role"), 26f, TextAlignmentOptions.Center);
         titleText.color = new Color(0.80f, 0.88f, 0.88f, 0.82f);
         titleText.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
@@ -284,6 +293,73 @@ public class RoleRevealIntro : MonoBehaviour
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
         audioSource.volume = 0.45f;
+    }
+
+    private bool TryBindExistingUi()
+    {
+        canvasGroup = GetComponent<CanvasGroup>();
+        roleText = FindText("Role");
+        titleText = FindText("Title");
+        hintText = FindText("Hint");
+        pulseRing = FindImage("Pulse Ring");
+        audioSource = GetComponent<AudioSource>();
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 0f;
+            audioSource.volume = 0.45f;
+        }
+
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+            canvasGroup.blocksRaycasts = true;
+            canvasGroup.interactable = true;
+        }
+
+        return canvasGroup != null &&
+               roleText != null &&
+               titleText != null &&
+               hintText != null &&
+               pulseRing != null;
+    }
+
+    private TMP_Text FindText(string objectName)
+    {
+        Transform target = FindDeepChild(transform, objectName);
+        return target != null ? target.GetComponent<TMP_Text>() : null;
+    }
+
+    private Image FindImage(string objectName)
+    {
+        Transform target = FindDeepChild(transform, objectName);
+        return target != null ? target.GetComponent<Image>() : null;
+    }
+
+    private static Transform FindDeepChild(Transform root, string objectName)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        if (root.name == objectName)
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindDeepChild(root.GetChild(i), objectName);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private void PlayRevealSound(bool isImposter)
