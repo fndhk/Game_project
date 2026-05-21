@@ -448,6 +448,11 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
         private IEnumerator Start()
         {
+            if (GenerateOnStart)
+            {
+                global::GameplayStartupGate.SetMapGenerationBlocked(true);
+            }
+
             yield return StartCoroutine(WaitForPhotonRoomSeed());
             ApplyPlayerCountBalance();
 

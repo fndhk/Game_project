@@ -121,6 +121,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
         GameplayStartupGate.SetLoadingScreenBlocked(false);
         sceneLoadRequested = false;
         pendingWaitForGameScene = false;
+        RoleRevealIntro.CancelPending();
 
         if (activeInstance == null)
         {
@@ -313,9 +314,23 @@ public class DarkScanLoadingScreen : MonoBehaviour
             yield break;
         }
 
-        while (!generator.IsGenerationComplete && LaboratoryGenerator.IsAnyGenerationRunning)
+        float waitForGenerationStartUntil = Time.unscaledTime + 10f;
+        while (!destroyRequested &&
+               !generator.IsGenerationComplete &&
+               !LaboratoryGenerator.IsAnyGenerationRunning &&
+               Time.unscaledTime < waitForGenerationStartUntil)
         {
             yield return null;
+        }
+
+        while (!destroyRequested && !generator.IsGenerationComplete && LaboratoryGenerator.IsAnyGenerationRunning)
+        {
+            yield return null;
+        }
+
+        if (destroyRequested)
+        {
+            yield break;
         }
 
         if (!finishing && generator.IsGenerationComplete)

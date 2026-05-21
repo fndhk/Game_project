@@ -13,7 +13,6 @@ public class RoleRevealIntro : MonoBehaviour
 
     private static bool hasShownForScene;
     private static RoleRevealIntro activeInstance;
-    private static bool sceneLoadRequested;
 
     private CanvasGroup canvasGroup;
     private TMP_Text roleText;
@@ -28,8 +27,9 @@ public class RoleRevealIntro : MonoBehaviour
 
     public static void ShowWhenReady()
     {
-        if (IsMenuScene(SceneManager.GetActiveScene().name))
+        if (!ShouldShowForActiveScene())
         {
+            CancelPending();
             return;
         }
 
@@ -40,16 +40,20 @@ public class RoleRevealIntro : MonoBehaviour
 
         GameplayStartupGate.SetRoleRevealBlocked(true);
 
-        if (!sceneLoadRequested && Application.CanStreamedLevelBeLoaded(RoleRevealSceneName))
+        GameObject root = new GameObject("Role Reveal Intro");
+        UnityEngine.Object.DontDestroyOnLoad(root);
+        activeInstance = root.AddComponent<RoleRevealIntro>();
+    }
+
+    public static void CancelPending()
+    {
+        if (activeInstance != null)
         {
-            sceneLoadRequested = true;
-            SceneManager.LoadSceneAsync(RoleRevealSceneName, LoadSceneMode.Additive);
-            return;
+            UnityEngine.Object.Destroy(activeInstance.gameObject);
         }
 
-        GameObject root = new GameObject("Role Reveal Intro");
-        DontDestroyOnLoad(root);
-        activeInstance = root.AddComponent<RoleRevealIntro>();
+        UnloadRoleRevealSceneIfLoaded();
+        GameplayStartupGate.SetRoleRevealBlocked(false);
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -61,24 +65,16 @@ public class RoleRevealIntro : MonoBehaviour
 
     private static void ResetForScene(Scene scene, LoadSceneMode mode)
     {
-        if (scene.name == RoleRevealSceneName && sceneLoadRequested && activeInstance == null)
-        {
-            GameObject root = new GameObject("Role Reveal Intro");
-            UnityEngine.Object.DontDestroyOnLoad(root);
-            activeInstance = root.AddComponent<RoleRevealIntro>();
-            return;
-        }
-
         if (IsMenuScene(scene.name))
         {
             hasShownForScene = false;
+            CancelPending();
+            return;
+        }
 
-            if (activeInstance != null)
-            {
-                UnityEngine.Object.Destroy(activeInstance.gameObject);
-            }
-
-            GameplayStartupGate.SetRoleRevealBlocked(false);
+        if (scene.name == RoleRevealSceneName)
+        {
+            UnloadRoleRevealSceneIfLoaded();
             return;
         }
 
@@ -93,10 +89,24 @@ public class RoleRevealIntro : MonoBehaviour
                sceneName == "PublicRoomListScene";
     }
 
+    private static bool ShouldShowForActiveScene()
+    {
+        string sceneName = SceneManager.GetActiveScene().name;
+        return sceneName == "labor" || sceneName == "GameScene";
+    }
+
+    private static void UnloadRoleRevealSceneIfLoaded()
+    {
+        Scene roleScene = SceneManager.GetSceneByName(RoleRevealSceneName);
+        if (roleScene.IsValid() && roleScene.isLoaded)
+        {
+            SceneManager.UnloadSceneAsync(roleScene);
+        }
+    }
+
     private void Awake()
     {
         activeInstance = this;
-        sceneLoadRequested = false;
         DontDestroyOnLoad(gameObject);
         GameplayStartupGate.SetRoleRevealBlocked(true);
 

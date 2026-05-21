@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class VictoryScreen : MonoBehaviour
 {
     private const string VictorySceneName = "VictoryScreen";
+    private const int VictorySortingOrder = 66000;
 
     private static VictoryScreen activeInstance;
     private static bool sceneLoadRequested;
@@ -19,6 +20,7 @@ public class VictoryScreen : MonoBehaviour
     private TMP_Text reasonText;
     private TMP_Text timerText;
     private TMP_Text subtitleText;
+    private Image blackout;
     private Image accentBar;
     private Image pulseRing;
     private bool citizensWon;
@@ -30,6 +32,11 @@ public class VictoryScreen : MonoBehaviour
 
     public static void Show(bool didCitizensWin, string gameOverReason, float secondsUntilReturn)
     {
+        DarkScanLoadingScreen.ForceHideImmediate();
+        RoleRevealIntro.CancelPending();
+        GameplayStartupGate.ResetAll();
+        GameplayStartupGate.SetVictoryScreenBlocked(true);
+
         pendingCitizensWon = didCitizensWin;
         pendingReason = string.IsNullOrWhiteSpace(gameOverReason) ? "Round Complete" : gameOverReason;
         pendingReturnDelay = Mathf.Max(0.1f, secondsUntilReturn);
@@ -61,6 +68,7 @@ public class VictoryScreen : MonoBehaviour
             BuildUi();
         }
 
+        PrepareExclusiveLayer();
         Configure(pendingCitizensWon, pendingReason, pendingReturnDelay);
     }
 
@@ -70,6 +78,8 @@ public class VictoryScreen : MonoBehaviour
         {
             activeInstance = null;
         }
+
+        GameplayStartupGate.SetVictoryScreenBlocked(false);
     }
 
     private void Configure(bool didCitizensWin, string gameOverReason, float secondsUntilReturn)
@@ -119,6 +129,8 @@ public class VictoryScreen : MonoBehaviour
 
     private void Update()
     {
+        PrepareExclusiveLayer();
+
         float elapsed = Time.unscaledTime - shownAt;
         float reveal = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / 0.6f));
 
@@ -151,6 +163,7 @@ public class VictoryScreen : MonoBehaviour
         reasonText = FindText("Reason");
         timerText = FindText("Return Timer");
         subtitleText = FindText("Subtitle");
+        blackout = FindImage("Blackout");
         accentBar = FindImage("Accent Bar");
         pulseRing = FindImage("Pulse Ring");
 
@@ -159,6 +172,7 @@ public class VictoryScreen : MonoBehaviour
                reasonText != null &&
                timerText != null &&
                subtitleText != null &&
+               blackout != null &&
                accentBar != null &&
                pulseRing != null;
     }
@@ -167,7 +181,8 @@ public class VictoryScreen : MonoBehaviour
     {
         Canvas canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 32200;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = VictorySortingOrder;
 
         CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -183,7 +198,7 @@ public class VictoryScreen : MonoBehaviour
         RectTransform root = canvas.GetComponent<RectTransform>();
         Stretch(root);
 
-        Image blackout = CreateImage("Blackout", root, new Color(0f, 0f, 0f, 0.88f));
+        blackout = CreateImage("Blackout", root, Color.black);
         Stretch(blackout.rectTransform);
 
         pulseRing = CreateImage("Pulse Ring", root, new Color(0.54f, 0.95f, 1f, 0.16f));
@@ -224,6 +239,29 @@ public class VictoryScreen : MonoBehaviour
         timerText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
         timerText.rectTransform.sizeDelta = new Vector2(620f, 36f);
         timerText.rectTransform.anchoredPosition = new Vector2(0f, 82f);
+    }
+
+    private void PrepareExclusiveLayer()
+    {
+        Canvas canvas = GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = VictorySortingOrder;
+        }
+
+        if (canvasGroup != null)
+        {
+            canvasGroup.blocksRaycasts = true;
+            canvasGroup.interactable = true;
+        }
+
+        if (blackout != null)
+        {
+            blackout.color = Color.black;
+        }
+
+        GameplayStartupGate.SetVictoryScreenBlocked(true);
     }
 
     private TMP_Text FindText(string objectName)

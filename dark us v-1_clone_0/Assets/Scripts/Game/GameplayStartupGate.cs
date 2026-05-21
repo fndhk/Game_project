@@ -7,13 +7,15 @@ public static class GameplayStartupGate
     private static bool mapGenerationBlocked;
     private static bool roleRevealBlocked;
     private static bool hostDepartureBlocked;
+    private static bool victoryScreenBlocked;
     private static bool sceneHooked;
 
     public static bool IsBlocked =>
         loadingScreenBlocked ||
         mapGenerationBlocked ||
         roleRevealBlocked ||
-        hostDepartureBlocked;
+        hostDepartureBlocked ||
+        victoryScreenBlocked;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
@@ -42,12 +44,18 @@ public static class GameplayStartupGate
         hostDepartureBlocked = blocked;
     }
 
+    public static void SetVictoryScreenBlocked(bool blocked)
+    {
+        victoryScreenBlocked = blocked;
+    }
+
     public static void ResetAll()
     {
         loadingScreenBlocked = false;
         mapGenerationBlocked = false;
         roleRevealBlocked = false;
         hostDepartureBlocked = false;
+        victoryScreenBlocked = false;
     }
 
     public static bool IsMenuScene(string sceneName)

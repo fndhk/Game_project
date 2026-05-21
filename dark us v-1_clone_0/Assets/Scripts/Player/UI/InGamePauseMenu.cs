@@ -361,6 +361,7 @@ public class InGamePauseMenu : MonoBehaviour
     private void ReturnToLobby()
     {
         SetOpen(false);
+        CancelStartupOverlays();
         MenuCursorState.UnlockCursor();
 
         if (PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient)
@@ -380,10 +381,12 @@ public class InGamePauseMenu : MonoBehaviour
     private void QuitToMainMenu()
     {
         SetOpen(false);
+        CancelStartupOverlays();
         MenuCursorState.UnlockCursor();
 
         if (PhotonNetwork.InRoom)
         {
+            PhotonNetwork.AutomaticallySyncScene = false;
             PhotonNetwork.LeaveRoom();
         }
 
@@ -393,6 +396,13 @@ public class InGamePauseMenu : MonoBehaviour
         }
 
         SceneManager.LoadScene(GetMainMenuSceneName());
+    }
+
+    private static void CancelStartupOverlays()
+    {
+        DarkScanLoadingScreen.ForceHideImmediate();
+        RoleRevealIntro.CancelPending();
+        GameplayStartupGate.ResetAll();
     }
 
     private void QuitGame()
