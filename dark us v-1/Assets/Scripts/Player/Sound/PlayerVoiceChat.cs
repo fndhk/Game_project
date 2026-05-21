@@ -9,6 +9,32 @@ using UnityEngine;
 
 public class DarkUsPunVoiceClient : PunVoiceClient
 {
+    public bool ForceJoinCurrentPunRoom()
+    {
+        if (!PhotonNetwork.InRoom || PhotonNetwork.OfflineMode || PhotonNetwork.CurrentRoom == null)
+        {
+            return false;
+        }
+
+        if (Client != null && Client.InRoom)
+        {
+            return true;
+        }
+
+        switch (ClientState)
+        {
+            case ClientState.PeerCreated:
+            case ClientState.Disconnected:
+                return ConnectAndJoinRoom();
+
+            case ClientState.ConnectedToMasterServer:
+                return JoinVoiceRoom($"{PhotonNetwork.CurrentRoom.Name}{VoiceRoomNameSuffix}");
+
+            default:
+                return false;
+        }
+    }
+
     protected override Speaker InstantiateSpeakerForRemoteVoice(int playerId, byte voiceId, object userData)
     {
         return InstantiateSpeakerPrefab(gameObject, true);
@@ -58,6 +84,7 @@ public class PlayerVoiceChat : MonoBehaviour
     private bool recorderAddedToVoiceClient;
     private bool recorderConfigured;
     private bool muteKeyWasDown;
+    private float nextVoiceJoinAttemptTime;
     private float nextSpeakerAudioRefreshTime;
 
     private void Awake()
@@ -115,6 +142,7 @@ public class PlayerVoiceChat : MonoBehaviour
             voiceClient = GetOrCreateVoiceClient();
         }
 
+        ConfigureVoiceClient(voiceClient);
         RegisterSpeakerEvents(voiceClient);
         EnsureSpeakerPrefab(voiceClient);
         EnsureRecorder();
@@ -128,6 +156,8 @@ public class PlayerVoiceChat : MonoBehaviour
                 recorderAddedToVoiceClient = voiceClient.AddRecorder(recorder);
             }
         }
+
+        EnsureVoiceRoomJoined();
     }
 
     private void EnsureRecorder()
@@ -157,15 +187,7 @@ public class PlayerVoiceChat : MonoBehaviour
             recorderConfigured = true;
         }
 
-        if (PhotonNetwork.LocalPlayer != null)
-        {
-            int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
-            if (lastRecorderActorNumber != actorNumber)
-            {
-                recorder.UserData = actorNumber;
-                lastRecorderActorNumber = actorNumber;
-            }
-        }
+        RefreshRecorderActorData();
 
         if (audioDsp == null)
         {
@@ -186,9 +208,65 @@ public class PlayerVoiceChat : MonoBehaviour
             return;
         }
 
+        RefreshRecorderActorData();
+        EnsureVoiceRoomJoined();
         bool canTransmit = PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer != null && voiceEnabled && !localVoiceMuted;
         recorder.TransmitEnabled = canTransmit;
         recorder.RecordingEnabled = canTransmit;
+    }
+
+    private void RefreshRecorderActorData()
+    {
+        if (recorder == null || PhotonNetwork.LocalPlayer == null)
+        {
+            return;
+        }
+
+        int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+        if (lastRecorderActorNumber == actorNumber)
+        {
+            return;
+        }
+
+        recorder.UserData = actorNumber;
+        lastRecorderActorNumber = actorNumber;
+    }
+
+    private void EnsureVoiceRoomJoined()
+    {
+        if (voiceClient == null ||
+            voiceClient.Client == null ||
+            !PhotonNetwork.InRoom ||
+            PhotonNetwork.OfflineMode ||
+            PhotonNetwork.LocalPlayer == null)
+        {
+            return;
+        }
+
+        if (voiceClient.Client.InRoom || Time.unscaledTime < nextVoiceJoinAttemptTime)
+        {
+            return;
+        }
+
+        ClientState voiceState = voiceClient.ClientState;
+        if (voiceState != ClientState.PeerCreated &&
+            voiceState != ClientState.Disconnected &&
+            voiceState != ClientState.ConnectedToMasterServer)
+        {
+            return;
+        }
+
+        nextVoiceJoinAttemptTime = Time.unscaledTime + 1f;
+        if (voiceClient is DarkUsPunVoiceClient darkUsVoiceClient)
+        {
+            darkUsVoiceClient.ForceJoinCurrentPunRoom();
+            return;
+        }
+
+        if (voiceState == ClientState.PeerCreated || voiceState == ClientState.Disconnected)
+        {
+            voiceClient.ConnectAndJoinRoom();
+        }
     }
 
     private void HandleMuteToggle()
@@ -250,8 +328,14 @@ public class PlayerVoiceChat : MonoBehaviour
 
     private static PunVoiceClient GetOrCreateVoiceClient()
     {
+        DarkUsPunVoiceClient existingDarkUsClient = Object.FindAnyObjectByType<DarkUsPunVoiceClient>();
+        if (existingDarkUsClient != null)
+        {
+            return existingDarkUsClient;
+        }
+
         PunVoiceClient existingClient = Object.FindAnyObjectByType<PunVoiceClient>();
-        if (existingClient != null)
+        if (existingClient != null && existingClient.GetType() == typeof(DarkUsPunVoiceClient))
         {
             return existingClient;
         }
@@ -259,6 +343,24 @@ public class PlayerVoiceChat : MonoBehaviour
         GameObject clientObject = new GameObject("DarkUsPunVoiceClient");
         Object.DontDestroyOnLoad(clientObject);
         return clientObject.AddComponent<DarkUsPunVoiceClient>();
+    }
+
+    private static void ConfigureVoiceClient(PunVoiceClient client)
+    {
+        if (client == null)
+        {
+            return;
+        }
+
+        if (!client.gameObject.activeSelf)
+        {
+            client.gameObject.SetActive(true);
+        }
+
+        client.enabled = true;
+        client.AutoConnectAndJoin = true;
+        client.UsePunAppSettings = true;
+        client.UsePunAuthValues = true;
     }
 
     private static void EnsureSpeakerPrefab(PunVoiceClient client)
@@ -349,7 +451,7 @@ public class PlayerVoiceChat : MonoBehaviour
                 speaker.transform.position = remoteTransform.position + Vector3.up * 1.65f;
             }
 
-            source.mute = ShouldMuteSpatialSpeaker(remoteTransform, source.maxDistance);
+            source.mute = remoteTransform != null && ShouldMuteSpatialSpeaker(remoteTransform, source.maxDistance);
         }
         else
         {

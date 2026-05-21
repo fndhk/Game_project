@@ -47,20 +47,26 @@ public class InGamePauseMenu : MonoBehaviour
     {
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
-        TryCreateForActiveScene();
+        SceneManager.activeSceneChanged -= HandleActiveSceneChanged;
+        SceneManager.activeSceneChanged += HandleActiveSceneChanged;
+        TryCreateForScene(SceneManager.GetActiveScene().name);
     }
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        TryCreateForActiveScene();
+        TryCreateForScene(scene.name);
     }
 
-    private static void TryCreateForActiveScene()
+    private static void HandleActiveSceneChanged(Scene previousScene, Scene nextScene)
     {
-        string sceneName = SceneManager.GetActiveScene().name;
+        TryCreateForScene(nextScene.name);
+    }
+
+    private static void TryCreateForScene(string sceneName)
+    {
         if (!ShouldShowInScene(sceneName))
         {
-            if (instance != null)
+            if (instance != null && !IsAnyPauseMenuSceneLoaded())
             {
                 Destroy(instance.gameObject);
                 instance = null;
@@ -84,6 +90,20 @@ public class InGamePauseMenu : MonoBehaviour
         return sceneName == PrivateRoomSceneName ||
                sceneName == PublicRoomSceneName ||
                sceneName == GameSceneName;
+    }
+
+    private static bool IsAnyPauseMenuSceneLoaded()
+    {
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            Scene scene = SceneManager.GetSceneAt(i);
+            if (scene.isLoaded && ShouldShowInScene(scene.name))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void Awake()
