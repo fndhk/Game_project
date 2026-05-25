@@ -4,12 +4,13 @@ public class SkillManager : MonoBehaviour
 {
     public static SkillManager Instance;
 
-    // 현재 유저가 선택한 스킬의 ID 또는 이름
-    public string SelectedSkill { get; private set; } = "None";
+    // 현재 선택된 시민팀/임포스터 스킬 데이터 (유저가 선택한 것)
+    public SkillData selectedCivilianSkill;
+    public SkillData selectedImposterSkill;
 
     void Awake()
     {
-        // 씬이 바뀌어도 이 오브젝트는 파괴되지 않고 유지됩니다.
+        // 씬 전환 시 파괴되지 않도록 설정 (DontDestroyOnLoad)
         if (Instance == null)
         {
             Instance = this;
@@ -21,10 +22,16 @@ public class SkillManager : MonoBehaviour
         }
     }
 
-    // 스킬을 저장하는 함수
-    public void SetSkill(string skillName)
+    // 각 스킬 버튼에 연결할 함수 (예: 버튼 클릭 시 호출)
+    public void SelectSkill(SkillData skillData, bool isCivilian)
     {
-        SelectedSkill = skillName;
-        Debug.Log($"[SkillManager] 현재 적용된 스킬: {SelectedSkill}");
+        if (isCivilian)
+        {
+            selectedCivilianSkill = skillData;
+        }
+        else
+        {
+            selectedImposterSkill = skillData;
+        }
     }
 }
