@@ -232,6 +232,84 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialSceneController
   mainMenuSceneName: LobbyScene
+  tutorialComputerHoldDuration: 6
+  tutorialSabotageDuration: 5
+  tutorialSabotagedRepairDuration: 4
+  blendInSeconds: 2
+  alibiSeconds: 2
+  commonRoomPrefab: {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
+  citizenRoomPrefab: {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
+  doppelgangerRoomPrefab: {fileID: 8044564116768356952, guid: 08a101170a80091489cedf4e31d15cc9, type: 3}
+  corridorPrefab: {fileID: 5265196270627548212, guid: 7fdf0ce100d570d4e808e71aaeb5d42b, type: 3}
+  doorPrefab: {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
+  computerPrefab: {fileID: 5066011981024590580, guid: 6ffbbf1ffc6d5ad41a9227807d96d3db, type: 3}
+  tablePrefab: {fileID: 6095102028218993867, guid: bb4a95e3e43e5b04f9043fbda4f69d17, type: 3}
+  cameraPickupPrefab: {fileID: 8821532076256912300, guid: c5b18f3e02837c04892e540e29e8719b, type: 3}
+  dotSourcePrefab: {fileID: 1403309224220635405, guid: 6165c3467485d0c4bb79a37f5bd1ee63, type: 3}
+  scanPulseClip: {fileID: 8300000, guid: 869e50b440605d342a75f030e78f5ce7, type: 3}
+  computerStartClip: {fileID: 8300000, guid: 983b209b3cc794b4baadc529c74dd1f3, type: 3}
+  computerProgressClip: {fileID: 8300000, guid: 18677d40f04a72d4790de50f216bce76, type: 3}
+  computerSuccessClip: {fileID: 8300000, guid: 2cbcdfecd4fb99e4886169e5d0cd02d0, type: 3}
+  computerFakeClip: {fileID: 8300000, guid: 85681cb2ce5fed142b89b66802060db1, type: 3}
+  ambientLoopClip: {fileID: 8300000, guid: c2c392d4ec07d40528432c3bda4bc466, type: 3}
+  footstepClips:
+  - {fileID: 8300000, guid: 9340a3e24326d144d8a6cbafe1529aed, type: 3}
+  - {fileID: 8300000, guid: 763787a09d676964f93f05c545c637d3, type: 3}
+  - {fileID: 8300000, guid: 2f5dd3849f256724f9efb90b343e3940, type: 3}
+  - {fileID: 8300000, guid: 348fe03f153b3d2428817e5ec0703391, type: 3}
+  - {fileID: 8300000, guid: 961ae28ca035f4143b73fb8608dea339, type: 3}
+  - {fileID: 8300000, guid: 1bb73eea71a6be74ebda378e85fd4132, type: 3}
+  - {fileID: 8300000, guid: f190194915926564c880bfb82fccbf45, type: 3}
+  - {fileID: 8300000, guid: 62b983c0d1d7d0947aff8f18ae713c67, type: 3}
+  - {fileID: 8300000, guid: a2bc95225e4eb29499e2b99ce1167546, type: 3}
+  tutorialRoomCount: 6
+  tutorialMapSize: {x: 58, y: 58}
+  generatorCellPrefabs:
+  - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
+  - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
+  - {fileID: 8044564116768356952, guid: 08a101170a80091489cedf4e31d15cc9, type: 3}
+  - {fileID: 2544819581998452821, guid: 8b5577afc25c572459c4213c0a12d0f4, type: 3}
+  - {fileID: -6443463401650359278, guid: 7ac87c0e57bbb1f45b9485062790f352, type: 3}
+  - {fileID: -6784982675034364850, guid: 4b29d7c4164535146bcce9da5f272cfe, type: 3}
+  - {fileID: 2019504973805890188, guid: ab98d60067966a843bb2ae51e69da9d0, type: 3}
+  - {fileID: -8494008749103874762, guid: 69f27df9dae5bd242953871dd31f99e3, type: 3}
+  - {fileID: 7392582032655661870, guid: e25d900929cc02e4fb99c38afb67631d, type: 3}
+  - {fileID: 5428626794942048183, guid: 745ddb39886dccd49b96446346e39cae, type: 3}
+  - {fileID: 5265196270627548212, guid: 7fdf0ce100d570d4e808e71aaeb5d42b, type: 3}
+  - {fileID: 2004381066968732985, guid: 6d3a6a3de37804d42b682ce33cf9f5f9, type: 3}
+  - {fileID: 4306283604690561917, guid: 81484d12f3c12f840aae73e77b07944e, type: 3}
+  - {fileID: 346204988107806966, guid: 0515e8a4d07f2b041a2639efa8833605, type: 3}
+  - {fileID: 3687077963086360783, guid: ab2dd0706daeff54d87d645bbbf25bbf, type: 3}
+  - {fileID: 4892643769144039951, guid: f497c844ac9af9d49b14f07299b092fe, type: 3}
+  - {fileID: 1777275399059887341, guid: e4c345c465a9a1f4f932cf25a81d70fd, type: 3}
+  - {fileID: 5208687295194357408, guid: 0d4593f281a0ce34aaed0fc28b8e6cd9, type: 3}
+  - {fileID: 2004901786751058266, guid: 1011cbc0885fcee419031942e3c57c65, type: 3}
+  - {fileID: 471047999014910823, guid: 93ca53315dd82534fa0d7baa526b2c61, type: 3}
+  - {fileID: 500740190327199818, guid: 736565e83d2124d4899a2b5e51798507, type: 3}
+  - {fileID: 7218385072039734495, guid: 81a0bbacb3e98c044800fef7e60a62a5, type: 3}
+  - {fileID: 3745941486471605408, guid: 47c9e70439757384ebad1758ec8c3148, type: 3}
+  - {fileID: 5609003998976228916, guid: 18cbb28446f3b6649bd4f9c45e29d6a5, type: 3}
+  generatorStartRoomPrefabs:
+  - {fileID: 7017778445130184685, guid: a8b9c6f9a89711d4da799da51e7037ce, type: 3}
+  - {fileID: 1670828366126291275, guid: 6e74f84588c14e44db92ce4a58c37469, type: 3}
+  - {fileID: 8044564116768356952, guid: 08a101170a80091489cedf4e31d15cc9, type: 3}
+  - {fileID: 2544819581998452821, guid: 8b5577afc25c572459c4213c0a12d0f4, type: 3}
+  - {fileID: -6443463401650359278, guid: 7ac87c0e57bbb1f45b9485062790f352, type: 3}
+  - {fileID: -6784982675034364850, guid: 4b29d7c4164535146bcce9da5f272cfe, type: 3}
+  - {fileID: 2019504973805890188, guid: ab98d60067966a843bb2ae51e69da9d0, type: 3}
+  - {fileID: -8494008749103874762, guid: 69f27df9dae5bd242953871dd31f99e3, type: 3}
+  - {fileID: 7392582032655661870, guid: e25d900929cc02e4fb99c38afb67631d, type: 3}
+  generatorDoorPrefabs:
+  - {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
+  - {fileID: 330546594361903402, guid: e6d3177af4ac0904d89411af05b500ae, type: 3}
+  - {fileID: 3448587255341618831, guid: 5ec566e85fa59834cb93903674af2a8b, type: 3}
+  generatorConnectedDoorPrefab: {fileID: 2130471771715180275, guid: 64a38a0084fa3bc44a4aedc5643d1ee6, type: 3}
+  generatorBlockDoorPrefab: {fileID: 2130471771715180275, guid: 73278eca9bd804840a07ee5926b9acf0, type: 3}
+  generatorExitDoorPrefab: {fileID: 2130471771715180275, guid: 64a38a0084fa3bc44a4aedc5643d1ee6, type: 3}
+  generatorItemPrefabs:
+  - {fileID: 7565169816916176742, guid: 0ed28fa42bd7a3b48bd3d4cb6829eb75, type: 3}
+  - {fileID: 3480559283670373739, guid: 884c53604683e3c4381a2db56d93eb2c, type: 3}
+  - {fileID: 8821532076256912300, guid: c5b18f3e02837c04892e540e29e8719b, type: 3}
 --- !u!4 &1727963692
 Transform:
   m_ObjectHideFlags: 0

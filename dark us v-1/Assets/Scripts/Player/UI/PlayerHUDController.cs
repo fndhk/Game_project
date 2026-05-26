@@ -659,7 +659,18 @@ public class PlayerHUDController : MonoBehaviour
             ? targetCombatTarget.role
             : RoleAssignmentManager.GetLocalPhotonRole(PlayerRole.Citizen);
 
-        if (role == PlayerRole.Killer)
+        if (LabObjectiveManager.Instance != null && LabObjectiveManager.Instance.HasHudOverride)
+        {
+            objectiveRuntimeText.text = LabObjectiveManager.Instance.GetHudObjectiveText();
+
+            if (objectiveDetailText != null)
+            {
+                objectiveDetailText.text = LabObjectiveManager.Instance.GetHudObjectiveDetailText();
+            }
+
+            SetObjectiveProgress(LabObjectiveManager.Instance.GetHudObjectiveProgress01(), cyanColor);
+        }
+        else if (role == PlayerRole.Killer)
         {
             GetCitizenCounts(out int aliveCitizens, out int totalCitizens);
             int safeTotal = Mathf.Max(1, totalCitizens);

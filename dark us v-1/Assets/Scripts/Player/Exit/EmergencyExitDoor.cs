@@ -33,6 +33,8 @@ public class EmergencyExitDoor : MonoBehaviour, IPlayerInteractable
     // 문 닫힌 위치이다.
     private Vector3 closedLocalPosition;
 
+    public bool IsOpen => opened;
+
     // 초기 상태를 준비한다.
     private void Awake()
     {
@@ -62,6 +64,30 @@ public class EmergencyExitDoor : MonoBehaviour, IPlayerInteractable
         if (openAutomaticallyWhenUnlocked)
         {
             OpenDoor();
+        }
+    }
+
+    public void ResetDoorState(bool lockedState)
+    {
+        StopAllCoroutines();
+
+        locked = lockedState;
+        opened = false;
+
+        if (doorRoot == null)
+        {
+            doorRoot = transform;
+        }
+
+        doorRoot.localPosition = closedLocalPosition;
+
+        Collider[] childColliders = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < childColliders.Length; i++)
+        {
+            if (childColliders[i] != null)
+            {
+                childColliders[i].enabled = true;
+            }
         }
     }
 

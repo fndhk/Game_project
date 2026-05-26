@@ -49,8 +49,16 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Header("Basic")]
         public bool GenerateOnStart = true;
 
+        [Tooltip("켜면 Start에서 자동 생성/상태 적용을 하지 않고 외부 스크립트가 StartGeneration을 직접 호출함")]
+        public bool ManualGenerationOnly = false;
+
         [Tooltip("PUN 방에서 시작하면 호스트가 저장한 seed로 모든 클라이언트가 같은 맵을 생성")]
         public bool UsePhotonRoomSeed = true;
+
+        [Tooltip("튜토리얼/테스트처럼 항상 같은 맵이 필요할 때 사용할 고정 seed")]
+        public bool UseFixedGenerationSeed = false;
+
+        public int FixedGenerationSeed = 240527;
 
         [Tooltip("메인 맵에 생성할 방/복도 개수. 시작방은 별도 생성")]
         [Range(3, 200)]
@@ -448,6 +456,11 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
         private IEnumerator Start()
         {
+            if (ManualGenerationOnly)
+            {
+                yield break;
+            }
+
             if (GenerateOnStart)
             {
                 global::GameplayStartupGate.SetMapGenerationBlocked(true);
@@ -2670,6 +2683,15 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         private void ApplyPhotonRoomSeed()
         {
             hasPhotonMapSeed = false;
+
+            if (UseFixedGenerationSeed)
+            {
+                Random.InitState(FixedGenerationSeed);
+                photonMapSeed = FixedGenerationSeed;
+                hasPhotonMapSeed = true;
+                Debug.Log("[LaboratoryGenerator] Fixed map seed applied: " + FixedGenerationSeed);
+                return;
+            }
 
             if (!UsePhotonRoomSeed || !PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null)
             {

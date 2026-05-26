@@ -55,6 +55,10 @@ public class LabObjectiveManager : MonoBehaviour
     // 현재 등록된 탈출구이다.
     private EmergencyExitDoor registeredExitDoor;
     private bool promptStylePrepared = false;
+    private bool hasHudOverride = false;
+    private string hudObjectiveOverride = "";
+    private string hudDetailOverride = "";
+    private float hudProgressOverride = 0f;
 
     public int RequiredCoreCount => Mathf.Max(1, requiredCoreCount);
     public int CarriedCoreCount => carriedCoreCount;
@@ -62,6 +66,7 @@ public class LabObjectiveManager : MonoBehaviour
     public int RequiredComputerCount => Mathf.Max(1, requiredComputerCount);
     public int RestoredComputerCount => restoredComputerCount;
     public bool ExitUnlocked => exitUnlocked;
+    public bool HasHudOverride => hasHudOverride;
 
     // 새로 생성된 맵 기준으로 Access Core 목표 진행도를 초기화한다.
     public void ResetObjectiveState(int requiredCount)
@@ -266,6 +271,11 @@ public class LabObjectiveManager : MonoBehaviour
     // HUD 목표 문구를 반환한다.
     public string GetHudObjectiveText()
     {
+        if (hasHudOverride)
+        {
+            return hudObjectiveOverride;
+        }
+
         if (objectiveFlow == LabObjectiveFlow.ComputerRestore)
         {
             return GetComputerHudObjectiveText();
@@ -277,6 +287,11 @@ public class LabObjectiveManager : MonoBehaviour
     // HUD 진행률 바에 사용할 목표 진행도이다.
     public float GetHudObjectiveProgress01()
     {
+        if (hasHudOverride)
+        {
+            return Mathf.Clamp01(hudProgressOverride);
+        }
+
         if (exitUnlocked)
         {
             return 1f;
@@ -293,6 +308,11 @@ public class LabObjectiveManager : MonoBehaviour
     // HUD 목표 아래에 표시할 상세 진행 문구이다.
     public string GetHudObjectiveDetailText()
     {
+        if (hasHudOverride)
+        {
+            return hudDetailOverride;
+        }
+
         if (exitUnlocked)
         {
             return T("Reach The Exit");
@@ -362,6 +382,24 @@ public class LabObjectiveManager : MonoBehaviour
         {
             objectiveText.text = GetHudObjectiveText();
         }
+    }
+
+    public void SetHudOverride(string objective, string detail, float progress01)
+    {
+        hasHudOverride = true;
+        hudObjectiveOverride = objective ?? "";
+        hudDetailOverride = detail ?? "";
+        hudProgressOverride = Mathf.Clamp01(progress01);
+        RefreshHud();
+    }
+
+    public void ClearHudOverride()
+    {
+        hasHudOverride = false;
+        hudObjectiveOverride = "";
+        hudDetailOverride = "";
+        hudProgressOverride = 0f;
+        RefreshHud();
     }
 
     // 상호작용 안내 문구를 갱신한다.

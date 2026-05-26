@@ -191,6 +191,31 @@ public class LidarSpotScanner : MonoBehaviour
         pointsPerPulse = Mathf.Max(1, basePointsPerPulse);
     }
 
+    public void ApplyInGameDefaults()
+    {
+        pulseCooldown = 1.5f;
+        pulseTravelDuration = 0.38f;
+        pointsPerPulse = 650;
+        basePointsPerPulse = pointsPerPulse;
+        maxSpawnAttemptsPerDot = 15;
+        maxDistance = 15f;
+        screenHalfWidth = 0.42f;
+        screenHalfHeight = 0.30f;
+        waveThickness = 10f;
+        surfaceOffset = 0.01f;
+        minDotDistanceFromCamera = 0f;
+        groundDotChance = 0.577f;
+        ceilingDotChance = 0.66f;
+        wallAndObjectDotChance = 1f;
+        horizontalSurfaceNormalThreshold = 0.509f;
+        maxSamplesPerFrame = 36;
+        int revealLayer = LayerMask.NameToLayer("RevealSurface");
+        scanMask = revealLayer >= 0 ? 1 << revealLayer : scanMask;
+        triggerInteraction = QueryTriggerInteraction.Collide;
+        preferMeshColliderHits = true;
+        meshColliderPreferenceDepth = 0.75f;
+    }
+
     // 스캐너를 사용할 수 있는지 확인하는 함수이다.
     private bool CanUseScanner()
     {
