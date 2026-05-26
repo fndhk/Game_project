@@ -136,6 +136,16 @@ public class LidarSpotScanner : MonoBehaviour
             scanCamera = Camera.main;
         }
 
+        if (instancedDotRenderer == null)
+        {
+            instancedDotRenderer = GetComponent<InstancedScanDotRenderer>();
+        }
+
+        if (scanPulseSource == null)
+        {
+            scanPulseSource = GetComponent<AudioSource>();
+        }
+
         // 오디오 설정을 정리한다.
         if (scanPulseSource != null)
         {
@@ -655,6 +665,9 @@ public class LidarSpotScanner : MonoBehaviour
 
             case ScanSurfaceType.RestoredEscapeComputer:
                 return ScanDotColorGroup.RestoredEscapeComputer;
+
+            case ScanSurfaceType.SabotagedComputer:
+                return ScanDotColorGroup.SabotagedComputer;
 
             case ScanSurfaceType.Item:
                 return ScanDotColorGroup.Item;

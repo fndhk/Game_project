@@ -209,6 +209,26 @@ public class LabObjectiveManager : MonoBehaviour
         }
     }
 
+    // 컴퓨터 복구/방해 상태가 외부에서 바뀐 뒤 HUD와 탈출 조건을 다시 계산한다.
+    public void RefreshComputerObjectiveState()
+    {
+        if (objectiveFlow != LabObjectiveFlow.ComputerRestore)
+        {
+            RefreshHud();
+            return;
+        }
+
+        RecountRestoredComputers();
+
+        if (!exitUnlocked && restoredComputerCount >= RequiredComputerCount)
+        {
+            UnlockExit();
+            return;
+        }
+
+        RefreshHud();
+    }
+
     // 탈출구를 등록한다.
     public void RegisterExitDoor(EmergencyExitDoor exitDoor)
     {

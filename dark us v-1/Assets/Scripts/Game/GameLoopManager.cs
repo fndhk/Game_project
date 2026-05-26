@@ -12,6 +12,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
     private const byte PlayerDiedEventCode = 71;
     private const byte PlayerEscapedEventCode = 72;
     private const byte GameOverEventCode = 73;
+    private const byte ComputerSabotagedEventCode = 74;
     private const string MapSeedPropertyKey = "mapSeed";
     private const string ReadyPropertyKey = "ready";
     private const string StartSignalPropertyKey = "gameStarting";
@@ -162,6 +163,33 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         PhotonNetwork.RaiseEvent(ComputerRestoredEventCode, payload, options, SendOptions.SendReliable);
     }
 
+    public void ReportComputerSabotaged(ObjectiveComputer computer)
+    {
+        if (computer == null || computer.NetworkObjectiveId < 0)
+        {
+            return;
+        }
+
+        RebuildComputerIndex();
+
+        object[] payload =
+        {
+            computer.NetworkObjectiveId
+        };
+
+        if (!PhotonNetwork.InRoom)
+        {
+            return;
+        }
+
+        RaiseEventOptions options = new RaiseEventOptions
+        {
+            Receivers = ReceiverGroup.Others
+        };
+
+        PhotonNetwork.RaiseEvent(ComputerSabotagedEventCode, payload, options, SendOptions.SendReliable);
+    }
+
     public void ReportPlayerDeath(int actorNumber)
     {
         if (actorNumber <= 0)
@@ -235,6 +263,10 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
             case GameOverEventCode:
                 ApplyGameOverEvent(photonEvent.CustomData as object[]);
                 break;
+
+            case ComputerSabotagedEventCode:
+                ApplyComputerSabotagedEvent(photonEvent.CustomData as object[]);
+                break;
         }
     }
 
@@ -260,6 +292,31 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         if (computer != null)
         {
             computer.ApplyRestoredFromNetwork();
+        }
+    }
+
+    private void ApplyComputerSabotagedEvent(object[] payload)
+    {
+        if (payload == null || payload.Length <= 0)
+        {
+            return;
+        }
+
+        int objectiveId = ToInt(payload[0], -1);
+        if (objectiveId < 0)
+        {
+            return;
+        }
+
+        if (!computersById.TryGetValue(objectiveId, out ObjectiveComputer computer) || computer == null)
+        {
+            RebuildComputerIndex();
+            computersById.TryGetValue(objectiveId, out computer);
+        }
+
+        if (computer != null)
+        {
+            computer.ApplySabotagedFromNetwork();
         }
     }
 

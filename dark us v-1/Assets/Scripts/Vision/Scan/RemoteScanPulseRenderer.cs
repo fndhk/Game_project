@@ -501,6 +501,9 @@ public class RemoteScanPulseRenderer : MonoBehaviour
             case ScanSurfaceType.RestoredEscapeComputer:
                 return ScanDotColorGroup.RestoredEscapeComputer;
 
+            case ScanSurfaceType.SabotagedComputer:
+                return ScanDotColorGroup.SabotagedComputer;
+
             case ScanSurfaceType.Item:
                 return ScanDotColorGroup.Item;
 

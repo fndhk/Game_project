@@ -24,7 +24,10 @@ public enum ScanSurfaceType
     RestoredEscapeComputer = 17,
 
     // 아이템 공통 타입이다.
-    Item = 18
+    Item = 18,
+
+    // 도플갱어가 다시 망가뜨린 목표 컴퓨터이다.
+    SabotagedComputer = 31
 }
 
 // 이 컴포넌트는 월드 오브젝트에 붙여서

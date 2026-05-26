@@ -85,6 +85,11 @@ public static class InGameLocalization
             case "Restoring Computer": return "컴퓨터 확인 중";
             case "Check Computer": return "컴퓨터 확인";
             case "Restore Computer": return "컴퓨터 확인";
+            case "Sabotage Computer": return "컴퓨터 망가뜨리기";
+            case "Sabotaging Computer": return "컴퓨터 망가뜨리는 중";
+            case "Computer Sabotaged": return "컴퓨터 고장남";
+            case "Repair Computer": return "컴퓨터 재수리";
+            case "Repairing Computer": return "컴퓨터 재수리 중";
             case "Exit Locked": return "탈출구 잠김";
             case "Escape Route Open": return "탈출 경로 열림";
             case "Open Exit": return "탈출구 열기";
@@ -260,6 +265,11 @@ public static class InGameLocalization
             case "Restoring Computer": return "コンピューター確認中";
             case "Check Computer": return "コンピューター確認";
             case "Restore Computer": return "コンピューター確認";
+            case "Sabotage Computer": return "コンピューター破壊";
+            case "Sabotaging Computer": return "コンピューター破壊中";
+            case "Computer Sabotaged": return "コンピューター故障中";
+            case "Repair Computer": return "コンピューター再修理";
+            case "Repairing Computer": return "コンピューター再修理中";
             case "Exit Locked": return "出口ロック中";
             case "Escape Route Open": return "脱出経路開放";
             case "Open Exit": return "出口を開く";

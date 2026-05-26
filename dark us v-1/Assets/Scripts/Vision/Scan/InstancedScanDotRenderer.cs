@@ -39,7 +39,10 @@ public enum ScanDotColorGroup
     PlayerColor8 = 27,
     PlayerColor9 = 28,
     PlayerColor10 = 29,
-    PlayerColor11 = 30
+    PlayerColor11 = 30,
+
+    // 도플갱어가 다시 망가뜨린 목표 컴퓨터용 점 색상 그룹이다.
+    SabotagedComputer = 31
 }
 
 // 점을 GameObject로 만들지 않고 GPU 인스턴싱으로 그리는 렌더러이다.
@@ -60,8 +63,21 @@ public class InstancedScanDotRenderer : MonoBehaviour
     [SerializeField] private bool alignToSurfaceNormal = false;
 
     [Header("Capacity")]
-    // 동시에 유지할 최대 점 개수이다.
-    [SerializeField] private int maxActiveDots = 50000;
+    // 실제 내부 버퍼가 허용하는 최대 점 개수이다. HUD 표기 한도보다 약간 크게 둔다.
+    [SerializeField] private int maxActiveDots = 85000;
+
+    [Header("Memory Cleanup")]
+    // HUD에 표시할 점 메모리 한도이자 자동 정리를 시작하는 기준이다.
+    [SerializeField] private int softActiveDotLimit = 80000;
+
+    // softActiveDotLimit를 넘으면 이 개수까지 오래된 점을 조금씩 지운다.
+    [SerializeField] private int cleanupStopDotCount = 78000;
+
+    // 자동 정리 중 한 프레임에 제거할 오래된 점 최대 개수이다.
+    [SerializeField] private int cleanupDotsPerFrame = 120;
+
+    // softActiveDotLimit보다 더 확보할 내부 여유 버퍼이다.
+    [SerializeField] private int hardLimitExtraBuffer = 5000;
 
     // 같은 위치 중복 생성을 막기 위한 셀 크기이다.
     [SerializeField] private float cellSize = 0.055f;
@@ -115,6 +131,9 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 진짜 탈출 컴퓨터 복구 완료용 점 색이다.
     [SerializeField] private Color restoredEscapeComputerDotColor = new Color(0.18f, 0.55f, 1f, 1f);
 
+    // 도플갱어가 다시 망가뜨린 목표 컴퓨터용 점 색이다.
+    [SerializeField] private Color sabotagedComputerDotColor = new Color(0.78f, 0.18f, 1f, 1f);
+
     // 아이템 공통용 점 색이다. 너무 튀지 않게 회색 계열로 둔다.
     [SerializeField] private Color itemDotColor = new Color(0.68f, 0.68f, 0.66f, 1f);
 
@@ -147,6 +166,15 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
         // 색상 그룹 렌더링 리스트 안에서의 위치이다.
         public int groupListIndex;
+
+        // 오래된 점 정리 큐에서 stale 항목을 걸러내기 위한 값이다.
+        public int activeOrderVersion;
+    }
+
+    private struct ActiveDotOrderEntry
+    {
+        public int dotIndex;
+        public int version;
     }
 
     // 전체 점 데이터 저장소이다.
@@ -156,7 +184,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private readonly Dictionary<Vector3Int, int> occupiedCellToDotIndex = new Dictionary<Vector3Int, int>();
 
     // 가장 오래된 점부터 재사용하기 위한 큐이다.
-    private readonly Queue<int> activeOrder = new Queue<int>();
+    private readonly Queue<ActiveDotOrderEntry> activeOrder = new Queue<ActiveDotOrderEntry>();
 
     // 제거된 점 슬롯을 다시 쓰기 위한 큐이다.
     private readonly Queue<int> inactiveReusableOrder = new Queue<int>();
@@ -164,9 +192,14 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 프레임 렌더링용 그룹별 행렬 리스트이다.
     private List<Matrix4x4>[] frameMatricesByGroup;
 
+    // frameMatricesByGroup과 같은 순서로 dot index를 저장해 제거 시 전체 검색을 없앤다.
+    private List<int>[] frameDotIndicesByGroup;
+
     // DrawMeshInstanced 1회 최대 개수는 1023개라서 배치 버퍼를 쓴다.
     private readonly Matrix4x4[] drawBatch = new Matrix4x4[1023];
     private int activeDotCount;
+    private int activeOrderVersionCounter;
+    private bool automaticCleanupActive;
     private bool loggedFirstDraw;
 
     // 색상 프로퍼티 이름 캐시이다.
@@ -175,13 +208,17 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private float baseDotScale;
 
     // 색상 그룹 개수이다.
-    // 플레이어 색상이 30번까지 있으므로 총 31개가 필요하다.
-    private const int ColorGroupCount = 31;
+    // 도플갱어 방해 컴퓨터 색상이 31번까지 있으므로 총 32개가 필요하다.
+    private const int ColorGroupCount = 32;
 
     private void Awake()
     {
         // 안전값으로 보정한다.
-        maxActiveDots = Mathf.Max(1, maxActiveDots);
+        softActiveDotLimit = Mathf.Max(1, softActiveDotLimit);
+        hardLimitExtraBuffer = Mathf.Max(0, hardLimitExtraBuffer);
+        maxActiveDots = Mathf.Max(softActiveDotLimit + hardLimitExtraBuffer, maxActiveDots);
+        cleanupStopDotCount = Mathf.Clamp(cleanupStopDotCount, 0, softActiveDotLimit);
+        cleanupDotsPerFrame = Mathf.Max(1, cleanupDotsPerFrame);
         cellSize = Mathf.Max(0.01f, cellSize);
         dotScale = Mathf.Max(0.001f, dotScale);
         baseDotScale = dotScale;
@@ -205,6 +242,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private void LateUpdate()
     {
         ApplySavedDotSettings();
+        UpdateAutomaticCleanup();
 
         // 렌더링 준비가 안 됐으면 종료한다.
         if (!IsReadyToRender())
@@ -225,6 +263,22 @@ public class InstancedScanDotRenderer : MonoBehaviour
     {
         // 런타임 머티리얼을 정리한다.
         DestroyRuntimeMaterials();
+    }
+
+    public void SetSourceDotPrefab(GameObject prefab)
+    {
+        sourceDotPrefab = prefab;
+
+        if (sourceDotPrefab == null)
+        {
+            return;
+        }
+
+        instanceMesh = null;
+        sourceMaterial = null;
+        DestroyRuntimeMaterials();
+        TryResolveSourceResources();
+        CreateRuntimeMaterials();
     }
 
     // 점을 추가하거나 오래된 점을 재사용하는 함수이다.
@@ -282,6 +336,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         record.cell = cell;
         record.colorGroupIndex = Mathf.Clamp((int)colorGroup, 0, ColorGroupCount - 1);
         record.matrix = matrix;
+        record.activeOrderVersion = ++activeOrderVersionCounter;
         dots[dotIndex] = record;
         AddDotToRenderGroup(dotIndex);
 
@@ -294,7 +349,11 @@ public class InstancedScanDotRenderer : MonoBehaviour
         occupiedCellToDotIndex[cell] = dotIndex;
 
         // 재사용 순서를 기록한다.
-        activeOrder.Enqueue(dotIndex);
+        activeOrder.Enqueue(new ActiveDotOrderEntry
+        {
+            dotIndex = dotIndex,
+            version = record.activeOrderVersion
+        });
     }
 
     private void RecolorExistingDot(int dotIndex, ScanDotColorGroup colorGroup)
@@ -505,6 +564,8 @@ public class InstancedScanDotRenderer : MonoBehaviour
         activeOrder.Clear();
         inactiveReusableOrder.Clear();
         activeDotCount = 0;
+        activeOrderVersionCounter = 0;
+        automaticCleanupActive = false;
 
         // 프레임 리스트도 비운다.
         if (frameMatricesByGroup != null)
@@ -514,6 +575,71 @@ public class InstancedScanDotRenderer : MonoBehaviour
                 frameMatricesByGroup[i].Clear();
             }
         }
+
+        if (frameDotIndicesByGroup != null)
+        {
+            for (int i = 0; i < frameDotIndicesByGroup.Length; i++)
+            {
+                frameDotIndicesByGroup[i].Clear();
+            }
+        }
+    }
+
+    private void UpdateAutomaticCleanup()
+    {
+        if (activeDotCount > softActiveDotLimit)
+        {
+            automaticCleanupActive = true;
+        }
+
+        if (!automaticCleanupActive)
+        {
+            return;
+        }
+
+        int targetCount = Mathf.Clamp(cleanupStopDotCount, 0, softActiveDotLimit);
+        int removeBudget = Mathf.Max(1, cleanupDotsPerFrame);
+        int removedCount = 0;
+
+        while (activeDotCount > targetCount && removedCount < removeBudget)
+        {
+            if (!TryRemoveOldestActiveDot())
+            {
+                automaticCleanupActive = false;
+                return;
+            }
+
+            removedCount++;
+        }
+
+        if (activeDotCount <= targetCount)
+        {
+            automaticCleanupActive = false;
+        }
+    }
+
+    private bool TryRemoveOldestActiveDot()
+    {
+        while (activeOrder.Count > 0)
+        {
+            ActiveDotOrderEntry oldest = activeOrder.Dequeue();
+
+            if (oldest.dotIndex < 0 || oldest.dotIndex >= dots.Count)
+            {
+                continue;
+            }
+
+            DotRecord record = dots[oldest.dotIndex];
+            if (!record.isActive || record.activeOrderVersion != oldest.version)
+            {
+                continue;
+            }
+
+            RemoveDotAtIndex(oldest.dotIndex);
+            return true;
+        }
+
+        return false;
     }
 
     // 현재 활성 점 개수이다.
@@ -524,6 +650,11 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
     // HUD에서 점 용량을 표시할 때 사용한다.
     public int GetMaxActiveDotCount()
+    {
+        return softActiveDotLimit;
+    }
+
+    public int GetHardActiveDotCount()
     {
         return maxActiveDots;
     }
@@ -552,6 +683,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         // 복구 결과 컴퓨터는 테스트 단계에서만 구분이 확실히 되게 둔다.
         wrongComputerDotColor = new Color(0.95f, 0.16f, 0.16f, 1f);
         restoredEscapeComputerDotColor = new Color(0.18f, 0.55f, 1f, 1f);
+        sabotagedComputerDotColor = new Color(0.78f, 0.18f, 1f, 1f);
 
         // 아이템은 게임 분위기를 해치지 않게 낮은 회색 계열로 둔다.
         itemDotColor = new Color(0.68f, 0.68f, 0.66f, 1f);
@@ -561,10 +693,44 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private void InitializeFrameLists()
     {
         frameMatricesByGroup = new List<Matrix4x4>[ColorGroupCount];
+        frameDotIndicesByGroup = new List<int>[ColorGroupCount];
 
         for (int i = 0; i < ColorGroupCount; i++)
         {
             frameMatricesByGroup[i] = new List<Matrix4x4>(1024);
+            frameDotIndicesByGroup[i] = new List<int>(1024);
+        }
+    }
+
+    private void RebuildRenderGroups()
+    {
+        if (frameMatricesByGroup == null ||
+            frameMatricesByGroup.Length != ColorGroupCount ||
+            frameDotIndicesByGroup == null ||
+            frameDotIndicesByGroup.Length != ColorGroupCount)
+        {
+            InitializeFrameLists();
+        }
+
+        for (int i = 0; i < ColorGroupCount; i++)
+        {
+            frameMatricesByGroup[i].Clear();
+            frameDotIndicesByGroup[i].Clear();
+        }
+
+        for (int i = 0; i < dots.Count; i++)
+        {
+            DotRecord record = dots[i];
+            if (!record.isActive)
+            {
+                continue;
+            }
+
+            int groupIndex = Mathf.Clamp(record.colorGroupIndex, 0, ColorGroupCount - 1);
+            record.groupListIndex = frameMatricesByGroup[groupIndex].Count;
+            frameMatricesByGroup[groupIndex].Add(record.matrix);
+            frameDotIndicesByGroup[groupIndex].Add(i);
+            dots[i] = record;
         }
     }
 
@@ -572,8 +738,23 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private bool IsReadyToRender()
     {
         // 메쉬/머티리얼이 없으면 한 번 더 초기화를 시도한다.
-        if (instanceMesh == null || runtimeMaterials == null || runtimeMaterials.Length != ColorGroupCount)
+        if (instanceMesh == null ||
+            runtimeMaterials == null ||
+            runtimeMaterials.Length != ColorGroupCount ||
+            frameMatricesByGroup == null ||
+            frameMatricesByGroup.Length != ColorGroupCount ||
+            frameDotIndicesByGroup == null ||
+            frameDotIndicesByGroup.Length != ColorGroupCount)
         {
+            if (frameMatricesByGroup == null ||
+                frameMatricesByGroup.Length != ColorGroupCount ||
+                frameDotIndicesByGroup == null ||
+                frameDotIndicesByGroup.Length != ColorGroupCount)
+            {
+                InitializeFrameLists();
+                RebuildRenderGroups();
+            }
+
             TryResolveSourceResources();
             CreateRuntimeMaterials();
         }
@@ -588,31 +769,100 @@ public class InstancedScanDotRenderer : MonoBehaviour
             return false;
         }
 
+        if (frameMatricesByGroup == null ||
+            frameMatricesByGroup.Length != ColorGroupCount ||
+            frameDotIndicesByGroup == null ||
+            frameDotIndicesByGroup.Length != ColorGroupCount)
+        {
+            return false;
+        }
+
         return true;
     }
 
     // 원본 프리팹에서 메쉬와 머티리얼을 가져오는 함수이다.
     private void TryResolveSourceResources()
     {
-        // 원본 프리팹이 없으면 종료한다.
-        if (sourceDotPrefab == null)
+        if (sourceDotPrefab != null)
+        {
+            // 메쉬 필터를 찾는다.
+            MeshFilter meshFilter = sourceDotPrefab.GetComponentInChildren<MeshFilter>(true);
+            if (meshFilter != null)
+            {
+                instanceMesh = meshFilter.sharedMesh;
+            }
+
+            // 렌더러를 찾는다.
+            Renderer sourceRenderer = sourceDotPrefab.GetComponentInChildren<Renderer>(true);
+            if (sourceRenderer != null)
+            {
+                sourceMaterial = sourceRenderer.sharedMaterial;
+            }
+        }
+
+        if (instanceMesh != null && sourceMaterial != null)
         {
             return;
         }
 
-        // 메쉬 필터를 찾는다.
-        MeshFilter meshFilter = sourceDotPrefab.GetComponentInChildren<MeshFilter>(true);
-        if (meshFilter != null)
+        CreateFallbackSourceResources();
+    }
+
+    private void CreateFallbackSourceResources()
+    {
+        GameObject primitive = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        primitive.name = "RuntimeScanDotSource";
+
+        MeshFilter meshFilter = primitive.GetComponent<MeshFilter>();
+        if (instanceMesh == null && meshFilter != null)
         {
             instanceMesh = meshFilter.sharedMesh;
         }
 
-        // 렌더러를 찾는다.
-        Renderer sourceRenderer = sourceDotPrefab.GetComponentInChildren<Renderer>(true);
-        if (sourceRenderer != null)
+        Renderer primitiveRenderer = primitive.GetComponent<Renderer>();
+        if (sourceMaterial == null && primitiveRenderer != null && primitiveRenderer.sharedMaterial != null)
         {
-            sourceMaterial = sourceRenderer.sharedMaterial;
+            sourceMaterial = primitiveRenderer.sharedMaterial;
         }
+
+        if (sourceMaterial == null)
+        {
+            sourceMaterial = CreateFallbackSourceMaterial();
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(primitive);
+        }
+        else
+        {
+            DestroyImmediate(primitive);
+        }
+    }
+
+    private Material CreateFallbackSourceMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Unlit/Color");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
+        }
+
+        Material material = new Material(shader);
+        material.enableInstancing = true;
+        SetMaterialColor(material, Color.white);
+        return material;
     }
 
     // 런타임 머티리얼을 만드는 함수이다.
@@ -697,6 +947,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         colors[(int)ScanDotColorGroup.Creature] = creatureDotColor;
         colors[(int)ScanDotColorGroup.WrongComputer] = wrongComputerDotColor;
         colors[(int)ScanDotColorGroup.RestoredEscapeComputer] = restoredEscapeComputerDotColor;
+        colors[(int)ScanDotColorGroup.SabotagedComputer] = sabotagedComputerDotColor;
         colors[(int)ScanDotColorGroup.Item] = itemDotColor;
 
         for (int i = 0; i < PlayerColorPalette.ColorCount; i++)
@@ -732,7 +983,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
     // 점 하나를 현재 색상 그룹 렌더링 리스트에 등록한다.
     private void AddDotToRenderGroup(int dotIndex)
     {
-        if (dotIndex < 0 || dotIndex >= dots.Count || frameMatricesByGroup == null)
+        if (dotIndex < 0 || dotIndex >= dots.Count || frameMatricesByGroup == null || frameDotIndicesByGroup == null)
         {
             return;
         }
@@ -746,15 +997,17 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
         int groupIndex = Mathf.Clamp(record.colorGroupIndex, 0, ColorGroupCount - 1);
         List<Matrix4x4> group = frameMatricesByGroup[groupIndex];
+        List<int> groupDotIndices = frameDotIndicesByGroup[groupIndex];
         record.groupListIndex = group.Count;
         group.Add(record.matrix);
+        groupDotIndices.Add(dotIndex);
         dots[dotIndex] = record;
     }
 
     // 점 하나를 렌더링 리스트에서 제거한다. 마지막 원소와 교체해서 O(1)에 가깝게 처리한다.
     private void RemoveDotFromRenderGroup(int dotIndex)
     {
-        if (dotIndex < 0 || dotIndex >= dots.Count || frameMatricesByGroup == null)
+        if (dotIndex < 0 || dotIndex >= dots.Count || frameMatricesByGroup == null || frameDotIndicesByGroup == null)
         {
             return;
         }
@@ -768,51 +1021,53 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
         int groupIndex = Mathf.Clamp(record.colorGroupIndex, 0, ColorGroupCount - 1);
         List<Matrix4x4> group = frameMatricesByGroup[groupIndex];
+        List<int> groupDotIndices = frameDotIndicesByGroup[groupIndex];
         int removeIndex = record.groupListIndex;
         int lastIndex = group.Count - 1;
 
-        if (removeIndex < 0 || removeIndex > lastIndex)
+        if (removeIndex < 0 ||
+            removeIndex > lastIndex ||
+            groupDotIndices == null ||
+            groupDotIndices.Count != group.Count ||
+            groupDotIndices[removeIndex] != dotIndex)
         {
-            return;
+            RebuildRenderGroups();
+            record = dots[dotIndex];
+            groupIndex = Mathf.Clamp(record.colorGroupIndex, 0, ColorGroupCount - 1);
+            group = frameMatricesByGroup[groupIndex];
+            groupDotIndices = frameDotIndicesByGroup[groupIndex];
+            removeIndex = record.groupListIndex;
+            lastIndex = group.Count - 1;
+
+            if (removeIndex < 0 ||
+                removeIndex > lastIndex ||
+                groupDotIndices == null ||
+                groupDotIndices.Count != group.Count ||
+                groupDotIndices[removeIndex] != dotIndex)
+            {
+                return;
+            }
         }
 
         if (removeIndex != lastIndex)
         {
             Matrix4x4 movedMatrix = group[lastIndex];
+            int movedDotIndex = groupDotIndices[lastIndex];
             group[removeIndex] = movedMatrix;
-            UpdateMovedGroupListIndex(groupIndex, lastIndex, removeIndex, dotIndex);
+            groupDotIndices[removeIndex] = movedDotIndex;
+
+            if (movedDotIndex >= 0 && movedDotIndex < dots.Count && movedDotIndex != dotIndex)
+            {
+                DotRecord movedRecord = dots[movedDotIndex];
+                movedRecord.groupListIndex = removeIndex;
+                dots[movedDotIndex] = movedRecord;
+            }
         }
 
         group.RemoveAt(lastIndex);
+        groupDotIndices.RemoveAt(lastIndex);
         record.groupListIndex = -1;
         dots[dotIndex] = record;
-    }
-
-    private void UpdateMovedGroupListIndex(int groupIndex, int oldListIndex, int newListIndex, int removedDotIndex)
-    {
-        for (int i = 0; i < dots.Count; i++)
-        {
-            if (i == removedDotIndex)
-            {
-                continue;
-            }
-
-            DotRecord candidate = dots[i];
-
-            if (!candidate.isActive || candidate.colorGroupIndex != groupIndex)
-            {
-                continue;
-            }
-
-            if (candidate.groupListIndex != oldListIndex)
-            {
-                continue;
-            }
-
-            candidate.groupListIndex = newListIndex;
-            dots[i] = candidate;
-            return;
-        }
     }
 
     // 그룹별로 인스턴싱 렌더링하는 함수이다.
@@ -901,27 +1156,15 @@ public class InstancedScanDotRenderer : MonoBehaviour
             newRecord.hasCell = false;
             newRecord.colorGroupIndex = 0;
             newRecord.matrix = Matrix4x4.identity;
+            newRecord.groupListIndex = -1;
+            newRecord.activeOrderVersion = 0;
 
             dots.Add(newRecord);
             return dots.Count - 1;
         }
 
-        // 최대치면 가장 오래된 활성 점을 재사용한다.
-        while (activeOrder.Count > 0)
-        {
-            int oldestIndex = activeOrder.Dequeue();
-
-            if (oldestIndex < 0 || oldestIndex >= dots.Count)
-            {
-                continue;
-            }
-
-            if (dots[oldestIndex].isActive)
-            {
-                return oldestIndex;
-            }
-        }
-
+        // 하드캡에 닿으면 AddDot 안에서 점을 지우지 않는다.
+        // 오래된 점은 LateUpdate의 자동 정리 루틴이 조금씩 지우고, 그 전까지 새 점은 버린다.
         return -1;
     }
 
@@ -947,6 +1190,7 @@ public class InstancedScanDotRenderer : MonoBehaviour
         record.isActive = false;
         record.colorGroupIndex = 0;
         record.groupListIndex = -1;
+        record.activeOrderVersion = 0;
         dots[dotIndex] = record;
         activeDotCount = Mathf.Max(0, activeDotCount - 1);
 

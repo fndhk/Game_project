@@ -15,6 +15,12 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 복구 완료 상태이다.
     [SerializeField] private bool isRestored = false;
 
+    // 도플갱어가 이 목표 컴퓨터를 다시 망가뜨린 상태이다.
+    [SerializeField] private bool isSabotaged = false;
+
+    // 이 컴퓨터가 이번 라운드에서 이미 한 번 망가졌는지 저장한다.
+    [SerializeField] private bool hasBeenSabotaged = false;
+
     [Header("Restore")]
     // 복구에 필요한 시간이다.
     public float restoreDuration = 6f;
@@ -28,6 +34,22 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 시민만 복구할 수 있게 제한할지 정한다.
     // 싱글 테스트가 편하도록 기본값은 꺼둔다.
     public bool requireCitizenRole = false;
+
+    // 켜면 도플갱어는 복구 전 컴퓨터를 확인/복구할 수 없고, 복구된 목표 컴퓨터 방해만 할 수 있다.
+    public bool preventKillerRestore = true;
+
+    [Header("Sabotage")]
+    // 켜면 도플갱어가 복구 완료된 목표 컴퓨터를 한 번 망가뜨릴 수 있다.
+    public bool allowKillerSabotage = true;
+
+    // 도플갱어가 컴퓨터를 망가뜨리는 데 필요한 시간이다.
+    public float sabotageDuration = 5f;
+
+    // 시민이 망가진 컴퓨터를 다시 복구하는 데 필요한 시간이다.
+    public float sabotagedRepairDuration = 4f;
+
+    // 탈출구가 이미 열린 뒤에는 컴퓨터를 다시 망가뜨리지 못하게 한다.
+    public bool preventSabotageAfterExitUnlocked = true;
 
     [Header("Visual Roots")]
     // 복구 전 일반 상태에서 켤 오브젝트이다.
@@ -57,6 +79,9 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 진짜 탈출 시스템 컴퓨터를 복구 완료했을 때의 스캔 타입이다.
     public ScanSurfaceType escapeRestoredScanType = ScanSurfaceType.RestoredEscapeComputer;
 
+    // 도플갱어가 다시 망가뜨린 목표 컴퓨터의 스캔 타입이다.
+    public ScanSurfaceType sabotagedScanType = ScanSurfaceType.SabotagedComputer;
+
     [Header("Existing Scan Dot Recolor")]
     // 복구 완료 순간 이미 찍혀 있는 컴퓨터 점 색도 즉시 바꿀지 정한다.
     public bool recolorExistingDotsOnRestore = true;
@@ -74,6 +99,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     public bool tintRenderersOnRestore = true;
     public Color fakeRestoredTint = new Color(1f, 0.14f, 0.1f, 1f);
     public Color escapeRestoredTint = new Color(0.18f, 0.55f, 1f, 1f);
+    public Color sabotagedTint = new Color(0.78f, 0.18f, 1f, 1f);
 
     [Header("Audio")]
     // 복구 시작 시 재생할 소리이다.
@@ -97,17 +123,35 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 비워두면 completeAudioSource를 대신 재생한다.
     public AudioSource fakeCompleteAudioSource;
 
+    // 도플갱어가 목표 컴퓨터를 망가뜨릴 때 재생할 소리이다.
+    // 비워두면 fakeCompleteAudioSource 또는 completeAudioSource를 대신 재생한다.
+    public AudioSource sabotageAudioSource;
+
     // 현재 복구 진행도이다. 0~1 값이다.
     [SerializeField] private float restoreProgress = 0f;
 
     // 현재 복구 중인 플레이어이다.
     private PlayerObjectiveInteractor currentInteractor;
 
+    private ComputerHoldMode currentHoldMode = ComputerHoldMode.None;
+
     // 복구 시작 위치이다.
     private Vector3 holdStartPosition;
 
+    private enum ComputerHoldMode
+    {
+        None,
+        Restore,
+        Sabotage,
+        RepairSabotage
+    }
+
     // 외부에서 복구 완료 상태를 읽기 위한 프로퍼티이다.
     public bool IsRestored => isRestored;
+
+    public bool IsSabotaged => isSabotaged;
+
+    public bool HasBeenSabotaged => hasBeenSabotaged;
 
     // 외부에서 목표 선택 상태를 읽기 위한 프로퍼티이다.
     public bool IsSelectedObjective => isSelectedObjective;
@@ -136,6 +180,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     {
         StopLoopAudio();
         currentInteractor = null;
+        currentHoldMode = ComputerHoldMode.None;
     }
 
     // 컴퓨터 목표 선택 상태를 설정한다.
@@ -146,8 +191,11 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         if (resetState)
         {
             isRestored = false;
+            isSabotaged = false;
+            hasBeenSabotaged = false;
             restoreProgress = 0f;
             currentInteractor = null;
+            currentHoldMode = ComputerHoldMode.None;
         }
 
         RefreshVisualState();
@@ -167,52 +215,66 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 상호작용 문구를 반환한다.
     public string GetPrompt(PlayerObjectiveInteractor interactor)
     {
+        ComputerHoldMode holdMode = ResolveHoldMode(interactor);
+        int percent = Mathf.RoundToInt(GetRestoreNormalized() * 100f);
+
+        if (holdMode == ComputerHoldMode.Sabotage)
+        {
+            if (currentInteractor == interactor && currentHoldMode == ComputerHoldMode.Sabotage)
+            {
+                return T("Sabotaging Computer") + " " + percent + "%";
+            }
+
+            return "[Hold E] " + T("Sabotage Computer");
+        }
+
+        if (holdMode == ComputerHoldMode.RepairSabotage)
+        {
+            if (currentInteractor == interactor && currentHoldMode == ComputerHoldMode.RepairSabotage)
+            {
+                return T("Repairing Computer") + " " + percent + "%";
+            }
+
+            if (restoreProgress > 0f)
+            {
+                return "[Hold E] " + T("Repair Computer") + " " + percent + "%";
+            }
+
+            return "[Hold E] " + T("Repair Computer");
+        }
+
+        if (holdMode == ComputerHoldMode.Restore)
+        {
+            if (currentInteractor == interactor && currentHoldMode == ComputerHoldMode.Restore)
+            {
+                return T("Checking Computer") + " " + percent + "%";
+            }
+
+            if (restoreProgress > 0f)
+            {
+                return "[Hold E] " + T("Check Computer") + " " + percent + "%";
+            }
+
+            return "[Hold E] " + T("Check Computer");
+        }
+
+        if (isSabotaged)
+        {
+            return T("Computer Sabotaged");
+        }
+
         if (isRestored)
         {
             return isSelectedObjective ? T("Target Computer Found") : T("Wrong Computer");
         }
 
-        int percent = Mathf.RoundToInt(GetRestoreNormalized() * 100f);
-
-        if (currentInteractor == interactor)
-        {
-            return T("Checking Computer") + " " + percent + "%";
-        }
-
-        if (restoreProgress > 0f)
-        {
-            return "[Hold E] " + T("Check Computer") + " " + percent + "%";
-        }
-
-        return "[Hold E] " + T("Check Computer");
+        return string.Empty;
     }
 
     // 지금 상호작용 가능한지 반환한다.
     public bool CanInteract(PlayerObjectiveInteractor interactor)
     {
-        // 이제 목표 컴퓨터가 아니어도 복구 시도는 가능하다.
-        // 단, 이미 복구한 컴퓨터는 다시 복구하지 못한다.
-        if (isRestored)
-        {
-            return false;
-        }
-
-        if (currentInteractor != null && currentInteractor != interactor)
-        {
-            return false;
-        }
-
-        if (requireCitizenRole && interactor != null)
-        {
-            PlayerCombatTarget target = interactor.GetComponentInParent<PlayerCombatTarget>();
-
-            if (target != null && target.role != PlayerRole.Citizen)
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return ResolveHoldMode(interactor) != ComputerHoldMode.None;
     }
 
     // 일반 클릭 상호작용은 사용하지 않는다.
@@ -224,12 +286,19 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 길게 누르기 상호작용을 시작한다.
     public bool BeginHold(PlayerObjectiveInteractor interactor)
     {
-        if (!CanInteract(interactor))
+        ComputerHoldMode holdMode = ResolveHoldMode(interactor);
+        if (holdMode == ComputerHoldMode.None)
         {
             return false;
         }
 
         currentInteractor = interactor;
+        currentHoldMode = holdMode;
+
+        if (currentHoldMode != ComputerHoldMode.Restore)
+        {
+            restoreProgress = 0f;
+        }
 
         if (interactor != null)
         {
@@ -245,12 +314,12 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 길게 누르는 동안 복구 진행도를 갱신한다.
     public bool UpdateHold(PlayerObjectiveInteractor interactor, float deltaTime)
     {
-        if (currentInteractor != interactor)
+        if (currentInteractor != interactor || currentHoldMode == ComputerHoldMode.None)
         {
             return false;
         }
 
-        if (!CanInteract(interactor))
+        if (ResolveHoldMode(interactor) != currentHoldMode)
         {
             CancelHold(interactor);
             return false;
@@ -262,13 +331,13 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
             return false;
         }
 
-        float safeDuration = Mathf.Max(0.01f, restoreDuration);
+        float safeDuration = Mathf.Max(0.01f, GetHoldDuration(currentHoldMode));
         restoreProgress += deltaTime / safeDuration;
         restoreProgress = Mathf.Clamp01(restoreProgress);
 
         if (restoreProgress >= 1f)
         {
-            CompleteRestore();
+            CompleteCurrentHold();
             return false;
         }
 
@@ -284,9 +353,11 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         }
 
         currentInteractor = null;
+        ComputerHoldMode cancelledMode = currentHoldMode;
+        currentHoldMode = ComputerHoldMode.None;
         StopLoopAudio();
 
-        if (!isRestored && resetProgressWhenCancelled)
+        if (cancelledMode != ComputerHoldMode.Restore || (!isRestored && resetProgressWhenCancelled))
         {
             restoreProgress = 0f;
         }
@@ -304,17 +375,131 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         return distance > maxInteractorMoveDistance;
     }
 
+    private ComputerHoldMode ResolveHoldMode(PlayerObjectiveInteractor interactor)
+    {
+        if (currentInteractor != null && currentInteractor != interactor)
+        {
+            return ComputerHoldMode.None;
+        }
+
+        if (CanSabotage(interactor))
+        {
+            return ComputerHoldMode.Sabotage;
+        }
+
+        if (CanRepairSabotage(interactor))
+        {
+            return ComputerHoldMode.RepairSabotage;
+        }
+
+        if (CanRestoreComputer(interactor))
+        {
+            return ComputerHoldMode.Restore;
+        }
+
+        return ComputerHoldMode.None;
+    }
+
+    private bool CanRestoreComputer(PlayerObjectiveInteractor interactor)
+    {
+        // 이제 목표 컴퓨터가 아니어도 복구 시도는 가능하다.
+        // 단, 이미 복구했거나 도플갱어가 망가뜨린 컴퓨터는 별도 흐름으로 처리한다.
+        if (isRestored || isSabotaged)
+        {
+            return false;
+        }
+
+        PlayerRole interactorRole = GetInteractorRole(interactor);
+        if ((requireCitizenRole || preventKillerRestore) && interactorRole != PlayerRole.Citizen)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool CanRepairSabotage(PlayerObjectiveInteractor interactor)
+    {
+        if (!isSelectedObjective || !isSabotaged || isRestored)
+        {
+            return false;
+        }
+
+        return GetInteractorRole(interactor) == PlayerRole.Citizen;
+    }
+
+    private bool CanSabotage(PlayerObjectiveInteractor interactor)
+    {
+        if (!allowKillerSabotage || !isSelectedObjective || !isRestored || isSabotaged || hasBeenSabotaged)
+        {
+            return false;
+        }
+
+        if (preventSabotageAfterExitUnlocked && LabObjectiveManager.Instance != null && LabObjectiveManager.Instance.ExitUnlocked)
+        {
+            return false;
+        }
+
+        return GetInteractorRole(interactor) == PlayerRole.Killer;
+    }
+
+    private PlayerRole GetInteractorRole(PlayerObjectiveInteractor interactor)
+    {
+        if (interactor != null)
+        {
+            PlayerCombatTarget target = interactor.GetComponentInParent<PlayerCombatTarget>();
+
+            if (target != null)
+            {
+                return target.role;
+            }
+        }
+
+        return RoleAssignmentManager.GetLocalPhotonRole(PlayerRole.Citizen);
+    }
+
+    private float GetHoldDuration(ComputerHoldMode holdMode)
+    {
+        switch (holdMode)
+        {
+            case ComputerHoldMode.Sabotage:
+                return sabotageDuration;
+
+            case ComputerHoldMode.RepairSabotage:
+                return sabotagedRepairDuration;
+
+            default:
+                return restoreDuration;
+        }
+    }
+
+    private void CompleteCurrentHold()
+    {
+        if (currentHoldMode == ComputerHoldMode.Sabotage)
+        {
+            CompleteSabotage();
+            return;
+        }
+
+        CompleteRestore();
+    }
+
     // 복구를 완료한다.
     private void CompleteRestore()
     {
-        if (isRestored)
+        if (isRestored && !isSabotaged)
         {
+            currentInteractor = null;
+            currentHoldMode = ComputerHoldMode.None;
+            StopLoopAudio();
             return;
         }
 
         isRestored = true;
+        isSabotaged = false;
         restoreProgress = 1f;
         currentInteractor = null;
+        currentHoldMode = ComputerHoldMode.None;
 
         StopLoopAudio();
         PlayResultAudio();
@@ -337,16 +522,59 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         GameLoopManager.EnsureExists().ReportComputerRestored(this);
     }
 
+    private void CompleteSabotage()
+    {
+        if (!isSelectedObjective || !isRestored || isSabotaged || hasBeenSabotaged)
+        {
+            currentInteractor = null;
+            currentHoldMode = ComputerHoldMode.None;
+            restoreProgress = 0f;
+            StopLoopAudio();
+            return;
+        }
+
+        if (preventSabotageAfterExitUnlocked && LabObjectiveManager.Instance != null && LabObjectiveManager.Instance.ExitUnlocked)
+        {
+            currentInteractor = null;
+            currentHoldMode = ComputerHoldMode.None;
+            restoreProgress = 0f;
+            StopLoopAudio();
+            return;
+        }
+
+        isRestored = false;
+        isSabotaged = true;
+        hasBeenSabotaged = true;
+        restoreProgress = 0f;
+        currentInteractor = null;
+        currentHoldMode = ComputerHoldMode.None;
+
+        StopLoopAudio();
+        PlaySabotageAudio();
+        RefreshVisualState();
+        RecolorExistingScanDots();
+
+        if (LabObjectiveManager.Instance != null)
+        {
+            LabObjectiveManager.Instance.RefreshComputerObjectiveState();
+        }
+
+        PunWorldAudioSync.RaiseComputerStart(transform.position, GetNetworkComputerStartVolume());
+        GameLoopManager.EnsureExists().ReportComputerSabotaged(this);
+    }
+
     public void ApplyRestoredFromNetwork()
     {
-        if (isRestored)
+        if (isRestored && !isSabotaged)
         {
             return;
         }
 
         isRestored = true;
+        isSabotaged = false;
         restoreProgress = 1f;
         currentInteractor = null;
+        currentHoldMode = ComputerHoldMode.None;
 
         StopLoopAudio();
         PlayResultAudio();
@@ -363,6 +591,36 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
             {
                 LabObjectiveManager.Instance.RefreshHud();
             }
+        }
+    }
+
+    public void ApplySabotagedFromNetwork()
+    {
+        if (!isSelectedObjective || !isRestored || isSabotaged || hasBeenSabotaged)
+        {
+            return;
+        }
+
+        if (preventSabotageAfterExitUnlocked && LabObjectiveManager.Instance != null && LabObjectiveManager.Instance.ExitUnlocked)
+        {
+            return;
+        }
+
+        isRestored = false;
+        isSabotaged = true;
+        hasBeenSabotaged = true;
+        restoreProgress = 0f;
+        currentInteractor = null;
+        currentHoldMode = ComputerHoldMode.None;
+
+        StopLoopAudio();
+        PlaySabotageAudio();
+        RefreshVisualState();
+        RecolorExistingScanDots();
+
+        if (LabObjectiveManager.Instance != null)
+        {
+            LabObjectiveManager.Instance.RefreshComputerObjectiveState();
         }
     }
 
@@ -404,6 +662,8 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         // 이렇게 해야 컴퓨터 주변 바닥/벽 점까지 같이 빨간색/파란색으로 바뀌는 일을 줄일 수 있다.
         ScanDotColorGroup beforeColorGroup = SurfaceTypeToDotColorGroup(beforeRestoreScanType);
         ScanDotColorGroup wrongComputerGroup = SurfaceTypeToDotColorGroup(fakeRestoredScanType);
+        ScanDotColorGroup escapeComputerGroup = SurfaceTypeToDotColorGroup(escapeRestoredScanType);
+        ScanDotColorGroup sabotagedComputerGroup = SurfaceTypeToDotColorGroup(sabotagedScanType);
 
         for (int i = 0; i < scanDotRenderers.Length; i++)
         {
@@ -426,6 +686,20 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
                     existingDotRecolorRadius,
                     resultColorGroup,
                     wrongComputerGroup
+                );
+
+                scanDotRenderers[i].RecolorDotsInSphere(
+                    center,
+                    existingDotRecolorRadius,
+                    resultColorGroup,
+                    escapeComputerGroup
+                );
+
+                scanDotRenderers[i].RecolorDotsInSphere(
+                    center,
+                    existingDotRecolorRadius,
+                    resultColorGroup,
+                    sabotagedComputerGroup
                 );
             }
         }
@@ -450,7 +724,7 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
     // 현재 상태에 맞춰 시각 상태를 갱신한다.
     private void RefreshVisualState()
     {
-        bool showSelectedVisual = revealSelectedVisualBeforeRestore && isSelectedObjective && !isRestored;
+        bool showSelectedVisual = revealSelectedVisualBeforeRestore && isSelectedObjective && !isRestored && !isSabotaged;
 
         SetVisualRootActive(inactiveVisualRoot, !isRestored && !showSelectedVisual);
         SetVisualRootActive(activeVisualRoot, showSelectedVisual);
@@ -491,6 +765,11 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
 
     private ScanSurfaceType GetCurrentScanSurfaceType()
     {
+        if (isSabotaged)
+        {
+            return sabotagedScanType;
+        }
+
         if (!isRestored)
         {
             return beforeRestoreScanType;
@@ -515,13 +794,15 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
                 continue;
             }
 
-            if (!isRestored)
+            if (!isRestored && !isSabotaged)
             {
                 targetRenderer.SetPropertyBlock(null);
                 continue;
             }
 
-            Color targetColor = isSelectedObjective ? escapeRestoredTint : fakeRestoredTint;
+            Color targetColor = isSabotaged
+                ? sabotagedTint
+                : isSelectedObjective ? escapeRestoredTint : fakeRestoredTint;
             MaterialPropertyBlock block = new MaterialPropertyBlock();
             targetRenderer.GetPropertyBlock(block);
             block.SetColor(BaseColorId, targetColor);
@@ -603,6 +884,26 @@ public class ObjectiveComputer : MonoBehaviour, IPlayerHoldInteractable
         AudioSource targetAudioSource = isSelectedObjective ? completeAudioSource : fakeCompleteAudioSource;
 
         // 가짜 완료음이 비어 있으면 기존 완료음을 대신 사용한다.
+        if (targetAudioSource == null)
+        {
+            targetAudioSource = completeAudioSource;
+        }
+
+        if (targetAudioSource != null)
+        {
+            targetAudioSource.Play();
+        }
+    }
+
+    private void PlaySabotageAudio()
+    {
+        AudioSource targetAudioSource = sabotageAudioSource;
+
+        if (targetAudioSource == null)
+        {
+            targetAudioSource = fakeCompleteAudioSource;
+        }
+
         if (targetAudioSource == null)
         {
             targetAudioSource = completeAudioSource;

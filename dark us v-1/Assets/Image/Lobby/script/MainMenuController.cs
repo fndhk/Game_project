@@ -38,12 +38,18 @@ public class MainMenuController : MonoBehaviour
     // 설정 버튼을 눌렀을 때 이동할 씬 이름이다.
     public string settingsSceneName = "SettingsScene";
 
+    // 튜토리얼 확인 후 이동할 씬 이름이다.
+    public string tutorialSceneName = "TutorialScene";
+
     [Header("Panels")]
     // 친구 참가 버튼을 눌렀을 때 띄울 안내 패널이다.
     public GameObject joinFriendPanel;
 
     // 게임 종료를 다시 확인하는 패널이다.
     public GameObject quitConfirmPanel;
+
+    // 튜토리얼 진입을 다시 확인하는 패널이다.
+    public GameObject tutorialConfirmPanel;
 
     [Header("Audio Optional")]
     // 버튼 클릭 사운드이다.
@@ -79,6 +85,11 @@ public class MainMenuController : MonoBehaviour
         if (quitConfirmPanel != null)
         {
             quitConfirmPanel.SetActive(false);
+        }
+
+        if (tutorialConfirmPanel != null)
+        {
+            tutorialConfirmPanel.SetActive(false);
         }
 
         ApplyLanguage();
@@ -170,6 +181,26 @@ public class MainMenuController : MonoBehaviour
         LoadMenuScene(settingsSceneName, "Settings scene name is empty.");
     }
 
+    public void OnClickTutorial()
+    {
+        PlayClickSound();
+        EnsureMenuPanels();
+
+        if (tutorialConfirmPanel == null)
+        {
+            LoadTutorialScene();
+            return;
+        }
+
+        ShowPanel(tutorialConfirmPanel);
+    }
+
+    public void OnClickTutorialConfirm()
+    {
+        PlayClickSound();
+        LoadTutorialScene();
+    }
+
     public void OnClickCreateRoomConfirm()
     {
         PlayClickSound();
@@ -184,6 +215,11 @@ public class MainMenuController : MonoBehaviour
         PlayerPrefs.SetInt(RoomVisiblePrefsKey, 0);
         PlayerPrefs.Save();
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+    }
+
+    private void LoadTutorialScene()
+    {
+        LoadMenuScene(tutorialSceneName, "Tutorial scene name is empty.");
     }
 
     private bool TryJoinLaunchRoom()
@@ -315,6 +351,11 @@ public class MainMenuController : MonoBehaviour
             quitConfirmPanel.SetActive(false);
         }
 
+        if (tutorialConfirmPanel != null && tutorialConfirmPanel != panel)
+        {
+            tutorialConfirmPanel.SetActive(false);
+        }
+
         panel.transform.SetAsLastSibling();
         panel.SetActive(true);
         MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
@@ -325,6 +366,7 @@ public class MainMenuController : MonoBehaviour
     {
         AddButtonListener("CreateRoomButton", OnClickCreateRoom);
         AddButtonListener("FindRoomButton", OnClickFindRoom);
+        AddButtonListener("TutorialButton", OnClickTutorial);
         AddButtonListener("SettingsButton", OnClickSettings);
     }
 
@@ -413,19 +455,41 @@ public class MainMenuController : MonoBehaviour
             joinFriendButton.onClick.AddListener(OnClickJoinFriend);
         }
 
+        Button tutorialButton = null;
+        Transform tutorialTransform = buttonGroup.Find("TutorialButton");
+        if (tutorialTransform == null)
+        {
+            tutorialButton = CreateMenuButton(buttonGroup, "TutorialButton", "Tutorial");
+            tutorialTransform = tutorialButton.transform;
+        }
+        else
+        {
+            tutorialButton = tutorialTransform.GetComponent<Button>();
+        }
+
+        tutorialTransform.SetSiblingIndex(3);
+        if (tutorialButton != null)
+        {
+            tutorialButton.onClick.RemoveListener(OnClickTutorial);
+            tutorialButton.onClick.AddListener(OnClickTutorial);
+        }
+
         SetMenuButtonLabel("CreateRoomButton", "Host Crew");
         SetMenuButtonLabel("FindRoomButton", "Join by Code");
         SetMenuButtonLabel("JoinFriendButton", "Join Friend");
+        SetMenuButtonLabel("TutorialButton", "Tutorial");
         SetMenuButtonLabel("SettingsButton", "Settings");
         SetMenuButtonLabel("ExitButton", "Quit Game");
         SetButtonVisible("JoinFriendButton", false);
         DisableDecorativeRaycasts();
         ConfigureMainMenuVisualStyle("CreateRoomButton");
         ConfigureMainMenuVisualStyle("FindRoomButton");
+        ConfigureMainMenuVisualStyle("TutorialButton");
         ConfigureMainMenuVisualStyle("SettingsButton");
         ConfigureMainMenuVisualStyle("ExitButton");
         ConfigureMenuButtonSelection("CreateRoomButton");
         ConfigureMenuButtonSelection("FindRoomButton");
+        ConfigureMenuButtonSelection("TutorialButton");
         ConfigureMenuButtonSelection("SettingsButton");
         ConfigureMenuButtonSelection("ExitButton");
         EnsureMainMenuChrome(buttonGroup);
@@ -448,7 +512,8 @@ public class MainMenuController : MonoBehaviour
 
         PositionMainMenuButton("CreateRoomButton", new Vector2(0f, 176f));
         PositionMainMenuButton("FindRoomButton", new Vector2(0f, 106f));
-        PositionMainMenuButton("SettingsButton", new Vector2(0f, 36f));
+        PositionMainMenuButton("TutorialButton", new Vector2(0f, 36f));
+        PositionMainMenuButton("SettingsButton", new Vector2(0f, -34f));
         PositionMainMenuButton("ExitButton", new Vector2(0f, -350f));
         AlignLogoToMainMenuButtons();
     }
@@ -742,6 +807,18 @@ public class MainMenuController : MonoBehaviour
         }
 
         PrepareJoinFriendPanel(joinFriendPanel);
+
+        if (tutorialConfirmPanel == null)
+        {
+            Transform existingPanel = FindUiTransform("TutorialConfirmPanel");
+            tutorialConfirmPanel = existingPanel != null ? existingPanel.gameObject : CreateMenuPanel(
+                "TutorialConfirmPanel",
+                "Tutorial",
+                "Start the tutorial training now?",
+                "Confirm",
+                OnClickTutorialConfirm
+            );
+        }
     }
 
     private void DisableSeparatedScenePanels()
@@ -1098,6 +1175,7 @@ public class MainMenuController : MonoBehaviour
         ApplyLanguageToSceneButton("CreateRoomButton", "Host Crew");
         ApplyLanguageToSceneButton("FindRoomButton", "Join by Code");
         ApplyLanguageToSceneButton("JoinFriendButton", "Join Friend");
+        ApplyLanguageToSceneButton("TutorialButton", "Tutorial");
         ApplyLanguageToSceneButton("SettingsButton", "Settings");
         ApplyLanguageToSceneButton("ExitButton", "Quit Game");
 
@@ -1181,6 +1259,7 @@ public class MainMenuController : MonoBehaviour
             case "Confirm": return "확인";
             case "Cancel": return "취소";
             case "Quit Game?": return "게임을 종료할까요?";
+            case "Start the tutorial training now?": return "튜토리얼 훈련을 시작할까요?";
             case "Create": return "생성";
             case "Search": return "검색";
             case "Open a private operation room and wait for the crew.": return "비공개 작전 방을 만들고 대원을 기다립니다.";
@@ -1277,6 +1356,7 @@ public class MainMenuController : MonoBehaviour
             case "Confirm": return "確認";
             case "Cancel": return "キャンセル";
             case "Quit Game?": return "ゲームを終了しますか?";
+            case "Start the tutorial training now?": return "チュートリアル訓練を開始しますか?";
             case "Create": return "作成";
             case "Search": return "検索";
             case "Open a private operation room and wait for the crew.": return "プライベート作戦ルームを開き、クルーを待ちます。";
