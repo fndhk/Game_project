@@ -83,6 +83,7 @@ public class MainMenuController : MonoBehaviour
 
         ApplyLanguage();
         ClearSelectedUi();
+        TryJoinLaunchRoom();
     }
 
 #if UNITY_EDITOR
@@ -140,12 +141,17 @@ public class MainMenuController : MonoBehaviour
     public void OnClickFindRoom()
     {
         PlayClickSound();
-        LoadMenuScene(findRoomSceneName, "Public room list scene name is empty.");
+        OpenJoinFriendPanel();
     }
 
     public void OnClickJoinFriend()
     {
         PlayClickSound();
+        OpenJoinFriendPanel();
+    }
+
+    private void OpenJoinFriendPanel()
+    {
         EnsureMenuPanels();
 
         if (joinFriendPanel == null)
@@ -178,6 +184,22 @@ public class MainMenuController : MonoBehaviour
         PlayerPrefs.SetInt(RoomVisiblePrefsKey, 0);
         PlayerPrefs.Save();
         LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+    }
+
+    private bool TryJoinLaunchRoom()
+    {
+        if (!FriendInviteBridge.TryGetLaunchRoomCode(out string roomCode))
+        {
+            return false;
+        }
+
+        PlayerPrefs.SetString(RoomCodePrefsKey, roomCode);
+        PlayerPrefs.SetString(RoomTitlePrefsKey, "Private Room");
+        PlayerPrefs.SetInt(RoomHostPrefsKey, 0);
+        PlayerPrefs.SetInt(RoomVisiblePrefsKey, 0);
+        PlayerPrefs.Save();
+        LoadMenuScene(createRoomSceneName, "Create room scene name is empty.");
+        return true;
     }
 
     public void OnClickFindRoomConfirm()
@@ -303,7 +325,6 @@ public class MainMenuController : MonoBehaviour
     {
         AddButtonListener("CreateRoomButton", OnClickCreateRoom);
         AddButtonListener("FindRoomButton", OnClickFindRoom);
-        AddButtonListener("JoinFriendButton", OnClickJoinFriend);
         AddButtonListener("SettingsButton", OnClickSettings);
     }
 
@@ -392,20 +413,19 @@ public class MainMenuController : MonoBehaviour
             joinFriendButton.onClick.AddListener(OnClickJoinFriend);
         }
 
-        SetMenuButtonLabel("CreateRoomButton", "Private Game");
-        SetMenuButtonLabel("FindRoomButton", "Public Game");
+        SetMenuButtonLabel("CreateRoomButton", "Host Crew");
+        SetMenuButtonLabel("FindRoomButton", "Join by Code");
         SetMenuButtonLabel("JoinFriendButton", "Join Friend");
         SetMenuButtonLabel("SettingsButton", "Settings");
         SetMenuButtonLabel("ExitButton", "Quit Game");
+        SetButtonVisible("JoinFriendButton", false);
         DisableDecorativeRaycasts();
         ConfigureMainMenuVisualStyle("CreateRoomButton");
         ConfigureMainMenuVisualStyle("FindRoomButton");
-        ConfigureMainMenuVisualStyle("JoinFriendButton");
         ConfigureMainMenuVisualStyle("SettingsButton");
         ConfigureMainMenuVisualStyle("ExitButton");
         ConfigureMenuButtonSelection("CreateRoomButton");
         ConfigureMenuButtonSelection("FindRoomButton");
-        ConfigureMenuButtonSelection("JoinFriendButton");
         ConfigureMenuButtonSelection("SettingsButton");
         ConfigureMenuButtonSelection("ExitButton");
         EnsureMainMenuChrome(buttonGroup);
@@ -426,12 +446,20 @@ public class MainMenuController : MonoBehaviour
             verticalLayout.enabled = false;
         }
 
-        PositionMainMenuButton("CreateRoomButton", new Vector2(0f, 206f));
-        PositionMainMenuButton("FindRoomButton", new Vector2(0f, 136f));
-        PositionMainMenuButton("JoinFriendButton", new Vector2(0f, 66f));
-        PositionMainMenuButton("SettingsButton", new Vector2(0f, -4f));
+        PositionMainMenuButton("CreateRoomButton", new Vector2(0f, 176f));
+        PositionMainMenuButton("FindRoomButton", new Vector2(0f, 106f));
+        PositionMainMenuButton("SettingsButton", new Vector2(0f, 36f));
         PositionMainMenuButton("ExitButton", new Vector2(0f, -350f));
         AlignLogoToMainMenuButtons();
+    }
+
+    private void SetButtonVisible(string buttonName, bool visible)
+    {
+        Transform buttonTransform = FindUiTransform(buttonName);
+        if (buttonTransform != null)
+        {
+            buttonTransform.gameObject.SetActive(visible);
+        }
     }
 
     private void DisableDecorativeRaycasts()
@@ -1067,8 +1095,8 @@ public class MainMenuController : MonoBehaviour
     {
         selectedLanguageIndex = Mathf.Clamp(PlayerPrefs.GetInt("setting_language", 0), 0, 2);
 
-        ApplyLanguageToSceneButton("CreateRoomButton", "Private Game");
-        ApplyLanguageToSceneButton("FindRoomButton", "Public Game");
+        ApplyLanguageToSceneButton("CreateRoomButton", "Host Crew");
+        ApplyLanguageToSceneButton("FindRoomButton", "Join by Code");
         ApplyLanguageToSceneButton("JoinFriendButton", "Join Friend");
         ApplyLanguageToSceneButton("SettingsButton", "Settings");
         ApplyLanguageToSceneButton("ExitButton", "Quit Game");
@@ -1135,6 +1163,8 @@ public class MainMenuController : MonoBehaviour
             case "Find Room": return "방 찾기";
             case "Private Game": return "비공개 게임";
             case "Public Game": return "공개 게임";
+            case "Host Crew": return "대원 방 만들기";
+            case "Join by Code": return "코드로 참가";
             case "Join Friend": return "친구 참가";
             case "Steam friend invites will be connected here later.": return "Steam 친구 초대는 여기에 나중에 연결됩니다.";
             case "Enter the 4-digit room code from the host.": return "호스트 화면에 보이는 4자리 방 코드를 입력하세요.";
@@ -1229,6 +1259,8 @@ public class MainMenuController : MonoBehaviour
             case "Find Room": return "ルーム検索";
             case "Private Game": return "プライベートゲーム";
             case "Public Game": return "公開ゲーム";
+            case "Host Crew": return "クルー招集";
+            case "Join by Code": return "コード参加";
             case "Join Friend": return "フレンド参加";
             case "Steam friend invites will be connected here later.": return "Steamフレンド招待は後でここに接続されます。";
             case "Enter the 4-digit room code from the host.": return "ホスト画面の4桁ルームコードを入力してください。";

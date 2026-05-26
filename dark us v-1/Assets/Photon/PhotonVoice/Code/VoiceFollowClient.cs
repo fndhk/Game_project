@@ -243,7 +243,7 @@ namespace Photon.Voice
                 if (!LeaderInRoom || LeaderOfflineMode)
                 {
                     // voice client always disconnects for Leader's offline mode
-                    if (this.Client.IsConnected && this.Client.State != ClientState.Disconnecting)
+                    if (this.Client.IsConnected && this.Client.InRoom && this.Client.State == ClientState.Joined)
                     {
                         // this.Client.Disconnect();
                         // Remove the player from the room to avoid an error when reconnecting without rejoining with the same UserId
@@ -267,7 +267,7 @@ namespace Photon.Voice
                     this.Logger.Log(LogLevel.Warning,
                         "Voice room mismatch: Expected:\"{0}\" Current:\"{1}\", leaving the second to join the first.",
                         expectedRoomName, currentRoomName);
-                    if (!this.Client.OpLeaveRoom(false))
+                    if (this.Client.State == ClientState.Joined && !this.Client.OpLeaveRoom(false))
                     {
                         this.Logger.Log(LogLevel.Error, "Leaving the current voice room failed.");
                     }

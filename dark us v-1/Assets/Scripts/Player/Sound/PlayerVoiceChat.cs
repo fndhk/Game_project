@@ -9,6 +9,29 @@ using UnityEngine;
 
 public class DarkUsPunVoiceClient : PunVoiceClient
 {
+    public string ExpectedVoiceRoomName
+    {
+        get
+        {
+            if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || string.IsNullOrEmpty(PhotonNetwork.CurrentRoom.Name))
+            {
+                return null;
+            }
+
+            return $"{PhotonNetwork.CurrentRoom.Name}{VoiceRoomNameSuffix}";
+        }
+    }
+
+    public bool LeaveCurrentVoiceRoom()
+    {
+        if (Client == null || !Client.InRoom || ClientState != ClientState.Joined)
+        {
+            return false;
+        }
+
+        return Client.OpLeaveRoom(false);
+    }
+
     public bool ForceJoinCurrentPunRoom()
     {
         if (!PhotonNetwork.InRoom || PhotonNetwork.OfflineMode || PhotonNetwork.CurrentRoom == null)
@@ -18,7 +41,19 @@ public class DarkUsPunVoiceClient : PunVoiceClient
 
         if (Client != null && Client.InRoom)
         {
-            return true;
+            string expectedRoomName = ExpectedVoiceRoomName;
+            string currentRoomName = Client.CurrentRoom != null ? Client.CurrentRoom.Name : null;
+            if (string.IsNullOrEmpty(expectedRoomName) || currentRoomName == expectedRoomName)
+            {
+                return true;
+            }
+
+            if (ClientState == ClientState.Joined)
+            {
+                Client.OpLeaveRoom(false);
+            }
+
+            return false;
         }
 
         switch (ClientState)
@@ -65,6 +100,7 @@ public class PlayerVoiceChat : MonoBehaviour
     public int sampleRate = 16000;
     public int microphoneBufferSeconds = 1;
     public int chunkSampleCount = 720;
+    public bool useVoiceDetection = false;
     public float silenceThreshold = 0.005f;
     public float voiceHangoverSeconds = 0.45f;
 
@@ -178,7 +214,7 @@ public class PlayerVoiceChat : MonoBehaviour
             recorder.SamplingRate = ToPhotonSamplingRate(sampleRate);
             recorder.FrameDuration = OpusCodec.FrameDuration.Frame20ms;
             recorder.Bitrate = 30000;
-            recorder.VoiceDetection = true;
+            recorder.VoiceDetection = useVoiceDetection;
             recorder.VoiceDetectionThreshold = Mathf.Clamp(silenceThreshold, 0.001f, 0.2f);
             recorder.VoiceDetectionDelayMs = Mathf.RoundToInt(Mathf.Clamp(voiceHangoverSeconds, 0.05f, 2f) * 1000f);
             recorder.RecordWhenJoined = true;
@@ -236,14 +272,38 @@ public class PlayerVoiceChat : MonoBehaviour
     {
         if (voiceClient == null ||
             voiceClient.Client == null ||
-            !PhotonNetwork.InRoom ||
             PhotonNetwork.OfflineMode ||
             PhotonNetwork.LocalPlayer == null)
         {
+            LeaveVoiceRoomIfNeeded();
             return;
         }
 
-        if (voiceClient.Client.InRoom || Time.unscaledTime < nextVoiceJoinAttemptTime)
+        if (!PhotonNetwork.InRoom)
+        {
+            LeaveVoiceRoomIfNeeded();
+            return;
+        }
+
+        if (voiceClient.Client.InRoom)
+        {
+            if (voiceClient is DarkUsPunVoiceClient darkUsVoiceClientInRoom)
+            {
+                string expectedRoomName = darkUsVoiceClientInRoom.ExpectedVoiceRoomName;
+                string currentRoomName = voiceClient.Client.CurrentRoom != null ? voiceClient.Client.CurrentRoom.Name : null;
+                if (!string.IsNullOrEmpty(expectedRoomName) &&
+                    currentRoomName != expectedRoomName &&
+                    Time.unscaledTime >= nextVoiceJoinAttemptTime)
+                {
+                    nextVoiceJoinAttemptTime = Time.unscaledTime + 1f;
+                    darkUsVoiceClientInRoom.ForceJoinCurrentPunRoom();
+                }
+            }
+
+            return;
+        }
+
+        if (Time.unscaledTime < nextVoiceJoinAttemptTime)
         {
             return;
         }
@@ -266,6 +326,14 @@ public class PlayerVoiceChat : MonoBehaviour
         if (voiceState == ClientState.PeerCreated || voiceState == ClientState.Disconnected)
         {
             voiceClient.ConnectAndJoinRoom();
+        }
+    }
+
+    private void LeaveVoiceRoomIfNeeded()
+    {
+        if (voiceClient is DarkUsPunVoiceClient darkUsVoiceClient)
+        {
+            darkUsVoiceClient.LeaveCurrentVoiceRoom();
         }
     }
 

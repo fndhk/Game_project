@@ -9,7 +9,7 @@ public static class InGameLocalization
         switch (LanguageIndex)
         {
             case 1:
-                return key;
+                return English(key);
             case 2:
                 return Japanese(key);
             default:
@@ -41,9 +41,9 @@ public static class InGameLocalization
     {
         switch (key)
         {
-            case "Role": return "직업";
+            case "Role": return "역할";
             case "Citizen": return "시민";
-            case "Imposter": return "임포스터";
+            case "Imposter": return "도플갱어";
             case "Objective Find Computers": return "시간 안에 목표 컴퓨터 4개를 찾아 탈출하시오";
             case "Objective Kill Crew": return "대원을 모두 죽이고 탈출을 저지하십시오";
             case "VITAL": return "체력";
@@ -90,7 +90,7 @@ public static class InGameLocalization
             case "Open Exit": return "탈출구 열기";
             case "Escape": return "탈출";
             case "Citizens Win": return "시민 승리";
-            case "Killer Wins": return "킬러 승리";
+            case "Killer Wins": return "도플갱어 승리";
             case "Citizens Escaped": return "시민이 탈출했습니다";
             case "All Citizens Down": return "모든 시민이 쓰러졌습니다";
             case "Time Expired": return "시간 초과";
@@ -100,7 +100,7 @@ public static class InGameLocalization
             case "Press": return "누르기";
             case "to Kill": return "처치";
             case "Press Q to Kill": return "[Q] 즉사";
-            case "Hide From Imposter": return "임포스터를 피하십시오";
+            case "Hide From Imposter": return "도플갱어를 피하십시오";
             case "Alive Citizens": return "생존 시민";
             case "MIC OPEN": return "마이크 켜짐";
             case "MIC MUTED": return "마이크 음소거";
@@ -201,13 +201,24 @@ public static class InGameLocalization
         }
     }
 
+    private static string English(string key)
+    {
+        switch (key)
+        {
+            case "Imposter": return "Doppelganger";
+            case "Killer Wins": return "Doppelganger Wins";
+            case "Hide From Imposter": return "Hide From Doppelganger";
+            default: return key;
+        }
+    }
+
     private static string Japanese(string key)
     {
         switch (key)
         {
             case "Role": return "役職";
             case "Citizen": return "市民";
-            case "Imposter": return "インポスター";
+            case "Imposter": return "ドッペルゲンガー";
             case "Objective Find Computers": return "目標コンピューター4台を探して出口を開け";
             case "Objective Kill Crew": return "クルーを妨害し、脱出を阻止せよ";
             case "VITAL": return "体力";
@@ -254,7 +265,7 @@ public static class InGameLocalization
             case "Open Exit": return "出口を開く";
             case "Escape": return "脱出";
             case "Citizens Win": return "市民の勝利";
-            case "Killer Wins": return "キラーの勝利";
+            case "Killer Wins": return "ドッペルゲンガーの勝利";
             case "Citizens Escaped": return "市民が脱出しました";
             case "All Citizens Down": return "市民が全員倒れました";
             case "Time Expired": return "時間切れ";
@@ -264,7 +275,7 @@ public static class InGameLocalization
             case "Press": return "押す";
             case "to Kill": return "キル";
             case "Press Q to Kill": return "[Q] 即死";
-            case "Hide From Imposter": return "インポスターから逃げろ";
+            case "Hide From Imposter": return "ドッペルゲンガーから逃げろ";
             case "Alive Citizens": return "生存市民";
             case "MIC OPEN": return "マイクオン";
             case "MIC MUTED": return "マイクミュート";

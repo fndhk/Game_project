@@ -250,6 +250,7 @@ MonoBehaviour:
   sampleRate: 16000
   microphoneBufferSeconds: 1
   chunkSampleCount: 1024
+  useVoiceDetection: 0
   silenceThreshold: 0.015
   remoteVoiceVolume: 1
   spatialBlend: 1

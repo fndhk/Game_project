@@ -25,6 +25,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private const string MapSeedPropertyKey = "mapSeed";
     private const string ReadyPropertyKey = "ready";
     private const string StartSignalPropertyKey = "gameStarting";
+    private const byte MinPlayers = 4;
     private const byte MaxPlayers = 12;
 
     private readonly List<TMP_Text> slotTexts = new List<TMP_Text>();
@@ -45,6 +46,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     private GameObject colorPickerPanelObject;
     private Button colorConfirmButton;
     private Button colorCancelButton;
+    private Button copyRoomCodeButton;
+    private Button inviteFriendsButton;
     private Sprite micOpenIconSprite;
     private Sprite micMutedIconSprite;
     private Sprite settingSliderHandleSprite;
@@ -186,6 +189,12 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             return;
         }
 
+        if (!HasMinimumPlayers())
+        {
+            SetNetworkStatus(GetMinimumPlayersStatus());
+            return;
+        }
+
         if (!AreAllPlayersReady())
         {
             SetNetworkStatus("WAITING READY");
@@ -200,6 +209,18 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         StartCoroutine(StartGameWithLoading());
+    }
+
+    public void OnClickCopyRoomCode()
+    {
+        FriendInviteBridge.CopyInviteText(GetActiveRoomCode());
+        SetNetworkStatus("ROOM CODE COPIED");
+    }
+
+    public void OnClickInviteFriends()
+    {
+        bool steamOverlayOpened = FriendInviteBridge.PrepareSteamInvite(GetActiveRoomCode());
+        SetNetworkStatus(steamOverlayOpened ? "INVITE READY" : "INVITE CODE COPIED");
     }
 
     private System.Collections.IEnumerator StartGameWithLoading()
@@ -278,6 +299,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
     {
         roomOperationInFlight = false;
         EnsureMapSeedProperty();
+        FriendInviteBridge.SetRoomRichPresence(GetActiveRoomCode());
         SetNetworkStatus("ROOM CREATED");
     }
 
@@ -315,6 +337,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         PlayerPrefs.Save();
         SetLocalReady(false);
         EnsureLocalColorSelection();
+        FriendInviteBridge.SetRoomRichPresence(GetActiveRoomCode());
         UpdateRoomCodeText();
         SetNetworkStatus(PhotonNetwork.IsMasterClient ? "HOST READY" : "CONNECTED");
         RefreshPlayerSlots();
@@ -349,6 +372,8 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
     public override void OnLeftRoom()
     {
+        FriendInviteBridge.ClearRichPresence();
+
         if (HostDepartureManager.IsForcingRoomExit)
         {
             LoadScene(mainMenuSceneName);
@@ -531,6 +556,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient || pendingCreateRoom);
             startButton.interactable = PhotonNetwork.InRoom &&
                                        PhotonNetwork.IsMasterClient &&
+                                       HasMinimumPlayers() &&
                                        AreAllPlayersReady() &&
                                        ArePlayerColorsReadyAndUnique();
         }
@@ -547,6 +573,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         RefreshIntegratedVoiceControls();
         RefreshColorPicker();
+
+        if (PhotonNetwork.InRoom && !isStartingGame && !HasMinimumPlayers())
+        {
+            SetNetworkStatus(GetMinimumPlayersStatus());
+        }
     }
 
     private void RefreshSlotColorSwatch(int slotIndex)
@@ -716,6 +747,22 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         }
 
         return true;
+    }
+
+    private bool HasMinimumPlayers()
+    {
+        return PhotonNetwork.InRoom &&
+               PhotonNetwork.CurrentRoom != null &&
+               PhotonNetwork.CurrentRoom.PlayerCount >= MinPlayers;
+    }
+
+    private string GetMinimumPlayersStatus()
+    {
+        int currentPlayers = PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null
+            ? PhotonNetwork.CurrentRoom.PlayerCount
+            : 0;
+
+        return T("WAITING FOR CREW") + " " + currentPlayers + "/" + MinPlayers;
     }
 
     private void EnsureLocalColorSelection()
@@ -958,6 +1005,21 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         return roomCode;
     }
 
+    private string GetActiveRoomCode()
+    {
+        if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && IsValidRoomCode(PhotonNetwork.CurrentRoom.Name))
+        {
+            return PhotonNetwork.CurrentRoom.Name;
+        }
+
+        if (IsValidRoomCode(pendingRoomCode))
+        {
+            return pendingRoomCode;
+        }
+
+        return GetRoomCode();
+    }
+
     private void SaveJoinedRoomTitle()
     {
         if (PhotonNetwork.CurrentRoom == null || PhotonNetwork.CurrentRoom.CustomProperties == null)
@@ -1174,7 +1236,10 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         colorCancelButton = BindButton("ColorCancelButton", () => SetColorPickerVisible(false));
         readyButton = BindButton("ReadyButton", OnClickReady);
         startButton = BindButton("StartGameButton", OnClickStartGame);
+        copyRoomCodeButton = BindButton("CopyRoomCodeButton", OnClickCopyRoomCode);
+        inviteFriendsButton = BindButton("InviteFriendsButton", OnClickInviteFriends);
         BindButton("BackButton", OnClickBack);
+        EnsureInviteActionButtons();
 
         RefreshIntegratedVoiceControls();
         RefreshColorPicker();
@@ -1359,6 +1424,14 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         startRect.anchoredPosition = new Vector2(0f, 76f);
         startButton.onClick.AddListener(OnClickStartGame);
 
+        copyRoomCodeButton = CreateButton(canvas.transform, "CopyRoomCodeButton", T("Copy Code"), 250f, 50f, 22f);
+        PositionTopRightButton(copyRoomCodeButton, new Vector2(-180f, -96f));
+        copyRoomCodeButton.onClick.AddListener(OnClickCopyRoomCode);
+
+        inviteFriendsButton = CreateButton(canvas.transform, "InviteFriendsButton", T("Invite Friends"), 250f, 50f, 22f);
+        PositionTopRightButton(inviteFriendsButton, new Vector2(-180f, -158f));
+        inviteFriendsButton.onClick.AddListener(OnClickInviteFriends);
+
         Button backButton = CreateButton(canvas.transform, "BackButton", T("Back"), 200f, 70f, 30f);
         RectTransform backRect = backButton.GetComponent<RectTransform>();
         backRect.anchorMin = new Vector2(0.5f, 0f);
@@ -1368,6 +1441,51 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         UpdateRoomTitleText();
         UpdateRoomCodeText();
+    }
+
+    private void EnsureInviteActionButtons()
+    {
+        Canvas canvas = FindSceneCanvas();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        if (copyRoomCodeButton == null)
+        {
+            copyRoomCodeButton = CreateButton(canvas.transform, "CopyRoomCodeButton", T("Copy Code"), 250f, 50f, 22f);
+            copyRoomCodeButton.onClick.AddListener(OnClickCopyRoomCode);
+        }
+
+        PositionTopRightButton(copyRoomCodeButton, new Vector2(-180f, -96f));
+
+        if (inviteFriendsButton == null)
+        {
+            inviteFriendsButton = CreateButton(canvas.transform, "InviteFriendsButton", T("Invite Friends"), 250f, 50f, 22f);
+            inviteFriendsButton.onClick.AddListener(OnClickInviteFriends);
+        }
+
+        PositionTopRightButton(inviteFriendsButton, new Vector2(-180f, -158f));
+    }
+
+    private void PositionTopRightButton(Button button, Vector2 anchoredPosition)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        RectTransform rect = button.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(1f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = new Vector2(250f, 50f);
     }
 
     private void BuildColorPicker(Transform parent)
@@ -1689,6 +1807,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "Ready": return "준비";
             case "Cancel Ready": return "준비 취소";
             case "Start Game": return "게임 시작";
+            case "Copy Code": return "코드 복사";
+            case "Invite Friends": return "친구 초대";
+            case "ROOM CODE COPIED": return "방 코드 복사됨";
+            case "INVITE READY": return "초대 준비됨";
+            case "INVITE CODE COPIED": return "초대 코드 복사됨";
             case "Back": return "뒤로";
             case "Select": return "선택";
             case "Exit": return "나가기";
@@ -1760,6 +1883,11 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             case "Ready": return "準備";
             case "Cancel Ready": return "準備取消";
             case "Start Game": return "ゲーム開始";
+            case "Copy Code": return "コードコピー";
+            case "Invite Friends": return "フレンド招待";
+            case "ROOM CODE COPIED": return "ルームコードコピー済み";
+            case "INVITE READY": return "招待準備完了";
+            case "INVITE CODE COPIED": return "招待コードコピー済み";
             case "Back": return "戻る";
             case "Select": return "選択";
             case "Exit": return "閉じる";
@@ -2100,6 +2228,20 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
             if (target.name == objectName && target.gameObject.scene == gameObject.scene)
             {
                 return target;
+            }
+        }
+
+        return null;
+    }
+
+    private Canvas FindSceneCanvas()
+    {
+        Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas != null && canvas.gameObject.scene == gameObject.scene)
+            {
+                return canvas;
             }
         }
 

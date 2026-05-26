@@ -17,7 +17,7 @@ public class RoleAssignmentManager : MonoBehaviourPunCallbacks
     public PlayerCombatTarget[] players;
 
     [Header("Photon 역할 동기화")]
-    // Photon 방에서 시작한 게임이면 방 속성에 저장된 임포스터 번호로 자기 역할을 정한다.
+    // Photon 방에서 시작한 게임이면 방 속성에 저장된 도플갱어 번호로 자기 역할을 정한다.
     public bool usePhotonRoomRoles = true;
 
     [Header("자동 시작")]

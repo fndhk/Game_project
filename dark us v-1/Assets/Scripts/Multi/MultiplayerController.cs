@@ -25,7 +25,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
     [SerializeField] private Button leaveButton;
 
     [Header("Settings")]
-    [SerializeField] private int minPlayers = 2;
+    [SerializeField] private int minPlayers = 4;
     [SerializeField] private int maxPlayers = 12;
     [SerializeField] private string gameSceneName = "labor";
 
@@ -155,7 +155,7 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
         {
             RoomOptions options = new RoomOptions
             {
-                MaxPlayers = Mathf.Clamp(maxPlayers, 1, 20),
+                MaxPlayers = Mathf.Clamp(maxPlayers, minPlayers, 20),
                 IsOpen = true,
                 IsVisible = false,
                 CleanupCacheOnLeave = true,
@@ -262,6 +262,12 @@ public class MultiplayerController : MonoBehaviourPunCallbacks
     {
         if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
         {
+            return;
+        }
+
+        if (PhotonNetwork.CurrentRoom == null || PhotonNetwork.CurrentRoom.PlayerCount < minPlayers)
+        {
+            ShowErrorPopup("최소 4명 이상 모여야 시작할 수 있습니다.");
             return;
         }
 
