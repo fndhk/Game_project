@@ -231,7 +231,7 @@ public class SettingsUIController : MonoBehaviour
         viewportRect.anchorMin = new Vector2(0f, 0f);
         viewportRect.anchorMax = new Vector2(1f, 1f);
         viewportRect.offsetMin = new Vector2(58f, 92f);
-        viewportRect.offsetMax = new Vector2(-58f, -122f);
+        viewportRect.offsetMax = new Vector2(-78f, -122f);
         viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.08f);
         viewport.GetComponent<Mask>().showMaskGraphic = false;
 
@@ -259,6 +259,7 @@ public class SettingsUIController : MonoBehaviour
         scrollRect.vertical = true;
         scrollRect.movementType = ScrollRect.MovementType.Clamped;
         scrollRect.scrollSensitivity = 36f;
+        EnsureVerticalScrollbar(dialog.transform, viewportRect, scrollRect, false);
 
         BuildContent(content.transform);
 
@@ -327,7 +328,7 @@ public class SettingsUIController : MonoBehaviour
         viewportRect.anchorMin = Vector2.zero;
         viewportRect.anchorMax = Vector2.one;
         viewportRect.offsetMin = Vector2.zero;
-        viewportRect.offsetMax = Vector2.zero;
+        viewportRect.offsetMax = new Vector2(-20f, 0f);
         viewport.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.03f);
         viewport.GetComponent<Mask>().showMaskGraphic = false;
 
@@ -350,6 +351,7 @@ public class SettingsUIController : MonoBehaviour
 
         scrollRect.content = contentRect;
         scrollRect.viewport = viewportRect;
+        EnsureVerticalScrollbar(transform, viewportRect, scrollRect, true);
 
         BuildContent(content.transform);
         CreateEmbeddedActionRow(content.transform);
@@ -1155,7 +1157,10 @@ public class SettingsUIController : MonoBehaviour
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
             viewportRect.offsetMin = new Vector2(58f, 98f);
-            viewportRect.offsetMax = new Vector2(-58f, -124f);
+            viewportRect.offsetMax = new Vector2(-78f, -124f);
+
+            ScrollRect scrollRect = viewportRect.GetComponent<ScrollRect>();
+            EnsureVerticalScrollbar(viewportRect.parent, viewportRect, scrollRect, false);
         }
 
         Transform content = FindDescendant(transform, "Content");
@@ -1194,7 +1199,10 @@ public class SettingsUIController : MonoBehaviour
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
             viewportRect.offsetMin = Vector2.zero;
-            viewportRect.offsetMax = Vector2.zero;
+            viewportRect.offsetMax = new Vector2(-20f, 0f);
+
+            ScrollRect scrollRect = GetComponent<ScrollRect>();
+            EnsureVerticalScrollbar(transform, viewportRect, scrollRect, true);
         }
 
         Transform content = FindDescendant(transform, "Content");
@@ -1219,6 +1227,73 @@ public class SettingsUIController : MonoBehaviour
         }
 
         DarkUiSkin.ApplyToHierarchy(transform);
+    }
+
+    private void EnsureVerticalScrollbar(Transform parent, RectTransform viewportRect, ScrollRect scrollRect, bool embedded)
+    {
+        if (parent == null || viewportRect == null || scrollRect == null)
+        {
+            return;
+        }
+
+        string objectName = embedded ? "EmbeddedVerticalScrollbar" : "VerticalScrollbar";
+        Transform existing = parent.Find(objectName);
+        GameObject scrollbarObject;
+        if (existing == null)
+        {
+            scrollbarObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Scrollbar));
+            scrollbarObject.transform.SetParent(parent, false);
+        }
+        else
+        {
+            scrollbarObject = existing.gameObject;
+        }
+
+        RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
+        if (embedded)
+        {
+            scrollbarRect.anchorMin = new Vector2(1f, 0f);
+            scrollbarRect.anchorMax = new Vector2(1f, 1f);
+            scrollbarRect.offsetMin = new Vector2(-12f, 0f);
+            scrollbarRect.offsetMax = new Vector2(-2f, 0f);
+        }
+        else
+        {
+            scrollbarRect.anchorMin = new Vector2(1f, 0f);
+            scrollbarRect.anchorMax = new Vector2(1f, 1f);
+            scrollbarRect.offsetMin = new Vector2(-52f, 98f);
+            scrollbarRect.offsetMax = new Vector2(-40f, -124f);
+        }
+
+        Image track = scrollbarObject.GetComponent<Image>();
+        track.color = new Color(0.35f, 0.38f, 0.39f, 0.24f);
+        track.raycastTarget = true;
+
+        RectTransform slidingArea = GetOrCreateRectChild(scrollbarObject.transform, "Sliding Area");
+        slidingArea.anchorMin = Vector2.zero;
+        slidingArea.anchorMax = Vector2.one;
+        slidingArea.offsetMin = new Vector2(2f, 3f);
+        slidingArea.offsetMax = new Vector2(-2f, -3f);
+
+        Image handle = GetOrCreateImage(slidingArea, "Handle");
+        RectTransform handleRect = handle.GetComponent<RectTransform>();
+        handleRect.anchorMin = Vector2.zero;
+        handleRect.anchorMax = Vector2.one;
+        handleRect.offsetMin = Vector2.zero;
+        handleRect.offsetMax = Vector2.zero;
+        handle.color = new Color(0.62f, 0.66f, 0.67f, 0.78f);
+        handle.raycastTarget = true;
+
+        Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
+        scrollbar.direction = Scrollbar.Direction.BottomToTop;
+        scrollbar.transition = Selectable.Transition.ColorTint;
+        scrollbar.targetGraphic = handle;
+        scrollbar.handleRect = handleRect;
+        scrollbar.size = Mathf.Clamp(scrollbar.size, 0.16f, 1f);
+
+        scrollRect.verticalScrollbar = scrollbar;
+        scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        scrollRect.verticalScrollbarSpacing = 4f;
     }
 
     private void NormalizeRows(Transform content)

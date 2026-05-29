@@ -159,7 +159,7 @@ public class TutorialSceneController : MonoBehaviour
         ShowTutorialLoading("튜토리얼 맵 생성 중...", 0.02f);
         yield return null;
 
-        BuildPromptUi();
+        BuildOverlayUi();
         BuildManagers();
         BuildPlayer();
         ConfigureRoundFlow();
@@ -183,12 +183,6 @@ public class TutorialSceneController : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(GameInputBindings.Pause))
-        {
-            OnClickBackToMenu();
-            return;
-        }
-
         if (tutorialFinished)
         {
             return;
@@ -1896,7 +1890,7 @@ public class TutorialSceneController : MonoBehaviour
         currentStage = TutorialStage.Complete;
         if (labObjectiveManager != null)
         {
-            labObjectiveManager.SetHudOverride("튜토리얼 완료", "이동, 스캔, 아이템 사용, 컴퓨터 복구, 탈출 흐름을 완료했습니다. ESC로 메인 화면에 돌아갈 수 있습니다.", 1f);
+            labObjectiveManager.SetHudOverride("튜토리얼 완료", "이동, 스캔, 아이템 사용, 컴퓨터 복구, 탈출 흐름을 완료했습니다. ESC로 메뉴를 열 수 있습니다.", 1f);
         }
 
         if (promptText != null)

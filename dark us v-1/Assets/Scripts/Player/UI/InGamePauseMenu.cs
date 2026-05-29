@@ -18,6 +18,7 @@ public class InGamePauseMenu : MonoBehaviour
     private const string PrivateRoomSceneName = "CreateRoomLobbyScene";
     private const string PublicRoomSceneName = "PublicRoomListScene";
     private const string GameSceneName = "labor";
+    private const string TutorialSceneName = "TutorialScene";
     private const int PauseMenuSortingOrder = 65000;
 
     private static InGamePauseMenu instance;
@@ -89,7 +90,8 @@ public class InGamePauseMenu : MonoBehaviour
     {
         return sceneName == PrivateRoomSceneName ||
                sceneName == PublicRoomSceneName ||
-               sceneName == GameSceneName;
+               sceneName == GameSceneName ||
+               sceneName == TutorialSceneName;
     }
 
     private static bool IsAnyPauseMenuSceneLoaded()

@@ -340,7 +340,10 @@ public class PlayerHUDController : MonoBehaviour
 
         string canvasName = candidate.gameObject.name;
         return canvasName != "InGamePauseCanvas" &&
-               canvasName != "Dark Scan Loading Screen";
+               canvasName != "Dark Scan Loading Screen" &&
+               canvasName != "TutorialLoadingCanvas" &&
+               canvasName != "TutorialOverlayCanvas" &&
+               canvasName != "TutorialPromptCanvas";
     }
 
     private void DestroyHudObject(GameObject target)

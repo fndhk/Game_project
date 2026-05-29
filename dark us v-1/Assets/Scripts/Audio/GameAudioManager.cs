@@ -1,8 +1,11 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class GameAudioManager : MonoBehaviour
 {
+    private const float MenuMusicOutputMultiplier = 0.46f;
+    private const float MenuMusicFadeInSeconds = 2.5f;
     private const float SfxOutputMultiplier = 0.42f;
     private const float UiHoverCooldown = 0.055f;
     private const string MenuMusicPath = "Audio/BGM/MainMenu";
@@ -21,6 +24,7 @@ public class GameAudioManager : MonoBehaviour
     private AudioSource musicSource;
     private AudioSource sfxSource;
     private string currentMusicKey;
+    private Coroutine musicFadeRoutine;
     private float lastUiHoverAt = -100f;
 
     private AudioClip menuMusicClip;
@@ -52,7 +56,7 @@ public class GameAudioManager : MonoBehaviour
 
         if (instance.musicSource != null)
         {
-            instance.musicSource.volume = SettingsManager.BgmVolume;
+            instance.ApplyMusicVolume();
         }
 
         if (instance.sfxSource != null)
@@ -238,22 +242,89 @@ public class GameAudioManager : MonoBehaviour
 
         if (currentMusicKey == key && musicSource.isPlaying)
         {
+            ApplyMusicVolume();
             return;
         }
 
         currentMusicKey = key;
         musicSource.clip = clip;
-        musicSource.volume = SettingsManager.BgmVolume;
+        musicSource.volume = key == "menu" ? 0f : GetMusicTargetVolume(key);
         musicSource.Play();
+
+        if (key == "menu")
+        {
+            BeginMusicFade(MenuMusicFadeInSeconds);
+        }
+        else
+        {
+            ApplyMusicVolume();
+        }
     }
 
     private void StopMusic()
     {
         currentMusicKey = string.Empty;
+        StopMusicFade();
         if (musicSource != null)
         {
             musicSource.Stop();
         }
+    }
+
+    private void ApplyMusicVolume()
+    {
+        if (musicSource == null || musicFadeRoutine != null)
+        {
+            return;
+        }
+
+        musicSource.volume = GetMusicTargetVolume(currentMusicKey);
+    }
+
+    private float GetMusicTargetVolume(string key)
+    {
+        float multiplier = key == "menu" ? MenuMusicOutputMultiplier : 1f;
+        return SettingsManager.BgmVolume * multiplier;
+    }
+
+    private void BeginMusicFade(float duration)
+    {
+        StopMusicFade();
+        if (duration <= 0f)
+        {
+            ApplyMusicVolume();
+            return;
+        }
+
+        musicFadeRoutine = StartCoroutine(FadeMusicVolume(duration));
+    }
+
+    private void StopMusicFade()
+    {
+        if (musicFadeRoutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(musicFadeRoutine);
+        musicFadeRoutine = null;
+    }
+
+    private IEnumerator FadeMusicVolume(float duration)
+    {
+        float elapsed = 0f;
+        float startVolume = musicSource != null ? musicSource.volume : 0f;
+
+        while (elapsed < duration && musicSource != null)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float normalized = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+            musicSource.volume = Mathf.Lerp(startVolume, GetMusicTargetVolume(currentMusicKey), normalized);
+            yield return null;
+        }
+
+        musicFadeRoutine = null;
+        ApplyMusicVolume();
     }
 
     private static AudioClip CreateSoftNoiseHit(string name, float duration, float amplitude, float bodyFrequency, float noiseAmount, float decayRate, float filterSpeed)

@@ -517,10 +517,10 @@ public class MainMenuController : MonoBehaviour
             verticalLayout.enabled = false;
         }
 
-        PositionMainMenuButton("CreateRoomButton", new Vector2(0f, 176f));
-        PositionMainMenuButton("FindRoomButton", new Vector2(0f, 106f));
-        PositionMainMenuButton("TutorialButton", new Vector2(0f, 36f));
-        PositionMainMenuButton("SettingsButton", new Vector2(0f, -34f));
+        PositionMainMenuButton("CreateRoomButton", new Vector2(0f, 170f));
+        PositionMainMenuButton("FindRoomButton", new Vector2(0f, 92f));
+        PositionMainMenuButton("TutorialButton", new Vector2(0f, 14f));
+        PositionMainMenuButton("SettingsButton", new Vector2(0f, -64f));
         PositionMainMenuButton("ExitButton", new Vector2(0f, -350f));
         AlignLogoToMainMenuButtons();
     }
@@ -592,7 +592,7 @@ public class MainMenuController : MonoBehaviour
         RectTransform logoRect = logoTransform.GetComponent<RectTransform>();
         if (logoRect != null)
         {
-            logoRect.sizeDelta = new Vector2(430f, 145f);
+            logoRect.sizeDelta = new Vector2(390f, 138f);
         }
 
         Image logoImage = logoTransform.GetComponent<Image>();
@@ -622,7 +622,7 @@ public class MainMenuController : MonoBehaviour
         rectTransform.anchorMax = new Vector2(0f, 0.5f);
         rectTransform.pivot = new Vector2(0f, 0.5f);
         rectTransform.anchoredPosition = anchoredPosition;
-        rectTransform.sizeDelta = new Vector2(420f, 50f);
+        rectTransform.sizeDelta = new Vector2(420f, 64f);
 
         LayoutElement layout = buttonTransform.GetComponent<LayoutElement>();
         if (layout != null)
@@ -676,7 +676,7 @@ public class MainMenuController : MonoBehaviour
             panelRect.anchorMax = new Vector2(0f, 1f);
             panelRect.pivot = new Vector2(0f, 0.5f);
             panelRect.anchoredPosition = Vector2.zero;
-            panelRect.sizeDelta = new Vector2(520f, 0f);
+            panelRect.sizeDelta = new Vector2(540f, 0f);
         }
 
         panelImage.sprite = mainMenuSidePanelSprite;
@@ -807,29 +807,29 @@ public class MainMenuController : MonoBehaviour
         if (text != null)
         {
             text.fontStyle = FontStyles.Normal;
-            text.color = new Color(0.78f, 0.86f, 0.88f, 1f);
-            text.fontSize = 26f;
+            text.color = new Color(0.86f, 0.94f, 0.95f, 1f);
+            text.fontSize = 28f;
             text.characterSpacing = 2f;
             text.alignment = TextAlignmentOptions.MidlineLeft;
             RectTransform textRect = text.GetComponent<RectTransform>();
             if (textRect != null)
             {
-                textRect.offsetMin = new Vector2(62f, 0f);
-                textRect.offsetMax = new Vector2(-20f, 0f);
+                textRect.offsetMin = new Vector2(52f, 0f);
+                textRect.offsetMax = new Vector2(-24f, 0f);
             }
         }
 
         RectTransform rectTransform = buttonTransform.GetComponent<RectTransform>();
         if (rectTransform != null)
         {
-            rectTransform.sizeDelta = new Vector2(420f, 50f);
+            rectTransform.sizeDelta = new Vector2(420f, 64f);
         }
 
         LayoutElement layout = buttonTransform.GetComponent<LayoutElement>();
         if (layout != null)
         {
             layout.preferredWidth = 420f;
-            layout.preferredHeight = 50f;
+            layout.preferredHeight = 64f;
         }
 
         Outline outline = buttonTransform.GetComponent<Outline>();
@@ -849,7 +849,7 @@ public class MainMenuController : MonoBehaviour
             hover.normalBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.015f, 0.018f, 0.02f, 0.58f);
             hover.hoverBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.09f, 0.12f, 0.13f, 0.82f);
             hover.pressedBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.16f, 0.18f, 0.17f, 0.86f);
-            hover.normalTextColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+            hover.normalTextColor = new Color(0.86f, 0.94f, 0.95f, 1f);
             hover.hoverTextColor = new Color(1f, 0.78f, 0.38f, 1f);
             hover.ApplyDefaultState();
         }
@@ -1588,7 +1588,7 @@ public class MainMenuController : MonoBehaviour
         hoverEffect.normalBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.015f, 0.018f, 0.02f, 0.52f);
         hoverEffect.hoverBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.09f, 0.12f, 0.13f, 0.76f);
         hoverEffect.pressedBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.16f, 0.18f, 0.17f, 0.86f);
-        hoverEffect.normalTextColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+        hoverEffect.normalTextColor = new Color(0.86f, 0.94f, 0.95f, 1f);
         hoverEffect.hoverTextColor = new Color(1f, 0.78f, 0.38f, 1f);
         hoverEffect.ApplyDefaultState();
 
