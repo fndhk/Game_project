@@ -4,9 +4,9 @@ public class SkillManager : MonoBehaviour
 {
     public static SkillManager Instance;
 
-    // 현재 선택된 시민팀/임포스터 스킬 데이터 (유저가 선택한 것)
-    public SkillData selectedCivilianSkill;
-    public SkillData selectedImposterSkill;
+    // 최종적으로 저장될 스킬 이름을 담을 변수들 (외부에서 읽을 수 있도록 public 설정)
+    public string savedCivilianSkill { get; private set; } = "None";
+    public string savedImposterSkill { get; private set; } = "None";
 
     void Awake()
     {
@@ -22,16 +22,17 @@ public class SkillManager : MonoBehaviour
         }
     }
 
-    // 각 스킬 버튼에 연결할 함수 (예: 버튼 클릭 시 호출)
-    public void SelectSkill(SkillData skillData, bool isCivilian)
+    // [시민 스킬 저장] UI 스크립트에서 완료 버튼을 누를 때 이 함수를 호출해 값을 넘겨받습니다.
+    public void SetCivilianSkill(string skillName)
     {
-        if (isCivilian)
-        {
-            selectedCivilianSkill = skillData;
-        }
-        else
-        {
-            selectedImposterSkill = skillData;
-        }
+        savedCivilianSkill = skillName;
+        Debug.Log($"[SkillManager] 시민 스킬 최종 저장 완료: {savedCivilianSkill}");
+    }
+
+    // [임포스터 스킬 저장] UI 스크립트에서 완료 버튼을 누를 때 이 함수를 호출해 값을 넘겨받습니다.
+    public void SetImposterSkill(string skillName)
+    {
+        savedImposterSkill = skillName;
+        Debug.Log($"[SkillManager] 임포스터 스킬 최종 저장 완료: {savedImposterSkill}");
     }
 }
