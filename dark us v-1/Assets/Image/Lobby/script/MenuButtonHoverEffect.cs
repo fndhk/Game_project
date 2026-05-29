@@ -17,6 +17,11 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
     // 버튼 안의 TMP 텍스트이다.
     public TMP_Text labelText;
 
+    [Header("State Sprites")]
+    public Sprite normalSprite;
+    public Sprite hoverSprite;
+    public Sprite pressedSprite;
+
     [Header("Base Colors")]
     // 기본 버튼 배경 색이다.
     public Color normalBackgroundColor = new Color(0f, 0f, 0f, 0.25f);
@@ -51,6 +56,8 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
 
     // 현재 목표 글자 색이다.
     private Color targetTextColor;
+
+    private Sprite targetSprite;
 
     // 현재 목표 크기이다.
     private Vector3 targetScale;
@@ -87,6 +94,11 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
         }
 
         hover.EnsureReferences();
+        if (hover.normalSprite == null && (hover.buttonImage == null || hover.buttonImage.sprite == null))
+        {
+            DarkUiSkin.ApplyButtonHover(hover);
+        }
+
         return hover;
     }
 
@@ -110,12 +122,22 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
         }
     }
 
+    public void ApplyDefaultState()
+    {
+        EnsureReferences();
+        isHovered = false;
+        isPressed = false;
+        RefreshTargetState();
+        ApplyImmediateState();
+    }
+
     private void Awake()
     {
         // 참조가 비어 있으면 자동으로 찾는다.
         EnsureReferences();
         targetBackgroundColor = normalBackgroundColor;
         targetTextColor = normalTextColor;
+        targetSprite = normalSprite != null ? normalSprite : buttonImage != null ? buttonImage.sprite : null;
         targetScale = Vector3.one;
 
         ApplyImmediateState();
@@ -141,6 +163,11 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
         // 배경 색을 부드럽게 바꾼다.
         if (buttonImage != null)
         {
+            if (targetSprite != null && buttonImage.sprite != targetSprite)
+            {
+                buttonImage.sprite = targetSprite;
+            }
+
             buttonImage.color = Color.Lerp(
                 buttonImage.color,
                 targetBackgroundColor,
@@ -212,6 +239,7 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
         {
             targetBackgroundColor = pressedBackgroundColor;
             targetTextColor = hoverTextColor;
+            targetSprite = pressedSprite != null ? pressedSprite : normalSprite;
             targetScale = Vector3.one * pressedScale;
             return;
         }
@@ -220,12 +248,14 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
         {
             targetBackgroundColor = hoverBackgroundColor;
             targetTextColor = hoverTextColor;
+            targetSprite = hoverSprite != null ? hoverSprite : normalSprite;
             targetScale = Vector3.one * hoverScale;
             return;
         }
 
         targetBackgroundColor = normalBackgroundColor;
         targetTextColor = normalTextColor;
+        targetSprite = normalSprite != null ? normalSprite : buttonImage != null ? buttonImage.sprite : null;
         targetScale = Vector3.one;
     }
 
@@ -234,6 +264,11 @@ public class MenuButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPoint
     {
         if (buttonImage != null)
         {
+            if (normalSprite != null)
+            {
+                buttonImage.sprite = normalSprite;
+            }
+
             buttonImage.color = normalBackgroundColor;
         }
 

@@ -333,6 +333,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         [Tooltip("켜면 생성된 맵/아이템의 일반 BoxCollider를 끄고 MeshCollider 표면만 스캔/충돌에 사용")]
         public bool UseMeshCollidersInsteadOfBoxColliders = false;
 
+        [Tooltip("켜면 방 프리팹 안 ObjectiveComputer가 붙은 테이블이 SimpleRandom 장식 제거로 사라지지 않게 보호")]
+        public bool PreserveObjectiveComputersInGeneratedCells = false;
+
         [Header("Startup Performance")]
         [Tooltip("켜면 생성된 방/복도 MeshFilter마다 MeshCollider를 런타임에 추가함. 시작 렉이 커질 수 있어서 기본은 끔")]
         public bool CreateScanMeshCollidersForGeneratedCells = false;
@@ -606,6 +609,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         // 외부에서 조건으로 맵을 다시 생성할 수 있도록 public으로 둔다.
         public IEnumerator StartGeneration()
         {
+            ApplyPhotonRoomSeed();
             ApplyPlayerCountBalance();
             IsAnyGenerationRunning = true;
             IsGenerationComplete = false;
@@ -1498,6 +1502,11 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
             ApplyGeneratedLightOptimization(cell.gameObject);
 
+            if (PreserveObjectiveComputersInGeneratedCells)
+            {
+                PreserveObjectiveComputers(cell.gameObject);
+            }
+
             if (CreateScanMeshCollidersForGeneratedCells || UseMeshCollidersInsteadOfBoxColliders)
             {
                 EnsureScanMeshColliders(cell.gameObject);
@@ -1507,6 +1516,48 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
             DisableGeneratedHelperColliders(cell.gameObject);
 
             IncreaseSpawnCount(sourcePrefab);
+        }
+
+        private void PreserveObjectiveComputers(GameObject root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            global::ObjectiveComputer[] computers = root.GetComponentsInChildren<global::ObjectiveComputer>(true);
+            if (computers == null || computers.Length == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < computers.Length; i++)
+            {
+                global::ObjectiveComputer computer = computers[i];
+                if (computer == null)
+                {
+                    continue;
+                }
+
+                Transform current = computer.transform;
+                while (current != null && current != transform)
+                {
+                    SimpleRandom randomizer = current.GetComponent<SimpleRandom>();
+                    if (randomizer != null)
+                    {
+                        randomizer.EnableChance = false;
+                        randomizer.EnableChildrensDestroy = false;
+                        randomizer.enabled = false;
+                    }
+
+                    if (current == root.transform)
+                    {
+                        break;
+                    }
+
+                    current = current.parent;
+                }
+            }
         }
 
         // Cell의 사용 가능한 출구들을 열린 출구 목록에 추가한다.

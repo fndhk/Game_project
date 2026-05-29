@@ -612,7 +612,15 @@ public class PlayerHUDController : MonoBehaviour
                 ? GameInputBindings.GetLabel(GameInputBindings.Slot1Key, KeyCode.Alpha1)
                 : GameInputBindings.GetLabel(GameInputBindings.Slot2Key, KeyCode.Alpha2)) + "]";
             slotHighlights[i].gameObject.SetActive(i == selected);
-            slotFrames[i].color = i == selected ? new Color(0f, 0f, 0f, 0.92f) : panelColor;
+            if (DarkUiSkin.SlotFrameSprite != null)
+            {
+                DarkUiSkin.ApplySlotFrame(slotFrames[i], i == selected);
+            }
+            else
+            {
+                slotFrames[i].color = i == selected ? new Color(0f, 0f, 0f, 0.92f) : panelColor;
+            }
+
             slotKeyTexts[i].color = i == selected ? amberColor : new Color(0.76f, 0.75f, 0.66f, 0.52f);
         }
     }
@@ -1135,6 +1143,7 @@ public class PlayerHUDController : MonoBehaviour
     {
         Image image = AddImage(rect, color);
         AddOutline(rect, new Color(0.72f, 0.82f, 0.82f, 0.18f), new Vector2(1f, -1f));
+        DarkUiSkin.ApplyPanel(image, DarkUiSkin.PanelStyle.Hud);
         return image;
     }
 

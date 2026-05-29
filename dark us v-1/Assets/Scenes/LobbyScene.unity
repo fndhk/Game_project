@@ -302,14 +302,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -341,11 +341,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonHoverEffect
   buttonImage: {fileID: 139681887}
   labelText: {fileID: 1540768997}
-  normalBackgroundColor: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
-  hoverBackgroundColor: {r: 0.09, g: 0.12, b: 0.13, a: 0.82}
-  pressedBackgroundColor: {r: 0.16, g: 0.18, b: 0.17, a: 0.86}
-  normalTextColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
-  hoverTextColor: {r: 1, g: 0.8, b: 0.42, a: 1}
+  normalSprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
+  hoverSprite: {fileID: 21300000, guid: 516a98f7b96847dbad9d9d3ffb6df63c, type: 3}
+  pressedSprite: {fileID: 21300000, guid: c44176e6b43f4cd7aa44ebf7f91bb263, type: 3}
+  normalBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  pressedBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  normalTextColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
+  hoverTextColor: {r: 1, g: 0.78, b: 0.38, a: 1}
   colorLerpSpeed: 12
   hoverScale: 1.025
   pressedScale: 0.985
@@ -357,7 +360,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 139681883}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
@@ -500,21 +503,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuBackgroundAnimator
   backgroundRect: {fileID: 282826106}
-  baseScale: 1
-  zoomAmount: 0.025
-  zoomSpeed: 0.08
+  baseScale: 1.04
+  zoomAmount: 0.035
+  zoomSpeed: 0.055
+  panAmount: {x: 22, y: 10}
+  panSpeed: 0.045
+  rotationAmount: 0.12
+  rotationSpeed: 0.033
+  playIntroReveal: 1
+  introBlackHoldDuration: 1
+  introRevealDuration: 3.8
+  introLightFlickerSpeed: 8.5
+  introRevealFlickerStrength: 0.9
+  introLightMaxAlpha: 0.86
+  introLightAnchor: {x: 0.62, y: 0.92}
+  introLightSize: {x: 900, y: 420}
   darkOverlayImage: {fileID: 1261887881}
-  darkOverlayMinAlpha: 0.2
-  darkOverlayMaxAlpha: 0.32
+  darkOverlayMinAlpha: 0.18
+  darkOverlayMaxAlpha: 0.31
   darkOverlayFlickerSpeed: 0.7
   logoImage: {fileID: 1407503471}
   logoMinAlpha: 0.72
   logoMaxAlpha: 1
   logoFlickerSpeed: 1.2
   scanDotOverlayImage: {fileID: 0}
-  scanDotMinAlpha: 0
-  scanDotMaxAlpha: 0.12
+  scanDotMinAlpha: 0.015
+  scanDotMaxAlpha: 0.09
   scanDotFlickerSpeed: 0.45
+  createScanDotOverlayIfMissing: 1
+  scanDotScrollSpeed: {x: 7, y: -3}
+  scanDotDriftAmount: {x: 34, y: 18}
+  scanDotTileLoopDistance: 256
 --- !u!1 &309630204
 GameObject:
   m_ObjectHideFlags: 0
@@ -973,11 +992,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonHoverEffect
   buttonImage: {fileID: 585976514}
   labelText: {fileID: 1246615733}
-  normalBackgroundColor: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
-  hoverBackgroundColor: {r: 0.09, g: 0.12, b: 0.13, a: 0.82}
-  pressedBackgroundColor: {r: 0.16, g: 0.18, b: 0.17, a: 0.86}
-  normalTextColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
-  hoverTextColor: {r: 1, g: 0.8, b: 0.42, a: 1}
+  normalSprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
+  hoverSprite: {fileID: 21300000, guid: 516a98f7b96847dbad9d9d3ffb6df63c, type: 3}
+  pressedSprite: {fileID: 21300000, guid: c44176e6b43f4cd7aa44ebf7f91bb263, type: 3}
+  normalBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  pressedBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  normalTextColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
+  hoverTextColor: {r: 1, g: 0.78, b: 0.38, a: 1}
   colorLerpSpeed: 12
   hoverScale: 1.025
   pressedScale: 0.985
@@ -1071,14 +1093,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1103,7 +1125,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 585976509}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
@@ -1454,11 +1476,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonHoverEffect
   buttonImage: {fileID: 878917844}
   labelText: {fileID: 1875049177}
-  normalBackgroundColor: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
-  hoverBackgroundColor: {r: 0.09, g: 0.12, b: 0.13, a: 0.82}
-  pressedBackgroundColor: {r: 0.16, g: 0.18, b: 0.17, a: 0.86}
-  normalTextColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
-  hoverTextColor: {r: 1, g: 0.8, b: 0.42, a: 1}
+  normalSprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
+  hoverSprite: {fileID: 21300000, guid: 516a98f7b96847dbad9d9d3ffb6df63c, type: 3}
+  pressedSprite: {fileID: 21300000, guid: c44176e6b43f4cd7aa44ebf7f91bb263, type: 3}
+  normalBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  pressedBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  normalTextColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
+  hoverTextColor: {r: 1, g: 0.78, b: 0.38, a: 1}
   colorLerpSpeed: 12
   hoverScale: 1.025
   pressedScale: 0.985
@@ -1470,7 +1495,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 878917838}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
@@ -1555,14 +1580,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1615,8 +1640,8 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 620, y: 0}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_SizeDelta: {x: 520, y: 0}
+  m_Pivot: {x: 0, y: 0.5}
 --- !u!114 &951770548
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1630,14 +1655,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.5882353}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 192c2d20423745cea0f1ff9a38a4c6e1, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1689,8 +1714,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2, y: 0}
-  m_SizeDelta: {x: -36, y: 0}
+  m_AnchoredPosition: {x: 21, y: 0}
+  m_SizeDelta: {x: -82, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1076911497
 MonoBehaviour:
@@ -1721,8 +1746,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4292268482
-  m_fontColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
+    rgba: 4292926407
+  m_fontColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1739,8 +1764,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28
-  m_fontSizeBase: 28
+  m_fontSize: 26
+  m_fontSizeBase: 26
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1749,7 +1774,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 4096
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: 2
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
@@ -1826,8 +1851,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2, y: 0}
-  m_SizeDelta: {x: -36, y: 0}
+  m_AnchoredPosition: {x: 21, y: 0}
+  m_SizeDelta: {x: -82, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1246615733
 MonoBehaviour:
@@ -1858,8 +1883,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4292268482
-  m_fontColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
+    rgba: 4292926407
+  m_fontColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1876,8 +1901,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28
-  m_fontSizeBase: 28
+  m_fontSize: 26
+  m_fontSizeBase: 26
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1886,7 +1911,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 4096
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: 2
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
@@ -2135,14 +2160,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2174,11 +2199,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonHoverEffect
   buttonImage: {fileID: 1330963336}
   labelText: {fileID: 1076911497}
-  normalBackgroundColor: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
-  hoverBackgroundColor: {r: 0.09, g: 0.12, b: 0.13, a: 0.82}
-  pressedBackgroundColor: {r: 0.16, g: 0.18, b: 0.17, a: 0.86}
-  normalTextColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
-  hoverTextColor: {r: 1, g: 0.8, b: 0.42, a: 1}
+  normalSprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
+  hoverSprite: {fileID: 21300000, guid: 516a98f7b96847dbad9d9d3ffb6df63c, type: 3}
+  pressedSprite: {fileID: 21300000, guid: c44176e6b43f4cd7aa44ebf7f91bb263, type: 3}
+  normalBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  pressedBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  normalTextColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
+  hoverTextColor: {r: 1, g: 0.78, b: 0.38, a: 1}
   colorLerpSpeed: 12
   hoverScale: 1.025
   pressedScale: 0.985
@@ -2190,7 +2218,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1330963332}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
@@ -2344,7 +2372,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 286, y: -120}
-  m_SizeDelta: {x: 400, y: 200}
+  m_SizeDelta: {x: 430, y: 145}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1407503471
 MonoBehaviour:
@@ -2360,7 +2388,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -2418,8 +2446,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2, y: 0}
-  m_SizeDelta: {x: -36, y: 0}
+  m_AnchoredPosition: {x: 21, y: 0}
+  m_SizeDelta: {x: -82, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1540768997
 MonoBehaviour:
@@ -2450,8 +2478,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4292268482
-  m_fontColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
+    rgba: 4292926407
+  m_fontColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -2468,8 +2496,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28
-  m_fontSizeBase: 28
+  m_fontSize: 26
+  m_fontSizeBase: 26
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -2478,7 +2506,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 4096
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: 2
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
@@ -2577,6 +2605,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonHoverEffect
   buttonImage: {fileID: 1864959968}
   labelText: {fileID: 1884989307}
+  normalSprite: {fileID: 0}
+  hoverSprite: {fileID: 0}
+  pressedSprite: {fileID: 0}
   normalBackgroundColor: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
   hoverBackgroundColor: {r: 0.09, g: 0.12, b: 0.13, a: 0.82}
   pressedBackgroundColor: {r: 0.16, g: 0.18, b: 0.17, a: 0.86}
@@ -2737,8 +2768,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2, y: 0}
-  m_SizeDelta: {x: -36, y: 0}
+  m_AnchoredPosition: {x: 21, y: 0}
+  m_SizeDelta: {x: -82, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1875049177
 MonoBehaviour:
@@ -2769,8 +2800,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4292268482
-  m_fontColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
+    rgba: 4292926407
+  m_fontColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -2787,8 +2818,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28
-  m_fontSizeBase: 28
+  m_fontSize: 26
+  m_fontSizeBase: 26
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -2797,7 +2828,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 4096
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: 2
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
@@ -3096,14 +3127,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3135,11 +3166,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonHoverEffect
   buttonImage: {fileID: 1900000005}
   labelText: {fileID: 1900000013}
-  normalBackgroundColor: {r: 0.015, g: 0.018, b: 0.02, a: 0.58}
-  hoverBackgroundColor: {r: 0.09, g: 0.12, b: 0.13, a: 0.82}
-  pressedBackgroundColor: {r: 0.16, g: 0.18, b: 0.17, a: 0.86}
-  normalTextColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
-  hoverTextColor: {r: 1, g: 0.8, b: 0.42, a: 1}
+  normalSprite: {fileID: 21300000, guid: 4e4e8b94f5f6422d9313b080268d67ab, type: 3}
+  hoverSprite: {fileID: 21300000, guid: 516a98f7b96847dbad9d9d3ffb6df63c, type: 3}
+  pressedSprite: {fileID: 21300000, guid: c44176e6b43f4cd7aa44ebf7f91bb263, type: 3}
+  normalBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  pressedBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
+  normalTextColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
+  hoverTextColor: {r: 1, g: 0.78, b: 0.38, a: 1}
   colorLerpSpeed: 12
   hoverScale: 1.025
   pressedScale: 0.985
@@ -3151,7 +3185,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1900000001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
@@ -3193,8 +3227,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2, y: 0}
-  m_SizeDelta: {x: -36, y: 0}
+  m_AnchoredPosition: {x: 21, y: 0}
+  m_SizeDelta: {x: -82, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1900000013
 MonoBehaviour:
@@ -3225,8 +3259,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4292268482
-  m_fontColor: {r: 0.76, g: 0.82, b: 0.84, a: 1}
+    rgba: 4292926407
+  m_fontColor: {r: 0.78, g: 0.86, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -3243,8 +3277,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28
-  m_fontSizeBase: 28
+  m_fontSize: 26
+  m_fontSizeBase: 26
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -3253,7 +3287,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 4096
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: 2
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0

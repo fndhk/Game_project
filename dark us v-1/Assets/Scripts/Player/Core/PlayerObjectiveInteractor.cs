@@ -6,6 +6,9 @@ using UnityEngine.UI;
 // 기존 클릭 상호작용과 새 길게 누르기 상호작용을 모두 지원한다.
 public class PlayerObjectiveInteractor : MonoBehaviour
 {
+    private const float LocalObjectTreeInteractableMaxDistance = 1.45f;
+    private const float DefaultLookAssistRadius = 0.42f;
+
     [Header("References")]
     // 기준 카메라이다. 비어 있으면 자식 카메라 또는 Camera.main을 찾는다.
     public Camera playerCamera;
@@ -19,6 +22,9 @@ public class PlayerObjectiveInteractor : MonoBehaviour
 
     // 상호작용 가능한 레이어이다. 기본값은 모든 레이어이다.
     public LayerMask interactMask = ~0;
+
+    // 스캔 점만 보이는 어두운 화면에서는 중심 레이가 살짝 빗나가도 가까운 상호작용 대상을 잡는다.
+    public float lookAssistRadius = DefaultLookAssistRadius;
 
     // 상호작용 키이다.
     public KeyCode interactKey = KeyCode.E;
@@ -93,13 +99,10 @@ public class PlayerObjectiveInteractor : MonoBehaviour
             return;
         }
 
-        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-
-        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactMask, QueryTriggerInteraction.Ignore))
+        if (TryFindLookTarget(out IPlayerInteractable lookTarget))
         {
-            currentTarget = FindInteractable(hit.collider);
-
-            if (currentTarget != null && currentTarget.CanInteract(this))
+            currentTarget = lookTarget;
+            if (currentTarget.CanInteract(this))
             {
                 // 길게 누르는 중에 다른 대상을 보게 되면 기존 상호작용을 취소한다.
                 if (isHoldingInteraction && previousTarget != currentTarget)
@@ -135,8 +138,88 @@ public class PlayerObjectiveInteractor : MonoBehaviour
         }
     }
 
+    private bool TryFindLookTarget(out IPlayerInteractable target)
+    {
+        target = null;
+
+        if (playerCamera == null)
+        {
+            return false;
+        }
+
+        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+        RaycastHit[] hits = Physics.RaycastAll(ray, interactDistance, interactMask, QueryTriggerInteraction.Ignore);
+
+        if (TryFindTargetInHits(hits, true, out target))
+        {
+            return true;
+        }
+
+        return TryFindLookAssistTarget(ray, out target);
+    }
+
+    private bool TryFindLookAssistTarget(Ray ray, out IPlayerInteractable target)
+    {
+        target = null;
+
+        if (lookAssistRadius <= 0f)
+        {
+            return false;
+        }
+
+        RaycastHit[] hits = Physics.SphereCastAll(
+            ray,
+            lookAssistRadius,
+            interactDistance,
+            interactMask,
+            QueryTriggerInteraction.Ignore
+        );
+
+        return TryFindTargetInHits(hits, false, out target);
+    }
+
+    private bool TryFindTargetInHits(RaycastHit[] hits, bool stopAtBlockers, out IPlayerInteractable target)
+    {
+        target = null;
+
+        if (hits == null || hits.Length <= 0)
+        {
+            return false;
+        }
+
+        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hitCollider = hits[i].collider;
+            if (hitCollider == null)
+            {
+                continue;
+            }
+
+            IPlayerInteractable interactable = FindInteractable(hitCollider, hits[i].point);
+            if (interactable != null)
+            {
+                target = interactable;
+                return true;
+            }
+
+            if (IsFloorSurface(hits[i]))
+            {
+                continue;
+            }
+
+            if (stopAtBlockers)
+            {
+                break;
+            }
+        }
+
+        return false;
+    }
+
     // Collider의 부모 방향에서 IPlayerInteractable 구현체를 찾는다.
-    private IPlayerInteractable FindInteractable(Collider hitCollider)
+    private IPlayerInteractable FindInteractable(Collider hitCollider, Vector3 hitPoint)
     {
         if (hitCollider == null)
         {
@@ -153,7 +236,106 @@ public class PlayerObjectiveInteractor : MonoBehaviour
             }
         }
 
+        IPlayerInteractable childInteractable = FindInteractableInLocalObjectTree(hitCollider.transform, hitPoint);
+        if (childInteractable != null)
+        {
+            return childInteractable;
+        }
+
         return null;
+    }
+
+    private IPlayerInteractable FindInteractableInLocalObjectTree(Transform start, Vector3 hitPoint)
+    {
+        Transform current = start;
+        int searchedAncestorCount = 0;
+
+        while (current != null && searchedAncestorCount < 5)
+        {
+            if (current.GetComponent<ArtNotes.UndergroundLaboratoryGenerator.Cell>() != null)
+            {
+                return null;
+            }
+
+            MonoBehaviour[] behaviours = current.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                if (behaviours[i] is IPlayerInteractable interactable && IsInteractableNearHit(interactable, hitPoint))
+                {
+                    return interactable;
+                }
+            }
+
+            current = current.parent;
+            searchedAncestorCount++;
+        }
+
+        return null;
+    }
+
+    private bool IsInteractableNearHit(IPlayerInteractable interactable, Vector3 hitPoint)
+    {
+        if (!(interactable is MonoBehaviour behaviour) || behaviour == null)
+        {
+            return false;
+        }
+
+        float maxSqrDistance = LocalObjectTreeInteractableMaxDistance * LocalObjectTreeInteractableMaxDistance;
+
+        if (TryGetInteractableBounds(behaviour, out Bounds bounds))
+        {
+            return bounds.SqrDistance(hitPoint) <= maxSqrDistance;
+        }
+
+        return Vector3.SqrMagnitude(behaviour.transform.position - hitPoint) <= maxSqrDistance;
+    }
+
+    private bool TryGetInteractableBounds(MonoBehaviour behaviour, out Bounds bounds)
+    {
+        bounds = new Bounds(behaviour.transform.position, Vector3.zero);
+        bool hasBounds = false;
+
+        Collider[] colliders = behaviour.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider candidate = colliders[i];
+            if (candidate == null || !candidate.enabled)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = candidate.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(candidate.bounds);
+            }
+        }
+
+        Renderer[] renderers = behaviour.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer candidate = renderers[i];
+            if (candidate == null || !candidate.enabled)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = candidate.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(candidate.bounds);
+            }
+        }
+
+        return hasBounds;
     }
 
     // 화면 중앙 레이캐스트가 바닥을 먼저 맞춰도, 같은 선상 뒤의 바닥 아이템은 찾는다.
@@ -169,7 +351,7 @@ public class PlayerObjectiveInteractor : MonoBehaviour
 
         if (hits == null || hits.Length <= 0)
         {
-            return null;
+            return FindNearbyPickupByProximity();
         }
 
         System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
@@ -195,10 +377,73 @@ public class PlayerObjectiveInteractor : MonoBehaviour
                 continue;
             }
 
-            return null;
+            return FindNearbyPickupByProximity();
         }
 
-        return null;
+        return FindNearbyPickupByProximity();
+    }
+
+    private IPlayerInteractable FindNearbyPickupByProximity()
+    {
+        float radius = Mathf.Max(0.01f, groundItemPickupRadius);
+        Collider[] hits = Physics.OverlapSphere(transform.position, radius, interactMask, QueryTriggerInteraction.Ignore);
+        WorldItemPickup bestPickup = null;
+        float bestScore = float.MaxValue;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hitCollider = hits[i];
+            if (hitCollider == null)
+            {
+                continue;
+            }
+
+            WorldItemPickup pickup = hitCollider.GetComponentInParent<WorldItemPickup>();
+            if (pickup == null || !pickup.CanInteract(this) || !IsPickupVisibleEnough(pickup))
+            {
+                continue;
+            }
+
+            float distanceScore = Vector3.SqrMagnitude(pickup.transform.position - transform.position);
+            if (distanceScore < bestScore)
+            {
+                bestScore = distanceScore;
+                bestPickup = pickup;
+            }
+        }
+
+        return bestPickup;
+    }
+
+    private bool IsPickupVisibleEnough(WorldItemPickup pickup)
+    {
+        if (pickup == null)
+        {
+            return false;
+        }
+
+        if (playerCamera == null)
+        {
+            return true;
+        }
+
+        Vector3 viewportPoint = playerCamera.WorldToViewportPoint(pickup.transform.position);
+        if (viewportPoint.z <= 0f)
+        {
+            return false;
+        }
+
+        float distanceFromCenter = Vector2.Distance(
+            new Vector2(viewportPoint.x, viewportPoint.y),
+            new Vector2(0.5f, 0.5f)
+        );
+
+        if (distanceFromCenter <= 0.42f)
+        {
+            return true;
+        }
+
+        return Vector3.SqrMagnitude(pickup.transform.position - transform.position) <= 2.25f;
     }
 
     // 바닥 아이템 시야 보정에서 무시할 Floor 표면인지 확인한다.

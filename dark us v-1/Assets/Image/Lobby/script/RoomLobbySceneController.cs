@@ -1126,11 +1126,13 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         {
             BindExistingRoomLobbyUi();
             MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+            ApplyDarkUiSkinToSceneCanvas();
             return;
         }
 
         BuildRoomLobbyUi();
         MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+        ApplyDarkUiSkinToSceneCanvas();
     }
 
     private void BindExistingRoomLobbyUi()
@@ -1515,6 +1517,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
             Image buttonImage = buttonObject.GetComponent<Image>();
             buttonImage.color = new Color(0.03f, 0.04f, 0.046f, 0.92f);
+            DarkUiSkin.ApplySlotFrame(buttonImage, false);
 
             Outline buttonOutline = buttonObject.GetComponent<Outline>();
             buttonOutline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.42f);
@@ -1695,6 +1698,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
         Outline outline = panel.GetComponent<Outline>();
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.38f);
         outline.effectDistance = new Vector2(2f, -2f);
+        DarkUiSkin.ApplyPanel(image, DarkUiSkin.PanelStyle.Standard);
 
         animatedPanels.Add(rect);
         animatedPanelBasePositions.Add(anchoredPosition);
@@ -1979,6 +1983,7 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
+        DarkUiSkin.ApplyButton(button);
 
         return button;
     }
@@ -2020,7 +2025,17 @@ public class RoomLobbySceneController : MonoBehaviourPunCallbacks
 
         slider.fillRect = fillRect;
         slider.handleRect = handleRect;
+        DarkUiSkin.ApplySlider(slider);
         return slider;
+    }
+
+    private void ApplyDarkUiSkinToSceneCanvas()
+    {
+        Canvas canvas = FindSceneCanvas();
+        if (canvas != null)
+        {
+            DarkUiSkin.ApplyToHierarchy(canvas.transform);
+        }
     }
 
     private Sprite GetSettingSliderHandleSprite()

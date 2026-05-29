@@ -9,6 +9,7 @@ using UnityEngine.UI;
 
 public class TutorialSceneController : MonoBehaviour
 {
+    private const int RequiredTutorialComputerCount = 3;
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
@@ -27,8 +28,6 @@ public class TutorialSceneController : MonoBehaviour
     [SerializeField] private Cell doppelgangerRoomPrefab;
     [SerializeField] private Cell corridorPrefab;
     [SerializeField] private GameObject doorPrefab;
-    [SerializeField] private GameObject computerPrefab;
-    [SerializeField] private GameObject tablePrefab;
     [SerializeField] private GameObject cameraPickupPrefab;
     [SerializeField] private GameObject dotSourcePrefab;
 
@@ -134,12 +133,15 @@ public class TutorialSceneController : MonoBehaviour
     private TMP_Text roleText;
     private TMP_Text objectiveText;
     private TMP_Text promptText;
+    private Canvas tutorialLoadingCanvas;
+    private CanvasGroup tutorialLoadingGroup;
+    private TMP_Text tutorialLoadingText;
+    private Image tutorialLoadingFill;
     private Sprite whiteSprite;
 
     private Material floorMaterial;
     private Material wallMaterial;
     private Material metalMaterial;
-    private Material computerMaterial;
     private Material itemMaterial;
     private Material gateMaterial;
     private Material markerMaterial;
@@ -153,16 +155,30 @@ public class TutorialSceneController : MonoBehaviour
         UiEventSystemUtility.EnsureSingle(gameObject);
         ConfigureSceneLighting();
         PrepareMaterials();
+        BuildTutorialLoadingUi();
+        ShowTutorialLoading("튜토리얼 맵 생성 중...", 0.02f);
+        yield return null;
+
         BuildPromptUi();
         BuildManagers();
         BuildPlayer();
         ConfigureRoundFlow();
+        LaboratoryGenerator.LoadingPhaseChanged += HandleTutorialLoadingPhaseChanged;
         yield return StartCoroutine(BuildWorld());
+        LaboratoryGenerator.LoadingPhaseChanged -= HandleTutorialLoadingPhaseChanged;
         BuildTrainingObjects();
+        if (!HasRequiredTutorialComputers())
+        {
+            tutorialReady = false;
+            HideTutorialLoading();
+            yield break;
+        }
+
         ConfigureRoundFlow();
         EnterCommonStage();
         LockGameplayCursor();
         tutorialReady = true;
+        HideTutorialLoading();
     }
 
     private void Update()
@@ -187,6 +203,12 @@ public class TutorialSceneController : MonoBehaviour
         RefreshOverlayText();
     }
 
+    private void OnDestroy()
+    {
+        LaboratoryGenerator.LoadingPhaseChanged -= HandleTutorialLoadingPhaseChanged;
+        GameplayStartupGate.SetLoadingScreenBlocked(false);
+    }
+
     public void OnClickBackToMenu()
     {
         Cursor.lockState = CursorLockMode.None;
@@ -202,7 +224,7 @@ public class TutorialSceneController : MonoBehaviour
     {
         if (gate == commonGate && currentStage == TutorialStage.Common && currentStep == (int)CommonStep.OpenExit)
         {
-            CompleteTutorial();
+            EnterCitizenStage();
             return;
         }
 
@@ -238,7 +260,6 @@ public class TutorialSceneController : MonoBehaviour
         floorMaterial = CreateMaterial("Tutorial_Floor", new Color(0.16f, 0.18f, 0.18f, 1f));
         wallMaterial = CreateMaterial("Tutorial_Wall", new Color(0.24f, 0.27f, 0.29f, 1f));
         metalMaterial = CreateMaterial("Tutorial_Metal", new Color(0.32f, 0.38f, 0.41f, 1f));
-        computerMaterial = CreateMaterial("Tutorial_Computer", new Color(0.18f, 0.30f, 0.34f, 1f));
         itemMaterial = CreateMaterial("Tutorial_Item", new Color(0.56f, 0.57f, 0.54f, 1f));
         gateMaterial = CreateMaterial("Tutorial_Gate", new Color(0.72f, 0.48f, 0.16f, 1f));
         markerMaterial = CreateMaterial("Tutorial_Marker", new Color(0.16f, 0.65f, 0.75f, 1f));
@@ -289,9 +310,24 @@ public class TutorialSceneController : MonoBehaviour
         laboratoryGenerator = worldRoot.gameObject.AddComponent<LaboratoryGenerator>();
         ConfigureTutorialGenerator(laboratoryGenerator);
 
-        yield return StartCoroutine(laboratoryGenerator.StartGeneration());
+        int baseSeed = laboratoryGenerator.FixedGenerationSeed;
+        int generationAttempts = 4;
+        for (int attempt = 0; attempt < generationAttempts; attempt++)
+        {
+            laboratoryGenerator.FixedGenerationSeed = baseSeed + attempt * 97;
+            yield return StartCoroutine(laboratoryGenerator.StartGeneration());
+            CacheGeneratedWorldReferences();
 
-        CacheGeneratedWorldReferences();
+            if (laboratoryGenerator.IsGenerationComplete && GetGeneratedComputerCount() >= RequiredTutorialComputerCount)
+            {
+                break;
+            }
+
+            Debug.LogWarning(
+                "[TutorialSceneController] Generated map computer count is not enough. Regenerating tutorial map. Count: " +
+                GetGeneratedComputerCount() + " / Required: " + RequiredTutorialComputerCount
+            );
+        }
 
         if (!laboratoryGenerator.IsGenerationComplete)
         {
@@ -299,6 +335,26 @@ public class TutorialSceneController : MonoBehaviour
             BuildFallbackWorld();
             CacheGeneratedWorldReferences();
         }
+    }
+
+    private int GetGeneratedComputerCount()
+    {
+        int count = 0;
+
+        if (generatedComputers == null)
+        {
+            return count;
+        }
+
+        for (int i = 0; i < generatedComputers.Length; i++)
+        {
+            if (generatedComputers[i] != null)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private void BuildFallbackWorld()
@@ -392,6 +448,7 @@ public class TutorialSceneController : MonoBehaviour
         generator.HideGeneratedVisualsInGame = true;
         generator.HideGeneratedVisualsOnlyInPlayMode = true;
         generator.UseMeshCollidersInsteadOfBoxColliders = true;
+        generator.PreserveObjectiveComputersInGeneratedCells = true;
         generator.OptimizeGeneratedLightShadows = true;
         generator.DisableGeneratedLightShadows = true;
         generator.CreateFallbackBlockDoorWhenPrefabMissing = true;
@@ -844,6 +901,53 @@ public class TutorialSceneController : MonoBehaviour
         backButton.onClick.AddListener(OnClickBackToMenu);
     }
 
+    private void BuildTutorialLoadingUi()
+    {
+        GameObject canvasObject = new GameObject("TutorialLoadingCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
+        tutorialLoadingCanvas = canvasObject.GetComponent<Canvas>();
+        tutorialLoadingCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        tutorialLoadingCanvas.overrideSorting = true;
+        tutorialLoadingCanvas.sortingOrder = 2000;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        tutorialLoadingGroup = canvasObject.GetComponent<CanvasGroup>();
+        tutorialLoadingGroup.alpha = 1f;
+        tutorialLoadingGroup.blocksRaycasts = true;
+        tutorialLoadingGroup.interactable = true;
+
+        RectTransform root = CreateRect("Root", canvasObject.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        root.offsetMin = Vector2.zero;
+        root.offsetMax = Vector2.zero;
+        AddImage(root, Color.black);
+
+        RectTransform panel = CreateRect("Panel", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
+        panel.sizeDelta = new Vector2(760f, 260f);
+        AddImage(panel, new Color(0f, 0f, 0f, 0.72f));
+        AddOutline(panel, new Color(0.62f, 0.86f, 0.92f, 0.38f), new Vector2(1.6f, -1.6f));
+
+        TMP_Text title = CreateLabel("튜토리얼 준비 중", panel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -42f), 34f, new Color(0.88f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
+        title.rectTransform.sizeDelta = new Vector2(-80f, 56f);
+
+        tutorialLoadingText = CreateLabel("튜토리얼 맵 생성 중...", panel, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 18f), 22f, new Color(0.72f, 0.9f, 0.96f, 1f), TextAlignmentOptions.Center);
+        tutorialLoadingText.rectTransform.sizeDelta = new Vector2(-100f, 44f);
+        tutorialLoadingText.textWrappingMode = TextWrappingModes.Normal;
+
+        RectTransform bar = CreateRect("ProgressBar", panel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 50f));
+        bar.sizeDelta = new Vector2(520f, 12f);
+        AddImage(bar, new Color(0.1f, 0.16f, 0.18f, 1f));
+
+        RectTransform fill = CreateRect("ProgressFill", bar, Vector2.zero, new Vector2(0f, 1f), new Vector2(0f, 0.5f), Vector2.zero);
+        fill.offsetMin = Vector2.zero;
+        fill.offsetMax = Vector2.zero;
+        tutorialLoadingFill = AddImage(fill, new Color(0.38f, 0.86f, 1f, 1f));
+
+        canvasObject.SetActive(false);
+    }
+
     private void BuildPromptUi()
     {
         GameObject canvasObject = new GameObject("TutorialPromptCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -864,6 +968,80 @@ public class TutorialSceneController : MonoBehaviour
         promptText = CreateLabel("", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 148f), 24f, new Color(0.96f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
         promptText.rectTransform.sizeDelta = new Vector2(800f, 42f);
         promptText.gameObject.SetActive(false);
+    }
+
+    private void ShowTutorialLoading(string message, float progress)
+    {
+        if (tutorialLoadingCanvas != null)
+        {
+            tutorialLoadingCanvas.gameObject.SetActive(true);
+        }
+
+        if (tutorialLoadingGroup != null)
+        {
+            tutorialLoadingGroup.alpha = 1f;
+            tutorialLoadingGroup.blocksRaycasts = true;
+            tutorialLoadingGroup.interactable = true;
+        }
+
+        GameplayStartupGate.SetLoadingScreenBlocked(true);
+        SetTutorialLoadingProgress(message, progress);
+    }
+
+    private void HideTutorialLoading()
+    {
+        GameplayStartupGate.SetLoadingScreenBlocked(false);
+
+        if (tutorialLoadingCanvas != null)
+        {
+            tutorialLoadingCanvas.gameObject.SetActive(false);
+        }
+    }
+
+    private void HandleTutorialLoadingPhaseChanged(string message, float progress)
+    {
+        SetTutorialLoadingProgress(GetTutorialLoadingMessage(message), progress);
+    }
+
+    private void SetTutorialLoadingProgress(string message, float progress)
+    {
+        if (tutorialLoadingText != null)
+        {
+            tutorialLoadingText.text = string.IsNullOrWhiteSpace(message) ? "튜토리얼 맵 생성 중..." : message;
+        }
+
+        if (tutorialLoadingFill != null)
+        {
+            RectTransform fillRect = tutorialLoadingFill.rectTransform;
+            fillRect.anchorMax = new Vector2(Mathf.Clamp01(progress), 1f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+        }
+    }
+
+    private string GetTutorialLoadingMessage(string message)
+    {
+        switch (message)
+        {
+            case "SCANNING AREA...":
+                return "튜토리얼 구역 스캔 중...";
+            case "BUILDING PATHS...":
+                return "작은 실험실 맵 생성 중...";
+            case "CLOSING PATHS...":
+                return "막힌 출구 정리 중...";
+            case "CALIBRATING SCANNER...":
+                return "스캐너 표면 보정 중...";
+            case "SYNCING PLAYERS...":
+                return "플레이어 위치 설정 중...";
+            case "PLACING SIGNALS...":
+                return "아이템과 탈출구 배치 중...";
+            case "SCAN READY":
+                return "튜토리얼 진입 중...";
+            case "SCAN FAILED":
+                return "튜토리얼 맵 생성 실패";
+            default:
+                return string.IsNullOrWhiteSpace(message) ? "튜토리얼 맵 생성 중..." : message;
+        }
     }
 
     private void BuildCrosshair(RectTransform root)
@@ -893,7 +1071,7 @@ public class TutorialSceneController : MonoBehaviour
         TMP_Text finishTitle = CreateLabel("튜토리얼 완료", finishPanel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f), 38f, new Color(1f, 0.78f, 0.34f, 1f), TextAlignmentOptions.Center);
         finishTitle.rectTransform.sizeDelta = new Vector2(-80f, 58f);
 
-        TMP_Text finishBody = CreateLabel("공통 조작, 시민 목표 진행, 도플갱어 방해 흐름을 모두 완료했습니다.", finishPanel, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 18f), 24f, new Color(0.9f, 0.96f, 0.97f, 1f), TextAlignmentOptions.Center);
+        TMP_Text finishBody = CreateLabel("이동, 스캔, 아이템 사용, 컴퓨터 복구, 탈출 흐름을 완료했습니다.", finishPanel, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 18f), 24f, new Color(0.9f, 0.96f, 0.97f, 1f), TextAlignmentOptions.Center);
         finishBody.rectTransform.sizeDelta = new Vector2(-90f, 80f);
         finishBody.textWrappingMode = TextWrappingModes.Normal;
 
@@ -962,8 +1140,9 @@ public class TutorialSceneController : MonoBehaviour
         PlayerObjectiveInteractor interactor = playerObject.AddComponent<PlayerObjectiveInteractor>();
         interactor.playerCamera = camera;
         interactor.promptText = promptText;
-        interactor.interactDistance = 2.4f;
-        interactor.groundItemPickupRadius = 2.8f;
+        interactor.interactDistance = 4.2f;
+        interactor.lookAssistRadius = 0.65f;
+        interactor.groundItemPickupRadius = 3.4f;
 
         PlayerItemUser itemUser = playerObject.AddComponent<PlayerItemUser>();
         itemUser.inventory = playerInventory;
@@ -1158,13 +1337,30 @@ public class TutorialSceneController : MonoBehaviour
     private void BuildTrainingObjects()
     {
         List<ObjectiveComputer> generatedMapComputers = CollectSortedGeneratedComputers();
-        List<ObjectiveComputer> tutorialComputers = CreateDedicatedTutorialComputers();
 
-        commonComputer = GetTutorialComputer(tutorialComputers, 0, "CommonTrainingComputer", 1, false);
-        citizenTargetA = GetTutorialComputer(tutorialComputers, 1, "CitizenTargetComputer_A", 2, false);
-        citizenTargetB = GetTutorialComputer(tutorialComputers, 2, "CitizenTargetComputer_B", 3, false);
-        citizenWrongComputer = generatedMapComputers.Count > 0 ? generatedMapComputers[0] : null;
+        if (generatedMapComputers.Count < RequiredTutorialComputerCount)
+        {
+            Debug.LogError(
+                "[TutorialSceneController] Tutorial needs generated room computer tables, but the map only has " +
+                generatedMapComputers.Count + ". Check room prefabs that contain ObjectiveComputer."
+            );
+            return;
+        }
+
+        commonComputer = generatedMapComputers[0];
+        citizenTargetA = generatedMapComputers[1];
+        citizenTargetB = generatedMapComputers[2];
+        citizenWrongComputer = generatedMapComputers.Count > 3 ? generatedMapComputers[3] : commonComputer;
         doppelgangerComputer = citizenTargetB != null ? citizenTargetB : commonComputer;
+
+        ConfigureObjectiveComputer(commonComputer, false, 1);
+        ConfigureObjectiveComputer(citizenTargetA, false, 2);
+        ConfigureObjectiveComputer(citizenTargetB, false, 3);
+
+        if (citizenWrongComputer != null)
+        {
+            ConfigureObjectiveComputer(citizenWrongComputer, false, 4);
+        }
 
         cameraPickup = ResolveCameraPickup();
         MovePickupNearPlayer(cameraPickup);
@@ -1181,310 +1377,11 @@ public class TutorialSceneController : MonoBehaviour
         GameLoopManager.EnsureExists().RebuildComputerIndex();
     }
 
-    private List<ObjectiveComputer> CreateDedicatedTutorialComputers()
+    private bool HasRequiredTutorialComputers()
     {
-        List<ObjectiveComputer> result = new List<ObjectiveComputer>();
-        List<Cell> placementCells = CollectTutorialComputerCells(3);
-
-        for (int i = 0; i < 3; i++)
-        {
-            Vector3 position;
-            Quaternion rotation;
-
-            if (!TryGetTutorialComputerPlacement(placementCells, i, out position, out rotation))
-            {
-                position = GetFallbackTutorialComputerPosition(i);
-                rotation = GetTutorialComputerRotation(position);
-            }
-
-            ObjectiveComputer computer = CreateComputer("TutorialTargetComputer_" + (i + 1), position, rotation, false, i + 1);
-
-            if (computer == null)
-            {
-                continue;
-            }
-
-            PrepareTutorialObjectForScan(computer.gameObject, ScanSurfaceType.SecurityTerminal);
-            result.Add(computer);
-        }
-
-        return result;
-    }
-
-    private List<Cell> CollectTutorialComputerCells(int targetCount)
-    {
-        List<Cell> rooms = new List<Cell>();
-        List<Cell> result = new List<Cell>();
-
-        if (worldRoot == null)
-        {
-            return result;
-        }
-
-        Cell[] cells = worldRoot.GetComponentsInChildren<Cell>(true);
-        if (cells == null || cells.Length == 0)
-        {
-            return result;
-        }
-
-        for (int i = 0; i < cells.Length; i++)
-        {
-            Cell cell = cells[i];
-
-            if (cell == null || !cell.gameObject.activeInHierarchy)
-            {
-                continue;
-            }
-
-            cell.CacheTriggerBox();
-
-            if (cell.TriggerBox == null)
-            {
-                continue;
-            }
-
-            if (cell.IsRoomLike)
-            {
-                rooms.Add(cell);
-            }
-        }
-
-        if (rooms.Count == 0)
-        {
-            for (int i = 0; i < cells.Length; i++)
-            {
-                if (cells[i] != null && cells[i].TriggerBox != null)
-                {
-                    rooms.Add(cells[i]);
-                }
-            }
-        }
-
-        Vector3 playerPosition = playerObject != null ? playerObject.transform.position : Vector3.zero;
-        rooms.Sort((left, right) =>
-        {
-            float leftDistance = left != null ? Vector3.SqrMagnitude(GetCellCenter(left) - playerPosition) : float.MaxValue;
-            float rightDistance = right != null ? Vector3.SqrMagnitude(GetCellCenter(right) - playerPosition) : float.MaxValue;
-            return leftDistance.CompareTo(rightDistance);
-        });
-
-        if (rooms.Count == 0)
-        {
-            return result;
-        }
-
-        AddUniqueCell(result, rooms[0]);
-
-        if (rooms.Count > 2)
-        {
-            AddUniqueCell(result, rooms[rooms.Count / 2]);
-        }
-
-        if (rooms.Count > 1)
-        {
-            AddUniqueCell(result, rooms[rooms.Count - 1]);
-        }
-
-        for (int i = 0; i < rooms.Count && result.Count < targetCount; i++)
-        {
-            AddUniqueCell(result, rooms[i]);
-        }
-
-        while (result.Count < targetCount && rooms.Count > 0)
-        {
-            result.Add(rooms[result.Count % rooms.Count]);
-        }
-
-        return result;
-    }
-
-    private void AddUniqueCell(List<Cell> cells, Cell candidate)
-    {
-        if (cells == null || candidate == null || cells.Contains(candidate))
-        {
-            return;
-        }
-
-        cells.Add(candidate);
-    }
-
-    private bool TryGetTutorialComputerPlacement(List<Cell> placementCells, int index, out Vector3 position, out Quaternion rotation)
-    {
-        position = Vector3.zero;
-        rotation = Quaternion.identity;
-
-        if (placementCells == null || placementCells.Count == 0)
-        {
-            return false;
-        }
-
-        Cell cell = placementCells[Mathf.Clamp(index, 0, placementCells.Count - 1)];
-        return TryGetComputerPlacementInCell(cell, index, out position, out rotation);
-    }
-
-    private bool TryGetComputerPlacementInCell(Cell cell, int index, out Vector3 position, out Quaternion rotation)
-    {
-        position = Vector3.zero;
-        rotation = Quaternion.identity;
-
-        if (cell == null)
-        {
-            return false;
-        }
-
-        cell.CacheTriggerBox();
-        BoxCollider box = cell.TriggerBox;
-
-        if (box == null)
-        {
-            return false;
-        }
-
-        Vector3 extents = box.size * 0.5f;
-        float x = Mathf.Max(0.9f, extents.x - 1.8f);
-        float z = Mathf.Max(0.9f, extents.z - 1.8f);
-        float sideX = Mathf.Max(0.65f, Mathf.Min(x * 0.5f, 1.7f));
-        float sideZ = Mathf.Max(0.65f, Mathf.Min(z * 0.5f, 1.7f));
-
-        Vector3 center = box.center;
-        Vector3[] localPositions =
-        {
-            center + new Vector3(-x, 0f, -sideZ),
-            center + new Vector3(sideX, 0f, z),
-            center + new Vector3(x, 0f, sideZ),
-            center + new Vector3(-sideX, 0f, -z),
-            center + new Vector3(0f, 0f, z * 0.65f),
-            center + new Vector3(0f, 0f, -z * 0.65f)
-        };
-
-        Vector3[] localLookDirections =
-        {
-            Vector3.right,
-            Vector3.back,
-            Vector3.left,
-            Vector3.forward,
-            Vector3.back,
-            Vector3.forward
-        };
-
-        int preferredIndex = Mathf.Abs(index * 2) % localPositions.Length;
-        int selectedIndex = preferredIndex;
-        float bestScore = float.MinValue;
-        Vector3 playerPosition = playerObject != null ? playerObject.transform.position : Vector3.zero;
-
-        for (int i = 0; i < localPositions.Length; i++)
-        {
-            Vector3 candidatePosition = cell.transform.TransformPoint(localPositions[i]);
-            candidatePosition = ProjectPointToGround(candidatePosition, 0.04f);
-            float distance = Vector3.Distance(candidatePosition, playerPosition);
-            float score = distance * 0.35f;
-
-            if (i == preferredIndex)
-            {
-                score += 4f;
-            }
-
-            if (distance < 2.8f)
-            {
-                score -= 12f;
-            }
-
-            if (score > bestScore)
-            {
-                bestScore = score;
-                selectedIndex = i;
-                position = candidatePosition;
-            }
-        }
-
-        Vector3 lookDirection = cell.transform.TransformDirection(localLookDirections[selectedIndex]);
-        lookDirection.y = 0f;
-
-        if (lookDirection.sqrMagnitude < 0.001f)
-        {
-            lookDirection = GetCellCenter(cell) - position;
-            lookDirection.y = 0f;
-        }
-
-        if (lookDirection.sqrMagnitude < 0.001f)
-        {
-            lookDirection = -GetPlayerPlanarForward();
-        }
-
-        rotation = Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
-        return true;
-    }
-
-    private Vector3 GetFallbackTutorialComputerPosition(int index)
-    {
-        float[] forwardOffsets = { 2.25f, 3.1f, 3.95f };
-        float[] rightOffsets = { -1.05f, 1.05f, 0f };
-        int safeIndex = Mathf.Clamp(index, 0, forwardOffsets.Length - 1);
-        Vector3 position = GetPointNearPlayer(forwardOffsets[safeIndex], rightOffsets[safeIndex]);
-        return ProjectPointToGround(position, 0.04f);
-    }
-
-    private Quaternion GetTutorialComputerRotation(Vector3 computerPosition)
-    {
-        Vector3 lookDirection = playerObject != null
-            ? playerObject.transform.position - computerPosition
-            : Vector3.back;
-
-        lookDirection.y = 0f;
-
-        if (lookDirection.sqrMagnitude < 0.001f)
-        {
-            lookDirection = -GetPlayerPlanarForward();
-        }
-
-        return Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
-    }
-
-    private Vector3 GetPlayerPlanarForward()
-    {
-        Vector3 forward = playerObject != null ? playerObject.transform.forward : Vector3.forward;
-        forward.y = 0f;
-
-        if (forward.sqrMagnitude < 0.001f)
-        {
-            forward = Vector3.forward;
-        }
-
-        return forward.normalized;
-    }
-
-    private Vector3 ProjectPointToGround(Vector3 position, float yOffset)
-    {
-        int groundMask = GetInGameScanMask();
-        Vector3 rayStart = position + Vector3.up * 4f;
-        float fallbackY = position.y;
-        float bestDistanceFromPlayerY = float.MaxValue;
-        Vector3 bestGroundPoint = Vector3.zero;
-        bool foundGround = false;
-
-        RaycastHit[] hits = Physics.RaycastAll(rayStart, Vector3.down, 10f, groundMask, QueryTriggerInteraction.Ignore);
-        for (int i = 0; i < hits.Length; i++)
-        {
-            if (hits[i].normal.y < 0.45f)
-            {
-                continue;
-            }
-
-            float distanceFromPlayerY = Mathf.Abs(hits[i].point.y - fallbackY);
-            if (distanceFromPlayerY < bestDistanceFromPlayerY)
-            {
-                bestDistanceFromPlayerY = distanceFromPlayerY;
-                bestGroundPoint = hits[i].point;
-                foundGround = true;
-            }
-        }
-
-        if (foundGround)
-        {
-            return bestGroundPoint + Vector3.up * yOffset;
-        }
-
-        return new Vector3(position.x, fallbackY + yOffset, position.z);
+        return commonComputer != null &&
+               citizenTargetA != null &&
+               citizenTargetB != null;
     }
 
     private List<ObjectiveComputer> CollectSortedGeneratedComputers()
@@ -1512,28 +1409,6 @@ public class TutorialSceneController : MonoBehaviour
         });
 
         return result;
-    }
-
-    private ObjectiveComputer GetTutorialComputer(List<ObjectiveComputer> computers, int index, string fallbackName, int networkId, bool selected)
-    {
-        ObjectiveComputer computer = null;
-
-        if (computers != null && index >= 0 && index < computers.Count)
-        {
-            computer = computers[index];
-        }
-
-        if (computer == null)
-        {
-            computer = CreateComputer(fallbackName, GetPointNearPlayer(2.2f + index * 0.35f, 1.3f - index * 0.45f), Quaternion.identity, selected, networkId);
-            HideRenderers(computer != null ? computer.gameObject : null, true);
-        }
-        else
-        {
-            ConfigureObjectiveComputer(computer, selected, networkId);
-        }
-
-        return computer;
     }
 
     private WorldItemPickup ResolveCameraPickup()
@@ -1849,19 +1724,21 @@ public class TutorialSceneController : MonoBehaviour
             return;
         }
 
-        if (step == CommonStep.RepairFirstComputer && commonComputer.IsRestored)
+        int restoredComputerCount = GetCommonRestoredComputerCount();
+
+        if (step == CommonStep.RepairFirstComputer && restoredComputerCount >= 1)
         {
             SetCommonStep(CommonStep.RepairSecondComputer);
             return;
         }
 
-        if (step == CommonStep.RepairSecondComputer && citizenTargetA.IsRestored)
+        if (step == CommonStep.RepairSecondComputer && restoredComputerCount >= 2)
         {
             SetCommonStep(CommonStep.RepairThirdComputer);
             return;
         }
 
-        if (step == CommonStep.RepairThirdComputer && citizenTargetB.IsRestored)
+        if (step == CommonStep.RepairThirdComputer && restoredComputerCount >= 3)
         {
             SetCommonStep(CommonStep.OpenExit);
             return;
@@ -1869,8 +1746,30 @@ public class TutorialSceneController : MonoBehaviour
 
         if (step == CommonStep.OpenExit && IsTutorialExitOpen())
         {
-            CompleteTutorial();
+            EnterCitizenStage();
         }
+    }
+
+    private int GetCommonRestoredComputerCount()
+    {
+        int count = 0;
+
+        if (commonComputer != null && commonComputer.IsRestored)
+        {
+            count++;
+        }
+
+        if (citizenTargetA != null && citizenTargetA.IsRestored)
+        {
+            count++;
+        }
+
+        if (citizenTargetB != null && citizenTargetB.IsRestored)
+        {
+            count++;
+        }
+
+        return count;
     }
 
     private void UpdateCitizenProgress()
@@ -1997,7 +1896,7 @@ public class TutorialSceneController : MonoBehaviour
         currentStage = TutorialStage.Complete;
         if (labObjectiveManager != null)
         {
-            labObjectiveManager.SetHudOverride("튜토리얼 완료", "공통 조작, 시민 목표, 도플갱어 방해 흐름을 완료했습니다. ESC로 메인 화면에 돌아갈 수 있습니다.", 1f);
+            labObjectiveManager.SetHudOverride("튜토리얼 완료", "이동, 스캔, 아이템 사용, 컴퓨터 복구, 탈출 흐름을 완료했습니다. ESC로 메인 화면에 돌아갈 수 있습니다.", 1f);
         }
 
         if (promptText != null)
@@ -2120,16 +2019,16 @@ public class TutorialSceneController : MonoBehaviour
                     objective = "아이템 사용";
                     break;
                 case CommonStep.RepairFirstComputer:
-                    step = "첫 번째 목표 컴퓨터를 찾아 " + GameInputBindings.FormatKey(GameInputBindings.Interact) + "를 길게 눌러 복구하세요.";
-                    objective = "목표 컴퓨터 1/3";
+                    step = "목표 컴퓨터를 찾아 " + GameInputBindings.FormatKey(GameInputBindings.Interact) + "를 길게 눌러 복구하세요.";
+                    objective = "목표 컴퓨터 " + GetCommonRestoredComputerCount() + "/3";
                     break;
                 case CommonStep.RepairSecondComputer:
-                    step = "스캔으로 다음 목표 컴퓨터를 찾고 " + GameInputBindings.FormatKey(GameInputBindings.Interact) + "를 길게 눌러 복구하세요.";
-                    objective = "목표 컴퓨터 2/3";
+                    step = "스캔으로 다른 목표 컴퓨터를 찾고 " + GameInputBindings.FormatKey(GameInputBindings.Interact) + "를 길게 눌러 복구하세요.";
+                    objective = "목표 컴퓨터 " + GetCommonRestoredComputerCount() + "/3";
                     break;
                 case CommonStep.RepairThirdComputer:
                     step = "마지막 목표 컴퓨터를 복구하면 탈출문이 열립니다.";
-                    objective = "목표 컴퓨터 3/3";
+                    objective = "목표 컴퓨터 " + GetCommonRestoredComputerCount() + "/3";
                     break;
                 case CommonStep.OpenExit:
                     step = "탈출문을 찾아 " + GameInputBindings.FormatKey(GameInputBindings.Interact) + "로 열면 시민 실전으로 이어집니다.";
@@ -2201,39 +2100,6 @@ public class TutorialSceneController : MonoBehaviour
         }
     }
 
-    private ObjectiveComputer CreateComputer(string name, Vector3 position, Quaternion rotation, bool selected, int networkId)
-    {
-        GameObject root = CreatePrefabObject(computerPrefab, name, position, rotation, worldRoot);
-
-        if (root == null)
-        {
-            root = new GameObject(name);
-            root.transform.SetParent(worldRoot, false);
-            root.transform.position = position;
-            root.transform.rotation = rotation;
-
-            CreateChildCube("Base", root.transform, new Vector3(0f, 0.36f, 0f), new Vector3(1.25f, 0.72f, 0.52f), computerMaterial, ScanSurfaceType.SecurityTerminal);
-            CreateChildCube("Screen", root.transform, new Vector3(0f, 0.96f, -0.18f), new Vector3(1.05f, 0.55f, 0.12f), metalMaterial, ScanSurfaceType.SecurityTerminal);
-            CreateChildCube("Keyboard", root.transform, new Vector3(0f, 0.74f, 0.27f), new Vector3(0.98f, 0.12f, 0.34f), metalMaterial, ScanSurfaceType.SecurityTerminal);
-        }
-
-        PrepareTutorialObjectForScan(root, ScanSurfaceType.SecurityTerminal);
-
-        ObjectiveComputer computer = root.GetComponent<ObjectiveComputer>();
-        if (computer == null)
-        {
-            computer = root.GetComponentInChildren<ObjectiveComputer>(true);
-        }
-
-        if (computer == null)
-        {
-            computer = root.AddComponent<ObjectiveComputer>();
-        }
-
-        ConfigureObjectiveComputer(computer, selected, networkId);
-        return computer;
-    }
-
     private void ConfigureObjectiveComputer(ObjectiveComputer computer, bool selected, int networkId)
     {
         if (computer == null)
@@ -2248,6 +2114,7 @@ public class TutorialSceneController : MonoBehaviour
         computer.requireCitizenRole = false;
         computer.preventKillerRestore = true;
         computer.allowKillerSabotage = true;
+        computer.preventSabotageAfterExitUnlocked = false;
         computer.existingDotRecolorRadius = 1.5f;
         computer.existingDotRecolorCenter = computer.transform;
         computer.SetNetworkObjectiveId(networkId);
@@ -2293,25 +2160,6 @@ public class TutorialSceneController : MonoBehaviour
 
         ConfigureAudioSource(source, clip, volume, pitch, loop, 1f, 1.5f, 14f);
         return source;
-    }
-
-    private void CreateTable(string name, Vector3 position)
-    {
-        GameObject prefabTable = CreatePrefabObject(tablePrefab, name, position, Quaternion.identity, worldRoot);
-        if (prefabTable != null)
-        {
-            EnsureScanSurfaceInfo(prefabTable, ScanSurfaceType.Metal);
-            return;
-        }
-
-        GameObject table = new GameObject(name);
-        table.transform.SetParent(worldRoot, false);
-        table.transform.position = position;
-        CreateChildCube("Top", table.transform, new Vector3(0f, 0.58f, 0f), new Vector3(1.6f, 0.12f, 0.9f), metalMaterial, ScanSurfaceType.Metal);
-        CreateChildCube("LegA", table.transform, new Vector3(-0.62f, 0.28f, -0.32f), new Vector3(0.12f, 0.56f, 0.12f), metalMaterial, ScanSurfaceType.Metal);
-        CreateChildCube("LegB", table.transform, new Vector3(0.62f, 0.28f, -0.32f), new Vector3(0.12f, 0.56f, 0.12f), metalMaterial, ScanSurfaceType.Metal);
-        CreateChildCube("LegC", table.transform, new Vector3(-0.62f, 0.28f, 0.32f), new Vector3(0.12f, 0.56f, 0.12f), metalMaterial, ScanSurfaceType.Metal);
-        CreateChildCube("LegD", table.transform, new Vector3(0.62f, 0.28f, 0.32f), new Vector3(0.12f, 0.56f, 0.12f), metalMaterial, ScanSurfaceType.Metal);
     }
 
     private WorldItemPickup CreatePickup(ItemType itemType, Vector3 position)

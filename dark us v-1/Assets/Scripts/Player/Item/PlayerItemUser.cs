@@ -755,6 +755,18 @@ public class PlayerItemUser : MonoBehaviour
             return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
+        ObjectiveComputer objectiveComputer = hit.collider.GetComponentInParent<ObjectiveComputer>();
+        if (objectiveComputer != null)
+        {
+            return SurfaceTypeToDotColorGroup(objectiveComputer.CurrentScanSurfaceType, hit.normal, hit.collider);
+        }
+
+        WorldItemPickup itemPickup = hit.collider.GetComponentInParent<WorldItemPickup>();
+        if (itemPickup != null)
+        {
+            return ScanDotColorGroup.Item;
+        }
+
         ScanSurfaceInfo surfaceInfo = hit.collider.GetComponent<ScanSurfaceInfo>();
 
         if (surfaceInfo == null)
@@ -767,7 +779,12 @@ public class PlayerItemUser : MonoBehaviour
             return ResolveFallbackDotColorGroupByNormal(hit.normal);
         }
 
-        switch (surfaceInfo.surfaceType)
+        return SurfaceTypeToDotColorGroup(surfaceInfo.surfaceType, hit.normal, hit.collider);
+    }
+
+    private ScanDotColorGroup SurfaceTypeToDotColorGroup(ScanSurfaceType surfaceType, Vector3 fallbackNormal, Collider hitCollider)
+    {
+        switch (surfaceType)
         {
             case ScanSurfaceType.Floor:
                 return ScanDotColorGroup.Floor;
@@ -791,7 +808,7 @@ public class PlayerItemUser : MonoBehaviour
                 return ScanDotColorGroup.EmergencyExit;
 
             case ScanSurfaceType.PlayerBody:
-                PlayerCombatTarget playerTarget = hit.collider.GetComponentInParent<PlayerCombatTarget>();
+                PlayerCombatTarget playerTarget = hitCollider != null ? hitCollider.GetComponentInParent<PlayerCombatTarget>() : null;
                 return playerTarget != null
                     ? PlayerColorPalette.GetScanColorGroupForActor(playerTarget.GetActorNumber())
                     : ScanDotColorGroup.PlayerBody;
@@ -812,7 +829,7 @@ public class PlayerItemUser : MonoBehaviour
                 return ScanDotColorGroup.Item;
 
             default:
-                return ResolveFallbackDotColorGroupByNormal(hit.normal);
+                return ResolveFallbackDotColorGroupByNormal(fallbackNormal);
         }
     }
 

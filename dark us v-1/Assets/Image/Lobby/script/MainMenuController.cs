@@ -27,6 +27,11 @@ public class MainMenuController : MonoBehaviour
     private const string RoomHostPrefsKey = "dark_us_room_is_host";
     private const string RoomVisiblePrefsKey = "dark_us_room_is_visible";
     private const string RoomTitlePrefsKey = "dark_us_room_title";
+    private const string MainMenuUiResourcePath = "Lobby/UI/";
+    private Sprite mainMenuButtonSprite;
+    private Sprite mainMenuButtonHoverSprite;
+    private Sprite mainMenuButtonPressedSprite;
+    private Sprite mainMenuSidePanelSprite;
 
     [Header("Scene Names")]
     // 방 만들기를 눌렀을 때 이동할 씬 이름이다.
@@ -493,6 +498,8 @@ public class MainMenuController : MonoBehaviour
         ConfigureMenuButtonSelection("SettingsButton");
         ConfigureMenuButtonSelection("ExitButton");
         EnsureMainMenuChrome(buttonGroup);
+        ConfigureMainMenuPanelSkin();
+        ConfigureMainMenuLogoStyle();
 
         RectTransform groupRect = buttonGroup.GetComponent<RectTransform>();
         if (groupRect != null)
@@ -574,6 +581,29 @@ public class MainMenuController : MonoBehaviour
         logoRect.position = logoPosition;
     }
 
+    private void ConfigureMainMenuLogoStyle()
+    {
+        Transform logoTransform = FindUiTransform("LogoImage");
+        if (logoTransform == null)
+        {
+            return;
+        }
+
+        RectTransform logoRect = logoTransform.GetComponent<RectTransform>();
+        if (logoRect != null)
+        {
+            logoRect.sizeDelta = new Vector2(430f, 145f);
+        }
+
+        Image logoImage = logoTransform.GetComponent<Image>();
+        if (logoImage != null)
+        {
+            logoImage.color = Color.white;
+            logoImage.preserveAspect = true;
+            logoImage.raycastTarget = false;
+        }
+    }
+
     private void PositionMainMenuButton(string buttonName, Vector2 anchoredPosition)
     {
         Transform buttonTransform = FindUiTransform(buttonName);
@@ -621,6 +651,38 @@ public class MainMenuController : MonoBehaviour
         {
             buttonGroup.SetAsLastSibling();
         }
+    }
+
+    private void ConfigureMainMenuPanelSkin()
+    {
+        EnsureMainMenuUiSprites();
+
+        Transform panelTransform = FindUiTransform("LeftGradientPanel");
+        if (panelTransform == null || mainMenuSidePanelSprite == null)
+        {
+            return;
+        }
+
+        Image panelImage = panelTransform.GetComponent<Image>();
+        if (panelImage == null)
+        {
+            return;
+        }
+
+        RectTransform panelRect = panelTransform.GetComponent<RectTransform>();
+        if (panelRect != null)
+        {
+            panelRect.anchorMin = new Vector2(0f, 0f);
+            panelRect.anchorMax = new Vector2(0f, 1f);
+            panelRect.pivot = new Vector2(0f, 0.5f);
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = new Vector2(520f, 0f);
+        }
+
+        panelImage.sprite = mainMenuSidePanelSprite;
+        panelImage.type = Image.Type.Simple;
+        panelImage.color = Color.white;
+        panelImage.raycastTarget = false;
     }
 
     private GameObject CreateMenuChromePanel(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, Vector2 anchor, Vector2 pivot, Color color)
@@ -693,6 +755,29 @@ public class MainMenuController : MonoBehaviour
         }
     }
 
+    private void EnsureMainMenuUiSprites()
+    {
+        if (mainMenuButtonSprite == null)
+        {
+            mainMenuButtonSprite = Resources.Load<Sprite>(MainMenuUiResourcePath + "MainMenuButton");
+        }
+
+        if (mainMenuButtonHoverSprite == null)
+        {
+            mainMenuButtonHoverSprite = Resources.Load<Sprite>(MainMenuUiResourcePath + "MainMenuButtonHover");
+        }
+
+        if (mainMenuButtonPressedSprite == null)
+        {
+            mainMenuButtonPressedSprite = Resources.Load<Sprite>(MainMenuUiResourcePath + "MainMenuButtonPressed");
+        }
+
+        if (mainMenuSidePanelSprite == null)
+        {
+            mainMenuSidePanelSprite = Resources.Load<Sprite>(MainMenuUiResourcePath + "MainMenuSidePanel");
+        }
+    }
+
     private void ConfigureMainMenuVisualStyle(string buttonName)
     {
         Transform buttonTransform = FindUiTransform(buttonName);
@@ -701,24 +786,36 @@ public class MainMenuController : MonoBehaviour
             return;
         }
 
+        EnsureMainMenuUiSprites();
+
         Image image = buttonTransform.GetComponent<Image>();
         if (image != null)
         {
-            image.color = new Color(0.015f, 0.018f, 0.02f, 0.58f);
+            if (mainMenuButtonSprite != null)
+            {
+                image.sprite = mainMenuButtonSprite;
+                image.type = Image.Type.Sliced;
+                image.color = Color.white;
+            }
+            else
+            {
+                image.color = new Color(0.015f, 0.018f, 0.02f, 0.58f);
+            }
         }
 
         TMP_Text text = buttonTransform.GetComponentInChildren<TMP_Text>(true);
         if (text != null)
         {
             text.fontStyle = FontStyles.Normal;
-            text.color = new Color(0.76f, 0.82f, 0.84f, 1f);
-            text.fontSize = 28f;
+            text.color = new Color(0.78f, 0.86f, 0.88f, 1f);
+            text.fontSize = 26f;
+            text.characterSpacing = 2f;
             text.alignment = TextAlignmentOptions.MidlineLeft;
             RectTransform textRect = text.GetComponent<RectTransform>();
             if (textRect != null)
             {
-                textRect.offsetMin = new Vector2(20f, 0f);
-                textRect.offsetMax = new Vector2(-16f, 0f);
+                textRect.offsetMin = new Vector2(62f, 0f);
+                textRect.offsetMax = new Vector2(-20f, 0f);
             }
         }
 
@@ -738,6 +835,7 @@ public class MainMenuController : MonoBehaviour
         Outline outline = buttonTransform.GetComponent<Outline>();
         if (outline != null)
         {
+            outline.enabled = mainMenuButtonSprite == null;
             outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.20f);
             outline.effectDistance = new Vector2(2f, -2f);
         }
@@ -745,11 +843,15 @@ public class MainMenuController : MonoBehaviour
         MenuButtonHoverEffect hover = MenuButtonHoverEffect.EnsureOn(buttonTransform.gameObject);
         if (hover != null)
         {
-            hover.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.58f);
-            hover.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.82f);
-            hover.pressedBackgroundColor = new Color(0.16f, 0.18f, 0.17f, 0.86f);
-            hover.normalTextColor = new Color(0.76f, 0.82f, 0.84f, 1f);
-            hover.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);
+            hover.normalSprite = mainMenuButtonSprite;
+            hover.hoverSprite = mainMenuButtonHoverSprite;
+            hover.pressedSprite = mainMenuButtonPressedSprite;
+            hover.normalBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.015f, 0.018f, 0.02f, 0.58f);
+            hover.hoverBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.09f, 0.12f, 0.13f, 0.82f);
+            hover.pressedBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.16f, 0.18f, 0.17f, 0.86f);
+            hover.normalTextColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+            hover.hoverTextColor = new Color(1f, 0.78f, 0.38f, 1f);
+            hover.ApplyDefaultState();
         }
     }
 
@@ -1458,8 +1560,11 @@ public class MainMenuController : MonoBehaviour
         rectTransform.sizeDelta = new Vector2(preferredWidth, preferredHeight);
         rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
+        EnsureMainMenuUiSprites();
+
         Image image = buttonObject.GetComponent<Image>();
-        image.color = new Color(0.015f, 0.018f, 0.02f, 0.62f);
+        image.sprite = mainMenuButtonSprite;
+        image.color = mainMenuButtonSprite != null ? Color.white : new Color(0.015f, 0.018f, 0.02f, 0.62f);
         image.type = Image.Type.Sliced;
 
         LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
@@ -1467,6 +1572,7 @@ public class MainMenuController : MonoBehaviour
         layoutElement.preferredHeight = preferredHeight;
 
         Outline outline = buttonObject.GetComponent<Outline>();
+        outline.enabled = mainMenuButtonSprite == null;
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.34f);
         outline.effectDistance = new Vector2(2f, -2f);
 
@@ -1476,11 +1582,15 @@ public class MainMenuController : MonoBehaviour
         MenuButtonHoverEffect hoverEffect = buttonObject.GetComponent<MenuButtonHoverEffect>();
         hoverEffect.buttonImage = image;
         hoverEffect.labelText = labelText;
-        hoverEffect.normalBackgroundColor = new Color(0.015f, 0.018f, 0.02f, 0.52f);
-        hoverEffect.hoverBackgroundColor = new Color(0.09f, 0.12f, 0.13f, 0.76f);
-        hoverEffect.pressedBackgroundColor = new Color(0.16f, 0.18f, 0.17f, 0.86f);
-        hoverEffect.normalTextColor = new Color(0.76f, 0.82f, 0.84f, 1f);
-        hoverEffect.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);
+        hoverEffect.normalSprite = mainMenuButtonSprite;
+        hoverEffect.hoverSprite = mainMenuButtonHoverSprite;
+        hoverEffect.pressedSprite = mainMenuButtonPressedSprite;
+        hoverEffect.normalBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.015f, 0.018f, 0.02f, 0.52f);
+        hoverEffect.hoverBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.09f, 0.12f, 0.13f, 0.76f);
+        hoverEffect.pressedBackgroundColor = mainMenuButtonSprite != null ? Color.white : new Color(0.16f, 0.18f, 0.17f, 0.86f);
+        hoverEffect.normalTextColor = new Color(0.78f, 0.86f, 0.88f, 1f);
+        hoverEffect.hoverTextColor = new Color(1f, 0.78f, 0.38f, 1f);
+        hoverEffect.ApplyDefaultState();
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;

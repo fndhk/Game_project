@@ -633,6 +633,12 @@ public class LidarSpotScanner : MonoBehaviour
             return SurfaceTypeToDotColorGroup(objectiveComputer.CurrentScanSurfaceType, hit.normal, hit.collider);
         }
 
+        WorldItemPickup itemPickup = hit.collider.GetComponentInParent<WorldItemPickup>();
+        if (itemPickup != null)
+        {
+            return ScanDotColorGroup.Item;
+        }
+
         // 자기 자신에서 먼저 찾는다.
         ScanSurfaceInfo surfaceInfo = hit.collider.GetComponent<ScanSurfaceInfo>();
 

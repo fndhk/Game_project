@@ -324,6 +324,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         Outline outline = listPanel.GetComponent<Outline>();
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.34f);
         outline.effectDistance = new Vector2(2f, -2f);
+        DarkUiSkin.ApplyPanel(listImage, DarkUiSkin.PanelStyle.Standard);
 
         VerticalLayoutGroup layout = listPanel.GetComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(36, 36, 36, 36);
@@ -363,11 +364,13 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         {
             BindExistingPublicRoomListUi();
             MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+            ApplyDarkUiSkinToSceneCanvas();
             return;
         }
 
         BuildUi();
         MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
+        ApplyDarkUiSkinToSceneCanvas();
     }
 
     private void BindExistingPublicRoomListUi()
@@ -420,6 +423,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         Outline outline = dialog.GetComponent<Outline>();
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.4f);
         outline.effectDistance = new Vector2(2f, -2f);
+        DarkUiSkin.ApplyPanel(dialogImage, DarkUiSkin.PanelStyle.Modal);
 
         TMP_Text title = CreateText(dialog.transform, "TitleText", T("Create Room"), 42f, FontStyles.Normal);
         RectTransform titleRect = title.GetComponent<RectTransform>();
@@ -498,6 +502,7 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         input.characterLimit = 24;
         input.lineType = TMP_InputField.LineType.SingleLine;
         input.targetGraphic = inputImage;
+        DarkUiSkin.ApplyInputField(input);
 
         return input;
     }
@@ -591,8 +596,18 @@ public class PublicRoomListSceneController : MonoBehaviourPunCallbacks
         Navigation navigation = button.navigation;
         navigation.mode = Navigation.Mode.None;
         button.navigation = navigation;
+        DarkUiSkin.ApplyButton(button);
 
         return button;
+    }
+
+    private void ApplyDarkUiSkinToSceneCanvas()
+    {
+        Transform canvas = FindUiTransform("Canvas");
+        if (canvas != null)
+        {
+            DarkUiSkin.ApplyToHierarchy(canvas);
+        }
     }
 
     private bool IsValidRoomCode(string roomCode)

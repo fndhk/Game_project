@@ -242,8 +242,6 @@ MonoBehaviour:
   doppelgangerRoomPrefab: {fileID: 8044564116768356952, guid: 08a101170a80091489cedf4e31d15cc9, type: 3}
   corridorPrefab: {fileID: 5265196270627548212, guid: 7fdf0ce100d570d4e808e71aaeb5d42b, type: 3}
   doorPrefab: {fileID: 4383723645761305266, guid: e94f949465047664eba674e3275687c4, type: 3}
-  computerPrefab: {fileID: 5066011981024590580, guid: 6ffbbf1ffc6d5ad41a9227807d96d3db, type: 3}
-  tablePrefab: {fileID: 6095102028218993867, guid: bb4a95e3e43e5b04f9043fbda4f69d17, type: 3}
   cameraPickupPrefab: {fileID: 8821532076256912300, guid: c5b18f3e02837c04892e540e29e8719b, type: 3}
   dotSourcePrefab: {fileID: 1403309224220635405, guid: 6165c3467485d0c4bb79a37f5bd1ee63, type: 3}
   scanPulseClip: {fileID: 8300000, guid: 869e50b440605d342a75f030e78f5ce7, type: 3}

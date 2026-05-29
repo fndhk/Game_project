@@ -162,6 +162,7 @@ public class SettingsUIController : MonoBehaviour
             built = true;
             BuildEmbeddedLayout();
             NormalizeEmbeddedLayout();
+            DarkUiSkin.ApplyToHierarchy(transform);
             RefreshAll();
             return;
         }
@@ -171,6 +172,7 @@ public class SettingsUIController : MonoBehaviour
             built = true;
             BindExistingHierarchy();
             NormalizeLayout();
+            DarkUiSkin.ApplyToHierarchy(transform);
             RefreshAll();
             return;
         }
@@ -279,6 +281,7 @@ public class SettingsUIController : MonoBehaviour
         });
 
         NormalizeLayout();
+        DarkUiSkin.ApplyToHierarchy(transform);
         RefreshAll();
     }
 
@@ -874,6 +877,7 @@ public class SettingsUIController : MonoBehaviour
         slider.handleRect = handle.rectTransform;
         slider.targetGraphic = handle;
         NormalizeSliderVisuals(slider);
+        DarkUiSkin.ApplySlider(slider);
         return slider;
     }
 
@@ -972,6 +976,7 @@ public class SettingsUIController : MonoBehaviour
         slider.fillRect = fill.rectTransform;
         slider.handleRect = handle.rectTransform;
         slider.targetGraphic = handle;
+        DarkUiSkin.ApplySlider(slider);
     }
 
     private RectTransform GetOrCreateRectChild(Transform parent, string objectName)
@@ -1086,6 +1091,7 @@ public class SettingsUIController : MonoBehaviour
         hover.hoverTextColor = new Color(1f, 0.8f, 0.42f, 1f);
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
+        DarkUiSkin.ApplyButton(button);
         return button;
     }
 
@@ -1176,6 +1182,8 @@ public class SettingsUIController : MonoBehaviour
         {
             MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
         }
+
+        DarkUiSkin.ApplyToHierarchy(transform);
     }
 
     private void NormalizeEmbeddedLayout()
@@ -1209,6 +1217,8 @@ public class SettingsUIController : MonoBehaviour
         {
             MenuButtonHoverEffect.EnsureOnAllSceneButtons(gameObject.scene);
         }
+
+        DarkUiSkin.ApplyToHierarchy(transform);
     }
 
     private void NormalizeRows(Transform content)

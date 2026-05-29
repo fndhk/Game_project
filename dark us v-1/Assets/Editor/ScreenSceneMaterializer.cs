@@ -180,6 +180,7 @@ public static class ScreenSceneMaterializer
     private static RectTransform CreatePanel(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 position, Vector2 size, Vector2 pivot)
     {
         Image panel = CreateImage(name, parent, r => SetRect(r, anchorMin, anchorMax, position, size, pivot), new Color(0.006f, 0.012f, 0.014f, 0.56f));
+        DarkUiSkin.ApplyPanel(panel, DarkUiSkin.PanelStyle.Hud);
         RectTransform rect = panel.rectTransform;
         CreateImage(name + " Top", rect, r => SetOffsets(r, new Vector2(0f, 1f), Vector2.one, new Vector2(0f, -2f), Vector2.zero), new Color(0.44f, 0.92f, 1f, 0.18f));
         CreateImage(name + " Bottom", rect, r => SetOffsets(r, Vector2.zero, new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, 2f)), new Color(0.44f, 0.92f, 1f, 0.18f));

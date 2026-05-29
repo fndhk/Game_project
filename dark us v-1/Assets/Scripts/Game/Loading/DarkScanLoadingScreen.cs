@@ -742,6 +742,7 @@ public class DarkScanLoadingScreen : MonoBehaviour
         panel.pivot = new Vector2(anchorMin.x <= 0.5f ? 0f : 1f, 0.5f);
         panel.sizeDelta = size;
         panel.anchoredPosition = anchoredPosition;
+        DarkUiSkin.ApplyPanel(panel.GetComponent<Image>(), DarkUiSkin.PanelStyle.Hud);
 
         Color lineColor = new Color(0.44f, 0.92f, 1f, 0.18f);
         RectTransform top = CreateImage(name + " Top", panel, lineColor).rectTransform;

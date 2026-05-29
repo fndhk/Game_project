@@ -15062,21 +15062,29 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuBackgroundAnimator
   backgroundRect: {fileID: 2014994015}
-  baseScale: 1
-  zoomAmount: 0.025
-  zoomSpeed: 0.08
+  baseScale: 1.04
+  zoomAmount: 0.035
+  zoomSpeed: 0.055
+  panAmount: {x: 22, y: 10}
+  panSpeed: 0.045
+  rotationAmount: 0.12
+  rotationSpeed: 0.033
   darkOverlayImage: {fileID: 1171055350}
-  darkOverlayMinAlpha: 0.2
-  darkOverlayMaxAlpha: 0.32
+  darkOverlayMinAlpha: 0.18
+  darkOverlayMaxAlpha: 0.31
   darkOverlayFlickerSpeed: 0.7
   logoImage: {fileID: 0}
   logoMinAlpha: 0.72
   logoMaxAlpha: 1
   logoFlickerSpeed: 1.2
   scanDotOverlayImage: {fileID: 0}
-  scanDotMinAlpha: 0
-  scanDotMaxAlpha: 0.12
+  scanDotMinAlpha: 0.015
+  scanDotMaxAlpha: 0.09
   scanDotFlickerSpeed: 0.45
+  createScanDotOverlayIfMissing: 1
+  scanDotScrollSpeed: {x: 7, y: -3}
+  scanDotDriftAmount: {x: 34, y: 18}
+  scanDotTileLoopDistance: 256
 --- !u!114 &2014994017
 MonoBehaviour:
   m_ObjectHideFlags: 0

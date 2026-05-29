@@ -95,47 +95,47 @@ public class InstancedScanDotRenderer : MonoBehaviour
 
     [Header("Dot Colors")]
     // 기본 점 색이다.
-    [SerializeField] private Color defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
+    [SerializeField] private Color defaultDotColor = new Color(0.7735849f, 0.7735849f, 0.77254903f, 1f);
 
     [Header("Laboratory Dot Colors")]
     // 연구소 바닥용 점 색이다.
-    [SerializeField] private Color floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
+    [SerializeField] private Color floorDotColor = new Color(0.7607843f, 0.7607843f, 0.7411765f, 1f);
 
     // 연구소 벽용 점 색이다.
     [SerializeField] private Color wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
 
     // 금속/기계류용 점 색이다.
-    [SerializeField] private Color metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
+    [SerializeField] private Color metalDotColor = new Color(0.5671057f, 0.63719296f, 0.6792453f, 1f);
 
     // 유리용 점 색이다.
-    [SerializeField] private Color glassDotColor = new Color(0.42f, 0.72f, 0.86f, 1f);
+    [SerializeField] private Color glassDotColor = new Color(0.5742702f, 0.75670004f, 0.8396226f, 1f);
 
     // 탈출 핵심 오브젝트용 점 색이다.
-    [SerializeField] private Color accessCoreDotColor = new Color(0.12f, 0.88f, 0.82f, 1f);
+    [SerializeField] private Color accessCoreDotColor = new Color(0.8679245f, 0.86174536f, 0.46262014f, 1f);
 
     // 보안 단말기/복구 전 컴퓨터용 점 색이다.
-    [SerializeField] private Color securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
+    [SerializeField] private Color securityTerminalDotColor = new Color(0.16078432f, 0.5019608f, 1f, 1f);
 
     // 탈출구용 점 색이다.
-    [SerializeField] private Color emergencyExitDotColor = new Color(0.95f, 0.78f, 0.20f, 1f);
+    [SerializeField] private Color emergencyExitDotColor = new Color(1f, 0.9783717f, 0f, 1f);
 
     // 플레이어 신체용 점 색이다.
-    [SerializeField] private Color playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
+    [SerializeField] private Color playerBodyDotColor = new Color(0.7075472f, 0.7075472f, 0.49061057f, 1f);
 
     // 생명체/괴물용 점 색이다.
     [SerializeField] private Color creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
 
     // 가짜 컴퓨터 복구 완료용 점 색이다.
-    [SerializeField] private Color wrongComputerDotColor = new Color(0.95f, 0.16f, 0.16f, 1f);
+    [SerializeField] private Color wrongComputerDotColor = new Color(1f, 0.1f, 0.08f, 1f);
 
     // 진짜 탈출 컴퓨터 복구 완료용 점 색이다.
-    [SerializeField] private Color restoredEscapeComputerDotColor = new Color(0.18f, 0.55f, 1f, 1f);
+    [SerializeField] private Color restoredEscapeComputerDotColor = new Color(0.29803923f, 0.9019608f, 0.41960785f, 1f);
 
     // 도플갱어가 다시 망가뜨린 목표 컴퓨터용 점 색이다.
     [SerializeField] private Color sabotagedComputerDotColor = new Color(0.78f, 0.18f, 1f, 1f);
 
-    // 아이템 공통용 점 색이다. 너무 튀지 않게 회색 계열로 둔다.
-    [SerializeField] private Color itemDotColor = new Color(0.68f, 0.68f, 0.66f, 1f);
+    // 아이템 공통용 점 색이다.
+    [SerializeField] private Color itemDotColor = new Color(1f, 0.72638464f, 0f, 1f);
 
     // 원본 프리팹에서 가져온 메쉬이다.
     private Mesh instanceMesh;
@@ -663,30 +663,30 @@ public class InstancedScanDotRenderer : MonoBehaviour
     private void ApplyReadabilityColorPreset()
     {
         // 기본 구조물은 완전 흰색보다 낮은 회백색을 쓴다.
-        defaultDotColor = new Color(0.82f, 0.82f, 0.80f, 1f);
+        defaultDotColor = new Color(0.7735849f, 0.7735849f, 0.77254903f, 1f);
 
-        // 연구소 기본 구조물은 기존 공포감을 유지하기 위해 낮은 채도의 회색 계열로 둔다.
-        floorDotColor = new Color(0.46f, 0.46f, 0.44f, 1f);
+        // 연구소 기본 구조물은 labor 씬과 같은 색을 쓴다.
+        floorDotColor = new Color(0.7607843f, 0.7607843f, 0.7411765f, 1f);
         wallDotColor = new Color(0.76f, 0.76f, 0.74f, 1f);
-        metalDotColor = new Color(0.52f, 0.62f, 0.68f, 1f);
-        glassDotColor = new Color(0.42f, 0.72f, 0.86f, 1f);
+        metalDotColor = new Color(0.5671057f, 0.63719296f, 0.6792453f, 1f);
+        glassDotColor = new Color(0.5742702f, 0.75670004f, 0.8396226f, 1f);
 
         // 목표 오브젝트만 색이 확실히 보이게 한다.
-        accessCoreDotColor = new Color(0.12f, 0.88f, 0.82f, 1f);
-        securityTerminalDotColor = new Color(0.30f, 0.90f, 0.42f, 1f);
-        emergencyExitDotColor = new Color(0.95f, 0.78f, 0.20f, 1f);
+        accessCoreDotColor = new Color(0.8679245f, 0.86174536f, 0.46262014f, 1f);
+        securityTerminalDotColor = new Color(0.16078432f, 0.5019608f, 1f, 1f);
+        emergencyExitDotColor = new Color(1f, 0.9783717f, 0f, 1f);
 
         // 플레이어와 생명체는 역할 구분이 아니라 생체 신호 느낌만 준다.
-        playerBodyDotColor = new Color(0.95f, 0.24f, 0.20f, 1f);
+        playerBodyDotColor = new Color(0.7075472f, 0.7075472f, 0.49061057f, 1f);
         creatureDotColor = new Color(0.72f, 0.08f, 0.08f, 1f);
 
-        // 복구 결과 컴퓨터는 테스트 단계에서만 구분이 확실히 되게 둔다.
-        wrongComputerDotColor = new Color(0.95f, 0.16f, 0.16f, 1f);
-        restoredEscapeComputerDotColor = new Color(0.18f, 0.55f, 1f, 1f);
+        // 복구 결과 컴퓨터는 오답 빨강, 정답 초록으로 구분한다.
+        wrongComputerDotColor = new Color(1f, 0.1f, 0.08f, 1f);
+        restoredEscapeComputerDotColor = new Color(0.29803923f, 0.9019608f, 0.41960785f, 1f);
         sabotagedComputerDotColor = new Color(0.78f, 0.18f, 1f, 1f);
 
-        // 아이템은 게임 분위기를 해치지 않게 낮은 회색 계열로 둔다.
-        itemDotColor = new Color(0.68f, 0.68f, 0.66f, 1f);
+        // 아이템은 labor 씬과 같은 주황색으로 둔다.
+        itemDotColor = new Color(1f, 0.72638464f, 0f, 1f);
     }
 
     // 그룹별 리스트를 준비하는 함수이다.

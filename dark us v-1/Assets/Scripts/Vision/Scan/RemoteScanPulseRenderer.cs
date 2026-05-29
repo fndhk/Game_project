@@ -447,6 +447,12 @@ public class RemoteScanPulseRenderer : MonoBehaviour
             return SurfaceTypeToDotColorGroup(objectiveComputer.CurrentScanSurfaceType, hit.normal, hit.collider);
         }
 
+        WorldItemPickup itemPickup = hit.collider.GetComponentInParent<WorldItemPickup>();
+        if (itemPickup != null)
+        {
+            return ScanDotColorGroup.Item;
+        }
+
         ScanSurfaceInfo surfaceInfo = hit.collider.GetComponent<ScanSurfaceInfo>();
         if (surfaceInfo == null)
         {

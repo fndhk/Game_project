@@ -566,6 +566,7 @@ public class InGamePauseMenu : MonoBehaviour
         embeddedSettingsObject.SetActive(false);
 
         confirmDialog = CreateConfirmDialog(root.transform);
+        DarkUiSkin.ApplyToHierarchy(root.transform);
     }
 
     private void SetOpenFalse()
@@ -649,6 +650,7 @@ public class InGamePauseMenu : MonoBehaviour
         Outline outline = panel.GetComponent<Outline>();
         outline.effectColor = new Color(0.62f, 0.78f, 0.86f, 0.28f);
         outline.effectDistance = new Vector2(2f, -2f);
+        DarkUiSkin.ApplyPanel(image, objectName.Contains("Confirm") ? DarkUiSkin.PanelStyle.Modal : DarkUiSkin.PanelStyle.Standard);
 
         return panel;
     }
@@ -702,6 +704,7 @@ public class InGamePauseMenu : MonoBehaviour
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
         button.onClick.AddListener(action);
+        DarkUiSkin.ApplyButton(button);
         return button;
     }
 
