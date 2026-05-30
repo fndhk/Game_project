@@ -44,6 +44,19 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
     // 맵 생성과 플레이어 스폰이 끝날 시간을 주기 위해 기다릴 프레임 수이다.
     public int startDelayFrames = 2;
 
+    [Header("Startup Safety")]
+    // 자동 생성 맵에서는 방/컴퓨터가 만들어진 뒤 목표를 선택해야 한다.
+    public bool waitForMapGeneration = true;
+
+    // 맵 생성 완료를 기다릴 최대 시간이다.
+    public float mapGenerationWaitTimeout = 15f;
+
+    // 후보 컴퓨터가 아직 없을 때 추가로 재시도할 횟수이다.
+    public int emptyCandidateRetryCount = 30;
+
+    // 후보 컴퓨터 재시도 간격이다.
+    public float emptyCandidateRetryInterval = 0.15f;
+
     [Header("Distance Rules")]
     // 성공 컴퓨터 선택 시 거리 조건을 사용할지 정한다.
     public bool useDistanceRules = true;
@@ -102,12 +115,72 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
             yield return null;
         }
 
-        SelectObjectivesNow();
+        if (waitForMapGeneration)
+        {
+            yield return StartCoroutine(WaitForMapGenerationToFinish());
+        }
+
+        yield return StartCoroutine(SelectObjectivesWhenReady());
     }
 
     // ContextMenu나 다른 스크립트에서 즉시 목표 컴퓨터를 다시 선택할 수 있게 한다.
     [ContextMenu("Select Computer Objectives Now")]
     public void SelectObjectivesNow()
+    {
+        TrySelectObjectivesNow(true);
+    }
+
+    private IEnumerator SelectObjectivesWhenReady()
+    {
+        int totalAttempts = Mathf.Max(1, emptyCandidateRetryCount + 1);
+        float retryInterval = Mathf.Max(0f, emptyCandidateRetryInterval);
+
+        for (int attempt = 0; attempt < totalAttempts; attempt++)
+        {
+            bool isFinalAttempt = attempt == totalAttempts - 1;
+            if (TrySelectObjectivesNow(isFinalAttempt))
+            {
+                yield break;
+            }
+
+            if (retryInterval > 0f)
+            {
+                yield return new WaitForSecondsRealtime(retryInterval);
+            }
+            else
+            {
+                yield return null;
+            }
+        }
+    }
+
+    private IEnumerator WaitForMapGenerationToFinish()
+    {
+        float timeoutAt = Time.realtimeSinceStartup + Mathf.Max(0.1f, mapGenerationWaitTimeout);
+
+        while (Time.realtimeSinceStartup < timeoutAt)
+        {
+            ArtNotes.UndergroundLaboratoryGenerator.LaboratoryGenerator generator =
+                Object.FindAnyObjectByType<ArtNotes.UndergroundLaboratoryGenerator.LaboratoryGenerator>();
+
+            if (generator == null || !generator.GenerateOnStart || generator.ManualGenerationOnly)
+            {
+                yield break;
+            }
+
+            if (generator.IsGenerationComplete &&
+                !ArtNotes.UndergroundLaboratoryGenerator.LaboratoryGenerator.IsAnyGenerationRunning)
+            {
+                yield break;
+            }
+
+            yield return null;
+        }
+
+        Debug.LogWarning("[ComputerObjectiveRandomizer] Map generation wait timed out. Trying objective selection with current scene state.");
+    }
+
+    private bool TrySelectObjectivesNow(bool logWarnings)
     {
         GameLoopManager.EnsureExists();
         ApplyPlayerCountBalance();
@@ -119,8 +192,12 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
 
         if (objectiveManager == null)
         {
-            Debug.LogWarning("[ComputerObjectiveRandomizer] LabObjectiveManager를 찾지 못함.");
-            return;
+            if (logWarnings)
+            {
+                Debug.LogWarning("[ComputerObjectiveRandomizer] LabObjectiveManager를 찾지 못함.");
+            }
+
+            return false;
         }
 
         List<ObjectiveComputer> candidates = CollectCandidates();
@@ -129,8 +206,12 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
 
         if (candidates == null || candidates.Count <= 0)
         {
-            Debug.LogWarning("[ComputerObjectiveRandomizer] ObjectiveComputer 후보를 찾지 못함. 컴퓨터 프리팹에 ObjectiveComputer 컴포넌트를 붙여야 함.");
-            return;
+            if (logWarnings)
+            {
+                Debug.LogWarning("[ComputerObjectiveRandomizer] ObjectiveComputer 후보를 찾지 못함. 컴퓨터 프리팹에 ObjectiveComputer 컴포넌트를 붙여야 함.");
+            }
+
+            return false;
         }
 
         int targetCount = Mathf.Min(Mathf.Max(1, requiredComputerCount), candidates.Count);
@@ -165,6 +246,8 @@ public class ComputerObjectiveRandomizer : MonoBehaviour
             " / Candidates: " + candidates.Count +
             " / PlayerStarts: " + playerStartPositions.Count
         );
+
+        return true;
     }
 
     private void ApplyPlayerCountBalance()

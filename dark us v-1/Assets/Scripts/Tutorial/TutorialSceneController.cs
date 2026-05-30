@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public class TutorialSceneController : MonoBehaviour
 {
     private const int RequiredTutorialComputerCount = 3;
+    private const int PreferredTutorialComputerCount = 4;
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
@@ -171,6 +172,7 @@ public class TutorialSceneController : MonoBehaviour
         {
             tutorialReady = false;
             HideTutorialLoading();
+            ShowTutorialSetupError();
             yield break;
         }
 
@@ -362,9 +364,6 @@ public class TutorialSceneController : MonoBehaviour
         CreateDividerWall(8f);
         CreateDividerWall(24f);
 
-        commonGate = CreateGate("CommonToCitizenGate", new Vector3(0f, 1.5f, 8f), "common");
-        citizenGate = CreateGate("CitizenToDoppelgangerGate", new Vector3(0f, 1.5f, 24f), "citizen");
-
         commonRoomCenter = new Vector3(0f, 0f, 0f);
         citizenRoomCenter = new Vector3(0f, 0f, 16f);
         doppelgangerRoomCenter = new Vector3(0f, 0f, 32f);
@@ -426,7 +425,8 @@ public class TutorialSceneController : MonoBehaviour
         generator.ItemGroundOffset = 0.03f;
 
         generator.ExitMinDistanceFromStart = 12f;
-        generator.ExitDoorPrefab = generatorExitDoorPrefab;
+        generator.PlaceExitDoor = false;
+        generator.ExitDoorPrefab = null;
         generator.MaxPlacementAttempts = 360;
         generator.MaxFullGenerationAttempts = 12;
         generator.InsteadDoor = generatorBlockDoorPrefab != null ? generatorBlockDoorPrefab : generatorConnectedDoorPrefab;
@@ -497,11 +497,8 @@ public class TutorialSceneController : MonoBehaviour
 
         if (tutorialExitDoor != null)
         {
-            tutorialExitDoor.ResetDoorState(true);
-            if (labObjectiveManager != null)
-            {
-                labObjectiveManager.RegisterExitDoor(tutorialExitDoor);
-            }
+            DisableGeneratedExitDoor(tutorialExitDoor);
+            tutorialExitDoor = null;
         }
 
         Light[] generatedLights = root.GetComponentsInChildren<Light>(true);
@@ -517,6 +514,16 @@ public class TutorialSceneController : MonoBehaviour
         commonRoomCenter = playerPosition;
         citizenRoomCenter = playerPosition;
         doppelgangerRoomCenter = playerPosition;
+    }
+
+    private void DisableGeneratedExitDoor(EmergencyExitDoor exitDoor)
+    {
+        if (exitDoor == null)
+        {
+            return;
+        }
+
+        exitDoor.gameObject.SetActive(false);
     }
 
     private bool TryBuildInGamePrefabMap()
@@ -571,9 +578,6 @@ public class TutorialSceneController : MonoBehaviour
         }
 
         AlignCellToExit(doppelgangerRoom, doppelgangerSouthExit, secondCorridorNorthExit);
-
-        commonGate = CreateGateAtExit("CommonToCitizenGate", commonNorthExit, "common");
-        citizenGate = CreateGateAtExit("CitizenToDoppelgangerGate", citizenNorthExit, "citizen");
 
         Transform[] connectedExits =
         {
@@ -695,11 +699,7 @@ public class TutorialSceneController : MonoBehaviour
             gate = gateObject.AddComponent<TutorialGate>();
         }
 
-        gate.owner = this;
-        gate.gateId = gateId;
-        gate.lockedPrompt = "아직 잠겨 있습니다.";
-        gate.openPrompt = "[E] 문 열기";
-        gate.SetUnlocked(false);
+        ConfigureTutorialGate(gate, gateId);
         return gate;
     }
 
@@ -816,12 +816,22 @@ public class TutorialSceneController : MonoBehaviour
     {
         GameObject gateObject = CreateCube(name, position, new Vector3(3.7f, 3f, 0.3f), gateMaterial, ScanSurfaceType.EmergencyExit);
         TutorialGate gate = gateObject.AddComponent<TutorialGate>();
+        ConfigureTutorialGate(gate, gateId);
+        return gate;
+    }
+
+    private void ConfigureTutorialGate(TutorialGate gate, string gateId)
+    {
+        if (gate == null)
+        {
+            return;
+        }
+
         gate.owner = this;
         gate.gateId = gateId;
-        gate.lockedPrompt = "아직 잠겨 있습니다.";
-        gate.openPrompt = "[E] 문 열기";
+        gate.lockedPrompt = "목표를 완료하면 열립니다.";
+        gate.openPrompt = GameInputBindings.FormatKey(GameInputBindings.Interact) + " 탈출문 열기";
         gate.SetUnlocked(false);
-        return gate;
     }
 
     private void CreateRoomLight(string name, Vector3 position)
@@ -857,7 +867,7 @@ public class TutorialSceneController : MonoBehaviour
         root.offsetMax = Vector2.zero;
 
         RectTransform guidePanel = CreateRect("GuidePanel", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(36f, -36f));
-        guidePanel.sizeDelta = new Vector2(650f, 218f);
+        guidePanel.sizeDelta = new Vector2(650f, 268f);
         AddImage(guidePanel, new Color(0f, 0f, 0f, 0.72f));
         AddOutline(guidePanel, new Color(0.62f, 0.86f, 0.92f, 0.32f), new Vector2(1.5f, -1.5f));
 
@@ -865,11 +875,11 @@ public class TutorialSceneController : MonoBehaviour
         titleText.rectTransform.sizeDelta = new Vector2(-48f, 40f);
 
         bodyText = CreateLabel("", guidePanel, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(24f, -60f), 20f, new Color(0.86f, 0.94f, 0.95f, 1f), TextAlignmentOptions.Left);
-        bodyText.rectTransform.sizeDelta = new Vector2(-48f, 68f);
+        bodyText.rectTransform.sizeDelta = new Vector2(-48f, 108f);
         bodyText.textWrappingMode = TextWrappingModes.Normal;
 
-        stepText = CreateLabel("", guidePanel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(24f, 24f), 18f, new Color(0.64f, 0.91f, 1f, 1f), TextAlignmentOptions.Left);
-        stepText.rectTransform.sizeDelta = new Vector2(-48f, 58f);
+        stepText = CreateLabel("", guidePanel, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(24f, 22f), 18f, new Color(0.64f, 0.91f, 1f, 1f), TextAlignmentOptions.Left);
+        stepText.rectTransform.sizeDelta = new Vector2(-48f, 74f);
         stepText.textWrappingMode = TextWrappingModes.Normal;
 
         RectTransform statusPanel = CreateRect("StatusPanel", root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -36f));
@@ -884,8 +894,8 @@ public class TutorialSceneController : MonoBehaviour
         objectiveText.rectTransform.sizeDelta = new Vector2(-40f, 48f);
         objectiveText.textWrappingMode = TextWrappingModes.Normal;
 
-        promptText = CreateLabel("", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 148f), 24f, new Color(0.96f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
-        promptText.rectTransform.sizeDelta = new Vector2(800f, 42f);
+        promptText = CreateLabel("", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), 24f, new Color(0.96f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
+        promptText.rectTransform.sizeDelta = new Vector2(720f, 48f);
         promptText.gameObject.SetActive(false);
 
         BuildCrosshair(root);
@@ -959,8 +969,8 @@ public class TutorialSceneController : MonoBehaviour
         root.offsetMin = Vector2.zero;
         root.offsetMax = Vector2.zero;
 
-        promptText = CreateLabel("", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 148f), 24f, new Color(0.96f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
-        promptText.rectTransform.sizeDelta = new Vector2(800f, 42f);
+        promptText = CreateLabel("", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), 24f, new Color(0.96f, 0.98f, 1f, 1f), TextAlignmentOptions.Center);
+        promptText.rectTransform.sizeDelta = new Vector2(720f, 48f);
         promptText.gameObject.SetActive(false);
     }
 
@@ -1330,6 +1340,7 @@ public class TutorialSceneController : MonoBehaviour
 
     private void BuildTrainingObjects()
     {
+        EnsureTutorialComputerPool();
         List<ObjectiveComputer> generatedMapComputers = CollectSortedGeneratedComputers();
 
         if (generatedMapComputers.Count < RequiredTutorialComputerCount)
@@ -1346,6 +1357,7 @@ public class TutorialSceneController : MonoBehaviour
         citizenTargetB = generatedMapComputers[2];
         citizenWrongComputer = generatedMapComputers.Count > 3 ? generatedMapComputers[3] : commonComputer;
         doppelgangerComputer = citizenTargetB != null ? citizenTargetB : commonComputer;
+        EnsureSingleTutorialExitGate();
 
         ConfigureObjectiveComputer(commonComputer, false, 1);
         ConfigureObjectiveComputer(citizenTargetA, false, 2);
@@ -1371,11 +1383,249 @@ public class TutorialSceneController : MonoBehaviour
         GameLoopManager.EnsureExists().RebuildComputerIndex();
     }
 
+    private void EnsureSingleTutorialExitGate()
+    {
+        if (tutorialExitDoor != null)
+        {
+            return;
+        }
+
+        TutorialGate exitGate = commonGate != null ? commonGate : citizenGate;
+        Vector3 exitPosition = GetTutorialExitGatePosition();
+        Quaternion exitRotation = GetFallbackComputerRotation(exitPosition);
+
+        if (exitGate == null)
+        {
+            exitGate = CreateGate("TutorialExitDoor", exitPosition, "tutorial_exit");
+        }
+
+        exitGate.gameObject.name = "TutorialExitDoor";
+        exitGate.SetClosedPose(exitPosition, exitRotation);
+        ConfigureTutorialGate(exitGate, "tutorial_exit");
+        RemoveExtraTutorialGates(exitGate);
+
+        commonGate = exitGate;
+        citizenGate = exitGate;
+    }
+
+    private void RemoveExtraTutorialGates(TutorialGate keepGate)
+    {
+        Transform root = worldRoot != null ? worldRoot : transform;
+        TutorialGate[] gates = root.GetComponentsInChildren<TutorialGate>(true);
+
+        for (int i = 0; i < gates.Length; i++)
+        {
+            TutorialGate gate = gates[i];
+            if (gate == null || gate == keepGate)
+            {
+                continue;
+            }
+
+            Destroy(gate.gameObject);
+        }
+    }
+
+    private void EnsureCommonTutorialGate()
+    {
+        EnsureSingleTutorialExitGate();
+    }
+
+    private void EnsureCitizenTutorialGate()
+    {
+        EnsureSingleTutorialExitGate();
+    }
+
+    private Vector3 GetTutorialExitGatePosition()
+    {
+        Transform anchor = citizenTargetB != null
+            ? citizenTargetB.transform
+            : citizenTargetA != null
+                ? citizenTargetA.transform
+                : commonComputer != null ? commonComputer.transform : null;
+
+        Vector3 position = anchor != null
+            ? GetPointNearTransform(anchor, 2.8f, 0f)
+            : GetPointNearPlayer(7.2f, 0f);
+
+        position.y = 1.5f;
+        return position;
+    }
+
+    private void EnsureTutorialComputerPool()
+    {
+        List<ObjectiveComputer> computers = CollectUniqueTutorialComputers();
+        int targetCount = Mathf.Max(RequiredTutorialComputerCount, PreferredTutorialComputerCount);
+
+        for (int i = computers.Count; i < targetCount; i++)
+        {
+            ObjectiveComputer fallbackComputer = CreateFallbackObjectiveComputer(
+                "TutorialFallbackComputer_" + (i + 1),
+                GetFallbackComputerPosition(i)
+            );
+
+            if (fallbackComputer != null)
+            {
+                computers.Add(fallbackComputer);
+            }
+        }
+
+        generatedComputers = computers.ToArray();
+    }
+
+    private List<ObjectiveComputer> CollectUniqueTutorialComputers()
+    {
+        List<ObjectiveComputer> result = new List<ObjectiveComputer>();
+
+        if (generatedComputers != null)
+        {
+            for (int i = 0; i < generatedComputers.Length; i++)
+            {
+                if (generatedComputers[i] != null && !result.Contains(generatedComputers[i]))
+                {
+                    result.Add(generatedComputers[i]);
+                }
+            }
+        }
+
+        Transform root = worldRoot != null ? worldRoot : transform;
+        ObjectiveComputer[] sceneComputers = root.GetComponentsInChildren<ObjectiveComputer>(true);
+        for (int i = 0; i < sceneComputers.Length; i++)
+        {
+            if (sceneComputers[i] != null && !result.Contains(sceneComputers[i]))
+            {
+                result.Add(sceneComputers[i]);
+            }
+        }
+
+        return result;
+    }
+
+    private ObjectiveComputer CreateFallbackObjectiveComputer(string objectName, Vector3 position)
+    {
+        GameObject root = new GameObject(objectName);
+        root.transform.SetParent(worldRoot != null ? worldRoot : transform, false);
+        root.transform.position = position;
+        root.transform.rotation = GetFallbackComputerRotation(position);
+        ApplyRevealSurfaceLayer(root);
+
+        GameObject inactiveVisual = CreateChildCube(
+            objectName + "_Inactive",
+            root.transform,
+            new Vector3(0f, 0.54f, 0f),
+            new Vector3(1.15f, 1.05f, 0.68f),
+            metalMaterial,
+            ScanSurfaceType.SecurityTerminal
+        );
+
+        CreateChildCube(
+            objectName + "_Screen",
+            inactiveVisual.transform,
+            new Vector3(0f, 0.28f, -0.38f),
+            new Vector3(0.74f, 0.34f, 0.04f),
+            markerMaterial,
+            ScanSurfaceType.SecurityTerminal
+        );
+
+        GameObject restoredVisual = CreateChildCube(
+            objectName + "_Restored",
+            root.transform,
+            new Vector3(0f, 0.54f, 0f),
+            new Vector3(1.15f, 1.05f, 0.68f),
+            markerMaterial,
+            ScanSurfaceType.RestoredEscapeComputer
+        );
+        restoredVisual.SetActive(false);
+
+        ObjectiveComputer computer = root.AddComponent<ObjectiveComputer>();
+        computer.inactiveVisualRoot = inactiveVisual;
+        computer.restoredVisualRoot = restoredVisual;
+        computer.scanSurfaceInfos = root.GetComponentsInChildren<ScanSurfaceInfo>(true);
+        ConfigureObjectiveComputer(computer, false, 0);
+        return computer;
+    }
+
+    private Vector3 GetFallbackComputerPosition(int index)
+    {
+        float forwardOffset = 2.3f + (index % 3) * 1.25f;
+        float rightOffset;
+
+        switch (index % 4)
+        {
+            case 0:
+                rightOffset = -1.25f;
+                break;
+            case 1:
+                rightOffset = 1.25f;
+                break;
+            case 2:
+                rightOffset = 0f;
+                break;
+            default:
+                rightOffset = 2.35f;
+                break;
+        }
+
+        Vector3 position = GetPointNearPlayer(forwardOffset, rightOffset);
+        position.y = Mathf.Max(0.08f, position.y);
+        return position;
+    }
+
+    private Quaternion GetFallbackComputerRotation(Vector3 position)
+    {
+        if (playerObject == null)
+        {
+            return Quaternion.identity;
+        }
+
+        Vector3 lookDirection = playerObject.transform.position - position;
+        lookDirection.y = 0f;
+        if (lookDirection.sqrMagnitude <= 0.001f)
+        {
+            return Quaternion.identity;
+        }
+
+        return Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
+    }
+
     private bool HasRequiredTutorialComputers()
     {
         return commonComputer != null &&
                citizenTargetA != null &&
                citizenTargetB != null;
+    }
+
+    private void ShowTutorialSetupError()
+    {
+        Debug.LogError("[TutorialSceneController] Tutorial setup failed because required computers could not be prepared.");
+
+        if (titleText != null)
+        {
+            titleText.text = "튜토리얼 준비 실패";
+        }
+
+        if (bodyText != null)
+        {
+            bodyText.text = "튜토리얼 목표 컴퓨터를 준비하지 못했습니다. 메인 메뉴로 돌아간 뒤 다시 시도하세요.";
+        }
+
+        if (stepText != null)
+        {
+            stepText.text = "필수 오브젝트 생성 실패";
+        }
+
+        if (objectiveText != null)
+        {
+            objectiveText.text = "튜토리얼 중단";
+        }
+
+        if (promptText != null)
+        {
+            promptText.text = "ESC 메뉴 또는 버튼으로 나갈 수 있습니다.";
+            promptText.gameObject.SetActive(true);
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     private List<ObjectiveComputer> CollectSortedGeneratedComputers()
@@ -1505,6 +1755,7 @@ public class TutorialSceneController : MonoBehaviour
         gameLoop.showInGameResultOverlay = false;
         gameLoop.killerWinsOnTimerExpired = false;
         gameLoop.killerWinsWhenNoCitizenCanEscape = false;
+        gameLoop.citizensWinWhenNoKillerCanPlay = false;
         gameLoop.requiredEscapedCitizens = 99;
         RoundTimer.ResetTimer();
     }
@@ -1520,12 +1771,12 @@ public class TutorialSceneController : MonoBehaviour
         labObjectiveManager.SetupComputerObjectives(new[] { commonComputer, citizenTargetA, citizenTargetB }, 3);
         if (commonGate != null)
         {
-            commonGate.SetUnlocked(false);
+            commonGate.ResetClosed(false);
         }
 
-        if (citizenGate != null)
+        if (citizenGate != null && citizenGate != commonGate)
         {
-            citizenGate.SetUnlocked(false);
+            citizenGate.ResetClosed(false);
         }
 
         SetCommonStep(CommonStep.Move);
@@ -1544,7 +1795,7 @@ public class TutorialSceneController : MonoBehaviour
         labObjectiveManager.SetupComputerObjectives(new[] { citizenTargetA, citizenTargetB }, 2);
         if (citizenGate != null)
         {
-            citizenGate.SetUnlocked(false);
+            citizenGate.ResetClosed(false);
         }
 
         SetCitizenStep(CitizenStep.FindFirstTarget);
@@ -1624,6 +1875,8 @@ public class TutorialSceneController : MonoBehaviour
 
         if (step == CommonStep.OpenExit)
         {
+            EnsureCommonTutorialGate();
+
             if (commonGate != null)
             {
                 commonGate.SetUnlocked(true);
@@ -1643,6 +1896,8 @@ public class TutorialSceneController : MonoBehaviour
 
         if (step == CitizenStep.Escape)
         {
+            EnsureCitizenTutorialGate();
+
             if (citizenGate != null)
             {
                 citizenGate.SetUnlocked(true);
@@ -1957,7 +2212,7 @@ public class TutorialSceneController : MonoBehaviour
     private float GetTutorialProgress01()
     {
         int completedSteps = 0;
-        int totalSteps = 8;
+        int totalSteps = 17;
 
         switch (currentStage)
         {
@@ -1991,7 +2246,7 @@ public class TutorialSceneController : MonoBehaviour
         if (currentStage == TutorialStage.Common)
         {
             title = "튜토리얼: 1인 실전 훈련";
-            body = "labor 씬의 인게임 시스템 그대로 작은 맵에서 스폰, 스캔, 아이템, 컴퓨터 3개 복구, 탈출을 익힙니다.";
+            body = "시민 승리 조건: 목표 컴퓨터를 복구하고 탈출문으로 나가기.\n아이템: 카메라=넓은 스캔, 칼=근접 공격, 구급상자=회복.";
             CommonStep commonStep = (CommonStep)currentStep;
 
             switch (commonStep)
@@ -2005,11 +2260,11 @@ public class TutorialSceneController : MonoBehaviour
                     objective = "스캔";
                     break;
                 case CommonStep.PickUpItem:
-                    step = "스캔으로 드러난 카메라 아이템을 보고 " + GameInputBindings.FormatKey(GameInputBindings.Pickup) + "로 줍습니다.";
+                    step = "스캔으로 드러난 아이템을 보고 " + GameInputBindings.FormatKey(GameInputBindings.Pickup) + "로 줍습니다. 인벤토리는 " + GameInputBindings.FormatKey(GameInputBindings.Slot1) + "/" + GameInputBindings.FormatKey(GameInputBindings.Slot2) + " 슬롯입니다.";
                     objective = "아이템 줍기";
                     break;
                 case CommonStep.UseItem:
-                    step = GameInputBindings.FormatKey(GameInputBindings.UseItem) + "으로 카메라 아이템을 사용하세요.";
+                    step = GameInputBindings.FormatKey(GameInputBindings.Slot1) + "/" + GameInputBindings.FormatKey(GameInputBindings.Slot2) + "로 슬롯 선택, " + GameInputBindings.FormatKey(GameInputBindings.UseItem) + "로 사용, " + GameInputBindings.FormatKey(GameInputBindings.DropItem) + "로 버립니다. 지금은 카메라를 사용하세요.";
                     objective = "아이템 사용";
                     break;
                 case CommonStep.RepairFirstComputer:
@@ -2036,7 +2291,7 @@ public class TutorialSceneController : MonoBehaviour
         if (currentStage == TutorialStage.Citizen)
         {
             title = "튜토리얼 2: 시민 실전";
-            body = "목표 컴퓨터 2개를 찾고, 오답과 도플갱어 방해를 처리한 뒤 탈출합니다.";
+            body = "시민은 진짜 목표 컴퓨터만 진행도에 반영됩니다.\n오답 컴퓨터와 도플갱어 방해를 구분하고, 열린 탈출문으로 나가야 승리합니다.";
             CitizenStep citizenStep = (CitizenStep)currentStep;
 
             switch (citizenStep)
@@ -2058,7 +2313,7 @@ public class TutorialSceneController : MonoBehaviour
                     objective = "목표 컴퓨터 2/2";
                     break;
                 case CitizenStep.Escape:
-                    step = "열린 문을 열고 다음 방으로 이동하세요.";
+                    step = "목표를 끝냈다면 탈출문을 열고 나가세요. 실전에서는 시민이 필요한 수만큼 탈출하면 시민 승리입니다.";
                     objective = "탈출";
                     break;
             }
@@ -2069,7 +2324,7 @@ public class TutorialSceneController : MonoBehaviour
         if (currentStage == TutorialStage.Doppelganger)
         {
             title = "튜토리얼 3: 도플갱어 실전";
-            body = "시민처럼 행동하다가 킬타임에 공격하고, 복구된 목표 컴퓨터를 다시 망가뜨립니다.";
+            body = "도플갱어 승리 조건: 시민을 모두 쓰러뜨리거나 시간 동안 탈출을 막기.\n킬타임 공격과 복구된 목표 컴퓨터 방해가 핵심입니다.";
             DoppelgangerStep doppelStep = (DoppelgangerStep)currentStep;
 
             switch (doppelStep)
@@ -2595,6 +2850,42 @@ public class TutorialGate : MonoBehaviour, IPlayerInteractable
     private Collider[] colliders;
 
     public bool IsOpen => opened;
+
+    public void SetClosedPose(Vector3 worldPosition, Quaternion worldRotation)
+    {
+        transform.SetPositionAndRotation(worldPosition, worldRotation);
+        closedLocalPosition = transform.localPosition;
+        opened = false;
+        EnableColliders();
+    }
+
+    public void ResetClosed(bool isUnlocked)
+    {
+        opened = false;
+        unlocked = isUnlocked;
+        transform.localPosition = closedLocalPosition;
+
+        EnableColliders();
+    }
+
+    private void EnableColliders()
+    {
+        if (colliders == null || colliders.Length == 0)
+        {
+            colliders = GetComponentsInChildren<Collider>(true);
+        }
+
+        if (colliders != null)
+        {
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                if (colliders[i] != null)
+                {
+                    colliders[i].enabled = true;
+                }
+            }
+        }
+    }
 
     private void Awake()
     {

@@ -24,6 +24,7 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
     public int requiredEscapedCitizens = 1;
     public bool killerWinsOnTimerExpired = true;
     public bool killerWinsWhenNoCitizenCanEscape = true;
+    public bool citizensWinWhenNoKillerCanPlay = true;
 
     [Header("Round End Flow")]
     public bool autoReturnToRoomLobby = true;
@@ -107,6 +108,12 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         }
 
         if (GameplayStartupGate.IsBlocked)
+        {
+            return;
+        }
+
+        EvaluateCitizenWinCondition();
+        if (gameOver)
         {
             return;
         }
@@ -237,6 +244,17 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
             PhotonNetwork.RaiseEvent(PlayerEscapedEventCode, payload, new RaiseEventOptions { Receivers = ReceiverGroup.Others }, SendOptions.SendReliable);
         }
         EvaluateCitizenWinCondition();
+    }
+
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        if (gameOver)
+        {
+            return;
+        }
+
+        EvaluateCitizenWinCondition();
+        EvaluateKillerWinCondition();
     }
 
     public void OnEvent(EventData photonEvent)
@@ -384,6 +402,12 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         int escapedCitizens = 0;
         Player[] players = PhotonNetwork.InRoom ? PhotonNetwork.PlayerList : null;
 
+        if (citizensWinWhenNoKillerCanPlay && AreAllPhotonKillersUnableToPlay(players))
+        {
+            TriggerGameOver(true, "Killer Disconnected", true);
+            return;
+        }
+
         if (players != null && players.Length > 0)
         {
             for (int i = 0; i < players.Length; i++)
@@ -403,6 +427,55 @@ public class GameLoopManager : MonoBehaviourPunCallbacks, IOnEventCallback
         {
             TriggerGameOver(true, "Citizens Escaped", true);
         }
+    }
+
+    private bool AreAllPhotonKillersUnableToPlay(Player[] players)
+    {
+        if (!PhotonNetwork.InRoom || players == null || players.Length <= 0)
+        {
+            return false;
+        }
+
+        int[] imposterActors = RoleAssignmentManager.GetPhotonImposterActors();
+        if (imposterActors == null || imposterActors.Length <= 0)
+        {
+            return false;
+        }
+
+        int activeKillers = 0;
+        for (int i = 0; i < imposterActors.Length; i++)
+        {
+            int actorNumber = imposterActors[i];
+            if (actorNumber <= 0)
+            {
+                continue;
+            }
+
+            if (IsActorInPlayerList(players, actorNumber) && !deadActors.Contains(actorNumber) && !escapedActors.Contains(actorNumber))
+            {
+                activeKillers++;
+            }
+        }
+
+        return activeKillers <= 0;
+    }
+
+    private bool IsActorInPlayerList(Player[] players, int actorNumber)
+    {
+        if (players == null || actorNumber <= 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] != null && players[i].ActorNumber == actorNumber)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void EvaluateKillerWinCondition()

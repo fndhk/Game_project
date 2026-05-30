@@ -98,6 +98,7 @@ public static class InGameLocalization
             case "Killer Wins": return "도플갱어 승리";
             case "Citizens Escaped": return "시민이 탈출했습니다";
             case "All Citizens Down": return "모든 시민이 쓰러졌습니다";
+            case "Killer Disconnected": return "도플갱어가 이탈했습니다";
             case "Time Expired": return "시간 초과";
             case "Round Complete": return "라운드 종료";
             case "Kill Time": return "킬타임";
@@ -212,6 +213,7 @@ public static class InGameLocalization
         {
             case "Imposter": return "Doppelganger";
             case "Killer Wins": return "Doppelganger Wins";
+            case "Killer Disconnected": return "Doppelganger disconnected";
             case "Hide From Imposter": return "Hide From Doppelganger";
             default: return key;
         }
@@ -278,6 +280,7 @@ public static class InGameLocalization
             case "Killer Wins": return "ドッペルゲンガーの勝利";
             case "Citizens Escaped": return "市民が脱出しました";
             case "All Citizens Down": return "市民が全員倒れました";
+            case "Killer Disconnected": return "ドッペルゲンガーが離脱しました";
             case "Time Expired": return "時間切れ";
             case "Round Complete": return "ラウンド終了";
             case "Kill Time": return "キルタイム";

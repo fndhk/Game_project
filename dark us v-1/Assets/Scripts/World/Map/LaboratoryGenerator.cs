@@ -278,6 +278,9 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
         public float ItemGroundOffset = 0.03f;
 
         [Header("Exit Door")]
+        [Tooltip("켜면 생성된 맵의 열린 출구 하나에 탈출문을 배치")]
+        public bool PlaceExitDoor = true;
+
         [Tooltip("탈출구가 시작방에서 이 거리보다 가까우면 생성 금지")]
         public float ExitMinDistanceFromStart = 25f;
 
@@ -782,7 +785,7 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
                 }
             }
 
-            bool exitDoorOk = GenerateExitDoor(openExits);
+            bool exitDoorOk = !PlaceExitDoor || GenerateExitDoor(openExits);
 
             if (!exitDoorOk)
             {
@@ -1140,13 +1143,43 @@ namespace ArtNotes.UndergroundLaboratoryGenerator
 
             if (prefab != null)
             {
-                InstantiateDoorPrefab(prefab, selectedExit.Exit, ExitDoorPositionOffset, ExitDoorRotationOffset);
+                GameObject exitDoor = InstantiateDoorPrefab(prefab, selectedExit.Exit, ExitDoorPositionOffset, ExitDoorRotationOffset);
+                ConfigureGeneratedExitDoor(exitDoor);
             }
 
             RemoveOpenExit(openExits, selectedExit);
             DestroyExitObject(selectedExit.Exit);
 
             return true;
+        }
+
+        private void ConfigureGeneratedExitDoor(GameObject exitDoor)
+        {
+            if (exitDoor == null)
+            {
+                return;
+            }
+
+            global::EmergencyExitDoor emergencyExit = exitDoor.GetComponentInChildren<global::EmergencyExitDoor>(true);
+            if (emergencyExit == null)
+            {
+                emergencyExit = exitDoor.AddComponent<global::EmergencyExitDoor>();
+            }
+
+            emergencyExit.startLocked = true;
+            emergencyExit.openAutomaticallyWhenUnlocked = false;
+
+            if (emergencyExit.doorRoot == null)
+            {
+                emergencyExit.doorRoot = exitDoor.transform;
+            }
+
+            emergencyExit.ResetDoorState(true);
+
+            if (global::LabObjectiveManager.Instance != null)
+            {
+                global::LabObjectiveManager.Instance.RegisterExitDoor(emergencyExit);
+            }
         }
 
         // 실제 프리팹을 생성해서 targetExit에 맞춰 붙인다.
