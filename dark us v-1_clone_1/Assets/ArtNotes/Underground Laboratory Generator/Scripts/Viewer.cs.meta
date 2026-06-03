@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 76022e2e66af173449b99cb0b49b0964
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 179509
+  packageName: Undergroud Laboratory Generator
+  packageVersion: 1.0
+  assetPath: Assets/ArtNotes/Underground Laboratory Generator/Scripts/Viewer.cs
+  uploadId: 645257

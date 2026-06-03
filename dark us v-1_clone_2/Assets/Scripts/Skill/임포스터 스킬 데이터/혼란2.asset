@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93a2398d65d00d24db894ccfe982e553, type: 3}
+  m_Name: "\uD63C\uB7802"
+  m_EditorClassIdentifier: Assembly-CSharp::SkillData
+  skillName: "\uD63C\uB7802"
+  skillID: 12
+  skillIcon: {fileID: 0}
+  cooldown: 90
+  maxCharges: 9999
+  description: "\uBAA8\uB4E0 \uD50C\uB808\uC774\uC5B4\uC758 \uBAA9\uC18C\uB9AC\uB97C
+    15\uCD08\uAC04 \uBCC0\uC870 \uBC0F \uC2A4\uC2A4\uB85C\uC758 \uC774\uB3D9\uC18D\uB3C4\uB97C
+    \uC77C\uC2DC\uC801\uC73C\uB85C \uC99D\uAC00\uC2DC\uD0B5\uB2C8\uB2E4."

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: c7939606da92c0a48afb3b69f7670dc2
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 179509
+  packageName: Undergroud Laboratory Generator
+  packageVersion: 1.0
+  assetPath: Assets/ArtNotes/Underground Laboratory Generator/Scripts/SimpleRandom.cs
+  uploadId: 645257
