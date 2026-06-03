@@ -1,17 +1,16 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
+// í¬í†¤ ìƒì†ì„ ë²„ë¦¬ê³  ì¼ë°˜ MonoBehaviourë¡œ ëŒì•„ì™€ ê¼¬ì„ì„ ì›ì²œ ì°¨ë‹¨í•©ë‹ˆë‹¤.
 public class PlayerRoleAndSkillManager : MonoBehaviour
 {
     [Header("Player Role (0: Civilian, 1: Imposter)")]
     public int currentRole = -1;
 
     [Header("All Skill Database")]
-    // Áß¿ä: ±âÈ¹ÇÑ ½Ã¹Î/ÀÓÆ÷½ºÅÍ ½ºÅ³ µ¥ÀÌÅÍµé(ScriptableObject)À» ¿¡µğÅÍ¿¡¼­ ¿©±â¿¡ ´Ù ³Ö¾îµÎ¼¼¿ä!
     [SerializeField] private List<SkillData> allSkills = new List<SkillData>();
 
-    // ÇöÀç À¯ÀúÀÇ ½ºÅ³ Á¤º¸ (°ÔÀÓ ³»¿¡¼­ »ç¿ë)
     public SkillData currentSkill;
     private float currentCooldown;
     private int currentCharges;
@@ -19,107 +18,155 @@ public class PlayerRoleAndSkillManager : MonoBehaviour
     [Header("Current Applied Skill Name")]
     public string currentSkillName = "None";
 
+    // ë‚´ ìºë¦­í„°ì¸ì§€ íŒë‹¨í•  ë³€ìˆ˜
+    private bool isMyLocalPlayer = false;
+
     void Start()
     {
-        // 1. ¼­¹ö·ÎºÎÅÍ Á÷¾÷ ÇÒ´ç¹ŞÀ½ (ÀÌ ¿¹½Ã¿¡¼­´Â Start¿¡¼­ ÀÓÀÇ ÇÒ´ç)
-        currentRole = 0; // ¿¹: ½Ã¹Î ÇÒ´ç
+        Debug.Log($"--- [ìŠ¤í‚¬ ì¶”ì  1] {gameObject.name} ìŠ¤í° ì™„ë£Œ! Start ì§„ì… ---");
 
-        // 2. Á÷¾÷¿¡ ¸Â´Â ¼±ÅÃµÈ ½ºÅ³ µ¥ÀÌÅÍ °¡Á®¿À±â
-        ApplySelectedSkill();
+        // â˜… [í•µì‹¬] ìºë¦­í„°ì— ë¶™ì–´ìˆëŠ” ê¸°ì¡´ ì»´í¬ë„ŒíŠ¸(ì˜ˆ: PlayerCombatTarget)ë¥¼ í†µí•´ ì§„ì§œ ë‚´ê°€ ì¡°ì¢…í•˜ëŠ” ë¡œì»¬ ìœ ì €ì¸ì§€ ê²€ì‚¬í•©ë‹ˆë‹¤.
+        // ë§Œì•½ ê¸°ì¡´ ìŠ¤í¬ë¦½íŠ¸ì— ë³¸ì¸ì´ ë§ëŠ”ì§€ íŒë³„í•˜ëŠ” ë³€ìˆ˜ê°€ ìˆë‹¤ë©´ ê·¸ê²ƒì„ í™œìš©í•´ë„ ì¢‹ìŠµë‹ˆë‹¤.
+        // ìš°ì„ ì€ RoleAssignmentManagerì˜ ì •ì„ì ì¸ ë¡œì§ê³¼ íƒ€ì´ë°ì„ ë§ì¶”ê¸° ìœ„í•´ ì½”ë£¨í‹´ì„ ëŒë¦½ë‹ˆë‹¤.
+
+        StartCoroutine(CheckAndApplyRoleRoutine());
     }
 
     void Update()
     {
-        // 3. ½ºÅ³ »ç¿ë ¹× ÄğÅ¸ÀÓ °ü¸®
+        // ë‚´ ìºë¦­í„°ê°€ ì•„ë‹ˆë¼ë©´ í‚¤ë³´ë“œ ì…ë ¥ì„ ì² ì €íˆ ë¬´ì‹œí•©ë‹ˆë‹¤.
+        if (!isMyLocalPlayer) return;
+
         HandleSkillInput();
         UpdateCooldown();
     }
 
-    // Á÷¾÷ ÇÒ´ç ÈÄ È£Ãâ
+    IEnumerator CheckAndApplyRoleRoutine()
+    {
+        Debug.Log("--- [ìŠ¤í‚¬ ì¶”ì  2] ì§ì—… í• ë‹¹ ëŒ€ê¸° ì¤‘... ---");
+
+        // RoleAssignmentManagerê°€ ë°©ì—ì„œ ì§ì—… ì„¸íŒ…ì„ ì™„ë£Œí•  ë•Œê¹Œì§€ ëŒ€ê¸°í•©ë‹ˆë‹¤.
+        int maxWaitCount = 20;
+        int currentWait = 0;
+
+        while (RoleAssignmentManager.IsWaitingForPhotonRole())
+        {
+            currentWait++;
+            if (currentWait >= maxWaitCount)
+            {
+                Debug.LogWarning("--- [ìŠ¤í‚¬ ì¶”ì  3] ğŸš¨ ëŒ€ê¸° ì‹œê°„ ì´ˆê³¼! ê°•ì œë¡œ ë‚´ ì§ì—… ì¡°íšŒë¥¼ ì‹œë„í•©ë‹ˆë‹¤. ---");
+                break;
+            }
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        Debug.Log("--- [ìŠ¤í‚¬ ì¶”ì  4] ëŒ€ê¸° ì¢…ë£Œ! ë‚´ ì§ì—… ë° ë¡œì»¬ ì—¬ë¶€ íŒë³„ ì‹œì‘ ---");
+
+        // ì˜¬ë ¤ì£¼ì‹  RoleAssignmentManagerì˜ ì •ì„ í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•˜ì—¬ í˜„ì¬ ë‚´ í™”ë©´ì˜ ì§ì—…ì„ ê°€ì ¸ì˜µë‹ˆë‹¤.
+        // ì´ í•¨ìˆ˜ëŠ” ì•Œì•„ì„œ PhotonNetwork.LocalPlayerë¥¼ ì²´í¬í•˜ë¯€ë¡œ ì•ˆì „í•©ë‹ˆë‹¤.
+        PlayerRole myLocalRole = RoleAssignmentManager.GetLocalPhotonRole();
+
+        // ì´ ìŠ¤í¬ë¦½íŠ¸ê°€ ë¶™ì€ ì˜¤ë¸Œì íŠ¸ê°€ ì§„ì§œ 'ë‚´ê°€ ì¡°ì¢…í•˜ëŠ” í”Œë ˆì´ì–´'ì¸ì§€ ê²€ì¦í•©ë‹ˆë‹¤.
+        // ê¸°ì¡´ ìºë¦­í„° ì‹œìŠ¤í…œ(PlayerCombatTarget ë“±)ì˜ ActorNumberì™€ ë‚´ í¬í†¤ ActorNumberê°€ ì¼ì¹˜í•˜ëŠ”ì§€ ë¹„êµí•˜ëŠ” ê²ƒì´ ê°€ì¥ ì •í™•í•©ë‹ˆë‹¤.
+        var combatTarget = GetComponentInChildren<PlayerCombatTarget>();
+        if (combatTarget == null) combatTarget = GetComponentInParent<PlayerCombatTarget>();
+
+        if (combatTarget != null && PhotonPhotonNetworkInRoomCheck())
+        {
+            // ë‚´ í¬í†¤ ê³ ìœ  ë²ˆí˜¸ì™€ ì´ ìºë¦­í„°ì˜ ë²ˆí˜¸ê°€ ê°™ë‹¤ë©´ ì§„ì§œ ë‚´ ìºë¦­í„°ì…ë‹ˆë‹¤!
+            int myActorNumber = Photon.Pun.PhotonNetwork.LocalPlayer.ActorNumber;
+            if (combatTarget.GetActorNumber() == myActorNumber)
+            {
+                isMyLocalPlayer = true;
+            }
+        }
+        else
+        {
+            // ë§Œì•½ ì˜¤í”„ë¼ì¸ í…ŒìŠ¤íŠ¸ ì¤‘ì´ë¼ ì»´í¬ë„ŒíŠ¸ ì¡°íšŒê°€ ì•ˆ ëœë‹¤ë©´, ì¼ë‹¨ ë‚´ ìºë¦­í„°ë¡œ ì¸ì •í•˜ê³  í…ŒìŠ¤íŠ¸ë¥¼ í—ˆìš©í•©ë‹ˆë‹¤.
+            isMyLocalPlayer = true;
+        }
+
+        // ë‚´ ìºë¦­í„°ê°€ ì•„ë‹Œ ë³µì œë³¸(ë‚¨ì˜ ìºë¦­í„°)ì´ë¼ë©´ ì—¬ê¸°ì„œ ì¥ì°© ë¡œì§ì„ ì¤‘ë‹¨í•©ë‹ˆë‹¤.
+        if (!isMyLocalPlayer)
+        {
+            Debug.Log($"--- [ìŠ¤í‚¬ ì¶”ì  íƒˆì¶œ] {gameObject.name}ì€ ë‹¤ë¥¸ í”Œë ˆì´ì–´ì˜ ìºë¦­í„°ì´ë¯€ë¡œ ìŠ¤í‚¬ì„ ì ìš©í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤. ---");
+            yield break;
+        }
+
+        // ì§ì—… ë³€í™˜ (Killerë©´ 1, ì•„ë‹ˆë©´ 0)
+        currentRole = (myLocalRole == PlayerRole.Killer) ? 1 : 0;
+        Debug.Log($"--- [ìŠ¤í‚¬ ì¶”ì  5] ğŸ¯ ë‚´ ìºë¦­í„° íŒì • ì™„ë£Œ! í• ë‹¹ëœ ì§ì—…: {(currentRole == 0 ? "ì‹œë¯¼" : "ì„í¬ìŠ¤í„°")} ---");
+
+        ApplySelectedSkill();
+    }
+
+    private bool PhotonPhotonNetworkInRoomCheck()
+    {
+        return Photon.Pun.PhotonNetwork.InRoom && Photon.Pun.PhotonNetwork.LocalPlayer != null;
+    }
+
     public void ApplySelectedSkill()
     {
         if (SkillManager.Instance == null)
         {
-            Debug.LogError("SkillManager ÀÎ½ºÅÏ½º¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù! ½ºÅ³À» Àû¿ëÇÒ ¼ö ¾ø½À´Ï´Ù.");
-            return;
+            Debug.LogWarning("SkillManagerê°€ ì—†ìŠµë‹ˆë‹¤! ê¸°ë³¸ ìŠ¤í‚¬ ê°•ì œ ì£¼ì…!");
+            currentSkillName = currentRole == 0 ? "íƒì§€" : "ì •ì „";
+        }
+        else
+        {
+            currentSkillName = currentRole == 0 ? SkillManager.Instance.savedCivilianSkill : SkillManager.Instance.savedImposterSkill;
         }
 
-        // 1. °»½ÅµÈ SkillManagerÀÇ ±¸Á¶(string º¯¼ö)¿¡ ¸ÂÃß¾î ½ºÅ³ ÀÌ¸§À» ¸ÕÀú °¡Á®¿É´Ï´Ù.
-        if (currentRole == 0) // ½Ã¹ÎÆÀ
-        {
-            currentSkillName = SkillManager.Instance.savedCivilianSkill;
-        }
-        else if (currentRole == 1) // ÀÓÆ÷½ºÅÍÆÀ
-        {
-            currentSkillName = SkillManager.Instance.savedImposterSkill;
-        }
-
-        // 2. [ÇÙ½É Ãß°¡] °¡Á®¿Â ½ºÅ³ ÀÌ¸§°ú ÀÏÄ¡ÇÏ´Â ScriptableObject µ¥ÀÌÅÍ¸¦ ¸®½ºÆ®¿¡¼­ Ã£¾Æ¼­ ÁÖÀÔÇÕ´Ï´Ù.
         currentSkill = allSkills.Find(skill => skill != null && skill.skillName == currentSkillName);
 
         if (currentSkill != null)
         {
-            // µ¥ÀÌÅÍ°¡ ¼º°øÀûÀ¸·Î Ã£¾ÆÁ³À¸¹Ç·Î, ÄğÅ¸ÀÓ°ú »ç¿ë È½¼ö¸¦ ÃÊ±âÈ­ÇÕ´Ï´Ù.
             currentCharges = currentSkill.maxCharges == 0 ? 9999 : currentSkill.maxCharges;
             currentCooldown = 0f;
-
-            Debug.Log($"[ÇÃ·¹ÀÌ¾î] Á÷¾÷({currentRole})¿¡ ¸Â´Â ½ºÅ³ '{currentSkillName}'ÀÇ ¼öÄ¡ µ¥ÀÌÅÍ°¡ Á¤»ó ÀåÂøµÇ¾ú½À´Ï´Ù!");
+            Debug.Log($"--- [ìŠ¤í‚¬ ì¶”ì  6] ğŸ¯ ìŠ¤í‚¬ '{currentSkillName}' ì¥ì°© ì„±ê³µ! Zí‚¤ í™œì„±í™” ---");
         }
         else
         {
-            Debug.LogWarning($"[ÇÃ·¹ÀÌ¾î] ¼±ÅÃÇÑ ½ºÅ³¸í '{currentSkillName}'¿¡ ÇØ´çÇÏ´Â SkillData¸¦ µ¥ÀÌÅÍº£ÀÌ½º(All Skills)¿¡¼­ Ã£À» ¼ö ¾ø½À´Ï´Ù.");
+            Debug.LogError($"--- [ìŠ¤í‚¬ ì¶”ì  6-ì‹¤íŒ¨] '{currentSkillName}' ìŠ¤í‚¬ì„ ë°ì´í„°ë² ì´ìŠ¤ì—ì„œ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤. ---");
         }
     }
 
-    // ½ºÅ³ ÀÔ·Â Ã³¸® (¿¹: FÅ° »ç¿ë)
     void HandleSkillInput()
     {
-        if (Input.GetKeyDown(KeyCode.F))
+        if (Input.GetKeyDown(KeyCode.Z))
         {
-            // ÀÌÁ¦ currentSkillÀÌ Á¤»ó ÁÖÀÔµÇ¹Ç·Î Á¤»ó ÀÛµ¿ÇÕ´Ï´Ù!
-            if (currentSkill != null && currentCooldown <= 0 && currentCharges > 0)
+            if (currentSkill == null) return;
+
+            if (currentCooldown <= 0 && currentCharges > 0)
             {
                 UseSkill();
+            }
+            else if (currentCooldown > 0)
+            {
+                Debug.Log($"ìŠ¤í‚¬ ì¿¨íƒ€ì„ ì¤‘ì…ë‹ˆë‹¤. ë‚¨ì€ ì‹œê°„: {currentCooldown:F1}ì´ˆ");
             }
         }
     }
 
-    // ½ÇÁ¦ ½ºÅ³ »ç¿ë ·ÎÁ÷ (°¢ ½ºÅ³ ID¿¡ µû¶ó ±¸Çö)
     void UseSkill()
     {
-        // °¢ ½ºÅ³ È¿°ú ±¸Çö (¿¹: Å½Áö, °íÃ¶²Û µî)
         switch (currentSkill.skillID)
         {
-            case 0: // Å½Áö
-                Debug.Log("Å½Áö ½ºÅ³ »ç¿ë! ÁÖº¯ 3ÃÊ°£ ½ºÄµ ·ÎÁ÷ ¹ßµ¿.");
-                break;
-            case 1: // °íÃ¶²Û
-                Debug.Log("°íÃ¶²Û ½ºÅ³ »ç¿ë! Ä«¸Ş¶ó ¾ÆÀÌÅÛ È¹µæ ·ÎÁ÷ ¹ßµ¿.");
-                break;
-            case 2: // ¾Æµå·¹³¯¸°
-                Debug.Log("¾Æµå·¹³¯¸° ½ºÅ³ »ç¿ë! ÀÌµ¿¼Óµµ Áõ°¡(*1.5).");
-                break;
-            case 3: // ºñ»óÅ»Ãâ
-                Debug.Log("ºñ»óÅ»Ãâ ½ºÅ³ »ç¿ë! ·£´ı ÁÂÇ¥ ÅÚ·¹Æ÷Æ®.");
-                break;
-
-                // ... ÀÓÆ÷½ºÅÍ ½ºÅ³ IDµé(Á¤Àü, È¥¶õ µî)µµ ÀÌ¾î¼­ ±âÀçÇÏ½Ã¸é µË´Ï´Ù.
+            case 0: Debug.Log("íƒì§€ ìŠ¤í‚¬ ì‚¬ìš©! ì£¼ë³€ 3ì´ˆê°„ ìŠ¤ìº” ë¡œì§ ë°œë™."); break;
+            case 1: Debug.Log("ê³ ì² ê¾¼ ìŠ¤í‚¬ ì‚¬ìš©! ì¹´ë©”ë¼ ì•„ì´í…œ íšë“ ë¡œì§ ë°œë™."); break;
+            case 2: Debug.Log("ì•„ë“œë ˆë‚ ë¦° ìŠ¤í‚¬ ì‚¬ìš©! ì´ë™ì†ë„ ì¦ê°€(*1.5)."); break;
+            case 3: Debug.Log("ë¹„ìƒíƒˆì¶œ ìŠ¤í‚¬ ì‚¬ìš©! ëœë¤ ì¢Œí‘œ í…”ë ˆí¬íŠ¸."); break;
+            case 10: Debug.Log("ì •ì „ ìŠ¤í‚¬ ì‚¬ìš©! ë§µ ì „ì²´ ì¡°ëª… ì°¨ë‹¨ ë¡œì§ ë°œë™."); break;
+            case 11: Debug.Log("í˜¼ë€ ìŠ¤í‚¬ ì‚¬ìš©! ì‹œë¯¼ë“¤ì˜ ë°©í–¥í‚¤ ë°˜ì „ ë¡œì§ ë°œë™."); break;
+            case 12: Debug.Log("í˜¼ë€2 ìŠ¤í‚¬ ì‚¬ìš©! (ì¶”ê°€ ê¸°íšì— ë§ê²Œ ë¡œì§ ë°œë™)."); break;
+            case 13: Debug.Log("í•´í‚¹ ìŠ¤í‚¬ ì‚¬ìš©! íŠ¹ì • ë¬¸ ì ê¸ˆ ë˜ëŠ” CCTV ë¬´ë ¥í™” ë¡œì§ ë°œë™."); break;
         }
-
-        // ÄğÅ¸ÀÓ ¹× »ç¿ë È½¼ö Â÷°¨
         currentCooldown = currentSkill.cooldown;
-        if (currentSkill.maxCharges > 0)
-        {
-            currentCharges--;
-        }
+        if (currentSkill.maxCharges > 0) currentCharges--;
     }
 
-    // ÄğÅ¸ÀÓ ¾÷µ¥ÀÌÆ®
     void UpdateCooldown()
     {
-        if (currentCooldown > 0)
-        {
-            currentCooldown -= Time.deltaTime;
-        }
+        if (currentCooldown > 0) currentCooldown -= Time.deltaTime;
     }
 }

@@ -21,7 +21,7 @@ EditorBuildSettings:
     path: Assets/Scenes/labor.unity
     guid: 5bf52a0cb20260846b1289eec882a933
   - enabled: 1
-    path: Assets/Scenes/test Scene/SkillChoice.unity
+    path: Assets/Scenes/test skill Scene/SkillChoice.unity
     guid: 5c567af77aa5f5e409a150ce79b4ce98
   - enabled: 1
     path: Assets/Scenes/LoadingScreen.unity
@@ -36,12 +36,12 @@ EditorBuildSettings:
     path: Assets/Scenes/TutorialScene.unity
     guid: 58fa596816c6a374ca6aa446366c977c
   - enabled: 1
-    path: Assets/Scenes/test Scene/test_labor.unity
+    path: Assets/Scenes/test skill Scene/test_labor.unity
     guid: 782ad78158c3a98449fcdbd1c41e6687
   - enabled: 1
-    path: Assets/Scenes/test Scene/test_CreateRoomLobbyScene.unity
+    path: Assets/Scenes/test skill Scene/test_CreateRoomLobbyScene.unity
     guid: cc775160130b2c147aa13ffc4788d623
   - enabled: 1
-    path: Assets/Scenes/test Scene/test_LobbyScene.unity
+    path: Assets/Scenes/test skill Scene/test_LobbyScene.unity
     guid: b71e2bbaa87f1f94d889509cb10e6d99
   m_configObjects: {}

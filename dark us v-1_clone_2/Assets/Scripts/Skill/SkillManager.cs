@@ -5,8 +5,8 @@ public class SkillManager : MonoBehaviour
     public static SkillManager Instance;
 
     // 최종적으로 저장될 스킬 이름을 담을 변수들 (외부에서 읽을 수 있도록 public 설정)
-    public string savedCivilianSkill { get; private set; } = "None";
-    public string savedImposterSkill { get; private set; } = "None";
+    public string savedCivilianSkill { get; private set; } = "탐지";
+    public string savedImposterSkill { get; private set; } = "정전";
 
     void Awake()
     {

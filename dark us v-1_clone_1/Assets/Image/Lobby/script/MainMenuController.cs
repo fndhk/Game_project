@@ -43,6 +43,9 @@ public class MainMenuController : MonoBehaviour
     // 설정 버튼을 눌렀을 때 이동할 씬 이름이다.
     public string settingsSceneName = "SettingsScene";
 
+    // 스킬 버튼을 눌렀을 때 이동할 씬 이름
+    public string skillSceneName = "SkillChoice";
+
     // 튜토리얼 확인 후 이동할 씬 이름이다.
     public string tutorialSceneName = "TutorialScene";
 
@@ -184,6 +187,12 @@ public class MainMenuController : MonoBehaviour
     {
         PlayClickSound();
         LoadMenuScene(settingsSceneName, "Settings scene name is empty.");
+    }
+
+    public void OnClickAbilityScene()
+    {
+        PlayClickSound();
+        LoadMenuScene(skillSceneName, "Ability scene name is empty.");
     }
 
     public void OnClickTutorial()
@@ -373,6 +382,7 @@ public class MainMenuController : MonoBehaviour
         AddButtonListener("FindRoomButton", OnClickFindRoom);
         AddButtonListener("TutorialButton", OnClickTutorial);
         AddButtonListener("SettingsButton", OnClickSettings);
+        AddButtonListener("SkillSelectButton", OnClickAbilityScene);
     }
 
     private void AddButtonListener(string buttonName, UnityEngine.Events.UnityAction action)
